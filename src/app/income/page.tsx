@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, Fragment } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -176,6 +176,14 @@ export default function IncomePage() {
   const currentMonthIncome = records
     .filter((r) => r.record_month === latestMonth)
     .reduce((sum, r) => sum + Number(r.amount_eur), 0);
+
+  // Group records by month
+  const groupedRecords = records.reduce((acc: any, record) => {
+    const month = record.record_month;
+    if (!acc[month]) acc[month] = [];
+    acc[month].push(record);
+    return acc;
+  }, {});
 
   return (
     <div className="space-y-8">
@@ -357,7 +365,6 @@ export default function IncomePage() {
           <table className="w-full text-sm text-left">
             <thead className="bg-slate-50 dark:bg-slate-800/50 border-b">
               <tr>
-                <th className="px-6 py-4 font-semibold">Mesiac</th>
                 <th className="px-6 py-4 font-semibold">Kategória</th>
                 <th className="px-6 py-4 font-semibold">Čiastka (pôvodná)</th>
                 <th className="px-6 py-4 font-semibold text-right">
@@ -366,30 +373,55 @@ export default function IncomePage() {
               </tr>
             </thead>
             <tbody className="divide-y">
-              {records.slice(0, 20).map((record) => (
-                <motion.tr
-                  key={record.id}
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"
-                >
-                  <td className="px-6 py-4 font-medium">
-                    {new Date(record.record_month).toLocaleDateString('sk-SK', {
-                      month: 'long',
-                      year: 'numeric',
-                    })}
-                  </td>
-                  <td className="px-6 py-4 text-slate-500">
-                    {record.income_categories?.name}
-                  </td>
-                  <td className="px-6 py-4 text-slate-500">
-                    {record.amount} {record.currency}
-                  </td>
-                  <td className="px-6 py-4 text-right font-semibold text-emerald-600">
-                    {formatCurrency(record.amount_eur)}
-                  </td>
-                </motion.tr>
-              ))}
+              {Object.entries(groupedRecords).map(
+                ([month, monthRecords]: [string, any]) => (
+                  <Fragment key={month}>
+                    <tr className="bg-slate-50/80 dark:bg-slate-800/40">
+                      <td
+                        colSpan={3}
+                        className="px-6 py-3 text-left font-bold text-blue-600 uppercase text-xs tracking-wider border-y border-slate-100 dark:border-slate-800"
+                      >
+                        <div className="flex justify-between items-center">
+                          <span>
+                            {new Date(month).toLocaleDateString('sk-SK', {
+                              month: 'long',
+                              year: 'numeric',
+                            })}
+                          </span>
+                          <span className="text-slate-500 font-semibold">
+                            Celkom:{' '}
+                            {formatCurrency(
+                              monthRecords.reduce(
+                                (sum: number, r: any) =>
+                                  sum + Number(r.amount_eur),
+                                0
+                              )
+                            )}
+                          </span>
+                        </div>
+                      </td>
+                    </tr>
+                    {monthRecords.map((record: any) => (
+                      <motion.tr
+                        key={record.id}
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"
+                      >
+                        <td className="px-6 py-4 text-slate-500 font-medium">
+                          {record.income_categories?.name}
+                        </td>
+                        <td className="px-6 py-4 text-slate-400">
+                          {record.amount} {record.currency}
+                        </td>
+                        <td className="px-6 py-4 text-right font-semibold text-emerald-600">
+                          {formatCurrency(record.amount_eur)}
+                        </td>
+                      </motion.tr>
+                    ))}
+                  </Fragment>
+                )
+              )}
             </tbody>
           </table>
         </div>
