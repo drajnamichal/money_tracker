@@ -14,6 +14,7 @@ import {
   Trash2,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { toast } from 'sonner';
 import {
   PieChart,
   Pie,
@@ -121,10 +122,11 @@ export default function ExpensesPage() {
       setExpenses((prev) =>
         prev.map((exp) => (exp.id === tempId ? data : exp))
       );
+      toast.success('Výdavok úspešne pridaný');
     } catch (error) {
       // Rollback
       setExpenses((prev) => prev.filter((exp) => exp.id !== tempId));
-      alert('Chyba pri pridávaní výdavku. Zmeny boli vrátené.');
+      toast.error('Chyba pri pridávaní výdavku. Zmeny boli vrátené.');
     }
   };
 
@@ -132,8 +134,6 @@ export default function ExpensesPage() {
     if (!confirm('Naozaj chcete vymazať tento výdavok?')) return;
 
     const originalExpenses = [...expenses];
-    const expenseToDelete = expenses.find((e) => e.id === id);
-
     // Optimistic update
     setExpenses((prev) => prev.filter((e) => e.id !== id));
 
@@ -143,10 +143,11 @@ export default function ExpensesPage() {
         .delete()
         .eq('id', id);
       if (error) throw error;
+      toast.success('Výdavok bol vymazaný');
     } catch (error) {
       // Rollback
       setExpenses(originalExpenses);
-      alert('Chyba pri mazaní. Záznam bol vrátený.');
+      toast.error('Chyba pri mazaní. Záznam bol vrátený.');
     }
   }
 

@@ -8,6 +8,7 @@ import { supabase } from '@/lib/supabase';
 import { formatCurrency } from '@/lib/utils';
 import { Loader2, Plus, TrendingUp, Calendar, Save, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { toast } from 'sonner';
 import {
   BarChart,
   Bar,
@@ -144,7 +145,7 @@ export default function IncomePage() {
         });
 
       if (inserts.length === 0) {
-        alert('Prosím zadajte aspoň jeden príjem');
+        toast.error('Prosím zadajte aspoň jeden príjem');
         setSaving(false);
         return;
       }
@@ -155,10 +156,10 @@ export default function IncomePage() {
 
       setIsAdding(false);
       await fetchData();
-      alert('Príjmy boli úspešne uložené');
+      toast.success('Príjmy boli úspešne uložené');
     } catch (error) {
       console.error('Error saving income:', error);
-      alert('Chyba pri ukladaní príjmov');
+      toast.error('Chyba pri ukladaní príjmov');
     } finally {
       setSaving(false);
     }

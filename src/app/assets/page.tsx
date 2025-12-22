@@ -8,6 +8,7 @@ import { supabase } from '@/lib/supabase';
 import { formatCurrency } from '@/lib/utils';
 import { Loader2, Plus, ArrowRight, Download, Save, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { toast } from 'sonner';
 
 const assetSchema = z.object({
   recordDate: z.string().min(1, 'Dátum je povinný'),
@@ -117,7 +118,7 @@ export default function AssetsPage() {
         }));
 
       if (inserts.length === 0) {
-        alert('Prosím zadajte aspoň jednu sumu');
+        toast.error('Prosím zadajte aspoň jednu sumu');
         return;
       }
 
@@ -127,10 +128,10 @@ export default function AssetsPage() {
 
       setIsAdding(false);
       await fetchData();
-      alert('Záznamy boli úspešne uložené');
+      toast.success('Záznamy boli úspešne uložené');
     } catch (error) {
       console.error('Error saving records:', error);
-      alert('Chyba pri ukladaní záznamov');
+      toast.error('Chyba pri ukladaní záznamov');
     } finally {
       setSaving(false);
     }

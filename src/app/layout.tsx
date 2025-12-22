@@ -1,15 +1,16 @@
-import type { Metadata } from "next";
-import { Inter } from "next/font/google";
-import "./globals.css";
-import { ThemeProvider } from "@/components/theme-provider";
-import { Sidebar } from "@/components/sidebar";
+import type { Metadata } from 'next';
+import { Inter } from 'next/font/google';
+import './globals.css';
+import { ThemeProvider } from '@/components/theme-provider';
+import { Sidebar } from '@/components/sidebar';
+import { Toaster } from 'sonner';
 
-const inter = Inter({ subsets: ["latin"] });
+const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
-  title: "Family Money Tracker",
-  description: "Track your family assets, income, and expenses",
-  manifest: "/manifest.json",
+  title: 'Family Money Tracker',
+  description: 'Track your family assets, income, and expenses',
+  manifest: '/manifest.json',
 };
 
 export default function RootLayout({
@@ -34,9 +35,9 @@ export default function RootLayout({
               </div>
             </main>
           </div>
+          <Toaster position="top-right" richColors />
         </ThemeProvider>
       </body>
     </html>
   );
 }
-

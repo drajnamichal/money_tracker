@@ -15,6 +15,7 @@ import {
   Wallet,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { toast } from 'sonner';
 
 interface RecurringPayment {
   id: string;
@@ -71,6 +72,9 @@ export default function RecurringPaymentsPage() {
       setNewName('');
       setNewAmount('');
       fetchPayments();
+      toast.success('Platba bola pridaná');
+    } else {
+      toast.error('Chyba pri pridávaní platby');
     }
   }
 
@@ -81,7 +85,12 @@ export default function RecurringPaymentsPage() {
       .delete()
       .eq('id', id);
 
-    if (!error) fetchPayments();
+    if (!error) {
+      fetchPayments();
+      toast.success('Platba bola odstránená');
+    } else {
+      toast.error('Chyba pri mazaní platby');
+    }
   }
 
   async function handleUpdate(
@@ -98,6 +107,9 @@ export default function RecurringPaymentsPage() {
     if (!error) {
       setEditingId(null);
       fetchPayments();
+      toast.success('Platba bola upravená');
+    } else {
+      toast.error('Chyba pri úprave platby');
     }
   }
 
