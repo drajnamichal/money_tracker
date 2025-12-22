@@ -27,8 +27,8 @@ export default function LoginPage() {
       setError('Nesprávny email alebo heslo');
       setLoading(false);
     } else {
-      router.push('/');
-      router.refresh();
+      // Use window.location for a hard refresh to ensure middleware picks up the cookie
+      window.location.href = '/';
     }
   };
 
