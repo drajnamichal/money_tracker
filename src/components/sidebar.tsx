@@ -2,15 +2,16 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { 
-  LayoutDashboard, 
-  Wallet, 
-  TrendingUp, 
-  Receipt, 
+import {
+  LayoutDashboard,
+  Wallet,
+  TrendingUp,
+  Receipt,
   Calculator,
   Menu,
   X,
-  LogOut
+  LogOut,
+  CreditCard,
 } from 'lucide-react';
 import { useState } from 'react';
 import { cn } from '@/lib/utils';
@@ -24,6 +25,7 @@ const navigation = [
   { name: 'Majetok', href: '/assets', icon: Wallet },
   { name: 'Príjmy', href: '/income', icon: TrendingUp },
   { name: 'Výdaje', href: '/expenses', icon: Receipt },
+  { name: 'Platby', href: '/recurring-payments', icon: CreditCard },
   { name: 'Kalkulačka', href: '/calculator', icon: Calculator },
 ];
 
@@ -56,19 +58,21 @@ export function Sidebar() {
       {/* Desktop Sidebar */}
       <aside className="hidden md:flex flex-col w-64 border-r bg-slate-50 dark:bg-slate-900 h-screen sticky top-0">
         <div className="p-6">
-          <h1 className="text-2xl font-bold text-blue-600 dark:text-blue-400">MoneyTracker</h1>
+          <h1 className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+            MoneyTracker
+          </h1>
         </div>
-        
+
         <nav className="flex-1 px-4 space-y-2 mt-4">
           {navigation.map((item) => (
             <Link
               key={item.name}
               href={item.href}
               className={cn(
-                "flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200",
+                'flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200',
                 pathname === item.href
-                  ? "bg-blue-600 text-white shadow-md shadow-blue-200 dark:shadow-blue-900/20"
-                  : "text-slate-600 dark:text-slate-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:text-blue-600"
+                  ? 'bg-blue-600 text-white shadow-md shadow-blue-200 dark:shadow-blue-900/20'
+                  : 'text-slate-600 dark:text-slate-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:text-blue-600'
               )}
             >
               <item.icon size={20} />
@@ -80,7 +84,7 @@ export function Sidebar() {
         <div className="p-4 border-t space-y-4">
           <div className="flex justify-between items-center px-4">
             <ThemeToggle />
-            <button 
+            <button
               onClick={handleSignOut}
               className="text-slate-400 hover:text-rose-500 transition-colors"
               title="Odhlásiť sa"
@@ -89,7 +93,9 @@ export function Sidebar() {
             </button>
           </div>
           <div className="text-center">
-            <span className="text-[10px] text-slate-400 uppercase tracking-widest font-bold">v1.0.0</span>
+            <span className="text-[10px] text-slate-400 uppercase tracking-widest font-bold">
+              v1.0.0
+            </span>
           </div>
         </div>
       </aside>
@@ -106,16 +112,18 @@ export function Sidebar() {
               className="fixed inset-0 bg-black/50 z-40 md:hidden backdrop-blur-sm"
             />
             <motion.aside
-              initial={{ x: "-100%" }}
+              initial={{ x: '-100%' }}
               animate={{ x: 0 }}
-              exit={{ x: "-100%" }}
-              transition={{ type: "spring", damping: 25, stiffness: 200 }}
+              exit={{ x: '-100%' }}
+              transition={{ type: 'spring', damping: 25, stiffness: 200 }}
               className="fixed inset-y-0 left-0 w-64 bg-white dark:bg-slate-900 z-50 md:hidden shadow-2xl"
             >
               <div className="p-6 pt-16">
-                <h1 className="text-2xl font-bold text-blue-600 dark:text-blue-400">MoneyTracker</h1>
+                <h1 className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+                  MoneyTracker
+                </h1>
               </div>
-              
+
               <nav className="px-4 space-y-2 mt-4">
                 {navigation.map((item) => (
                   <Link
@@ -123,10 +131,10 @@ export function Sidebar() {
                     href={item.href}
                     onClick={() => setIsOpen(false)}
                     className={cn(
-                      "flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200",
+                      'flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200',
                       pathname === item.href
-                        ? "bg-blue-600 text-white shadow-md"
-                        : "text-slate-600 dark:text-slate-400 hover:bg-blue-50 dark:hover:bg-blue-900/20"
+                        ? 'bg-blue-600 text-white shadow-md'
+                        : 'text-slate-600 dark:text-slate-400 hover:bg-blue-50 dark:hover:bg-blue-900/20'
                     )}
                   >
                     <item.icon size={20} />
@@ -146,4 +154,3 @@ export function Sidebar() {
     </>
   );
 }
-
