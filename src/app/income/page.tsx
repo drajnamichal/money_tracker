@@ -3,62 +3,119 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { formatCurrency } from '@/lib/utils';
-import { Loader2, Plus, TrendingUp, Calendar } from 'lucide-react';
-import { motion } from 'framer-motion';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
+import { Loader2, Plus, TrendingUp, Calendar, Save, X } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
 export default function IncomePage() {
   const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const [categories, setCategories] = useState<any[]>([]);
   const [records, setRecords] = useState<any[]>([]);
   const [chartData, setChartData] = useState<any[]>([]);
 
+  // Adding state
+  const [isAdding, setIsAdding] = useState(false);
+  const [newMonth, setNewMonth] = useState(new Date().toISOString().substring(0, 7) + "-01");
+  const [newRecords, setNewRecords] = useState<Record<string, { amount: string, currency: string }>>({});
+
   useEffect(() => {
-    async function fetchData() {
-      try {
-        const { data: categoriesData } = await supabase
-          .from('income_categories')
-          .select('*')
-          .order('name');
-
-        const { data: incomeData } = await supabase
-          .from('income_records')
-          .select('*, income_categories(name)')
-          .order('record_month', { ascending: false });
-
-        if (categoriesData && incomeData) {
-          setCategories(categoriesData);
-          setRecords(incomeData);
-
-          // Prepare chart data (last 12 months)
-          const monthlyData: any = {};
-          incomeData.forEach(r => {
-            const month = r.record_month.substring(0, 7);
-            if (!monthlyData[month]) monthlyData[month] = { month, total: 0 };
-            monthlyData[month].total += Number(r.amount_eur);
-          });
-
-          const formattedChartData = Object.values(monthlyData)
-            .sort((a: any, b: any) => a.month.localeCompare(b.month))
-            .slice(-12)
-            .map((item: any) => ({
-              name: new Date(item.month).toLocaleDateString('sk-SK', { month: 'short' }),
-              total: item.total
-            }));
-          
-          setChartData(formattedChartData);
-        }
-      } catch (error) {
-        console.error('Error fetching income:', error);
-      } finally {
-        setLoading(false);
-      }
-    }
-
     fetchData();
   }, []);
 
-  if (loading) {
+  async function fetchData() {
+    setLoading(true);
+    try {
+      const { data: categoriesData } = await supabase
+        .from('income_categories')
+        .select('*')
+        .order('name');
+
+      const { data: incomeData } = await supabase
+        .from('income_records')
+        .select('*, income_categories(name)')
+        .order('record_month', { ascending: false });
+
+      if (categoriesData && incomeData) {
+        setCategories(categoriesData);
+        setRecords(incomeData);
+
+        // Prepare chart data (last 12 months)
+        const monthlyData: any = {};
+        incomeData.forEach(r => {
+          const month = r.record_month.substring(0, 7);
+          if (!monthlyData[month]) monthlyData[month] = { month, total: 0 };
+          monthlyData[month].total += Number(r.amount_eur);
+        });
+
+        const formattedChartData = Object.values(monthlyData)
+          .sort((a: any, b: any) => a.month.localeCompare(b.month))
+          .slice(-12)
+          .map((item: any) => ({
+            name: new Date(item.month).toLocaleDateString('sk-SK', { month: 'short' }),
+            total: item.total
+          }));
+        
+        setChartData(formattedChartData);
+
+        // Initialize new records state
+        const initialRecords: Record<string, { amount: string, currency: string }> = {};
+        categoriesData.forEach(cat => {
+          initialRecords[cat.id] = { amount: '', currency: 'CZK' };
+        });
+        setNewRecords(initialRecords);
+      }
+    } catch (error) {
+      console.error('Error fetching income:', error);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleAddIncome(e: React.FormEvent) {
+    e.preventDefault();
+    setSaving(true);
+    try {
+      const inserts = Object.entries(newRecords)
+        .filter(([_, data]) => data.amount !== '' && Number(data.amount) !== 0)
+        .map(([categoryId, data]) => {
+          const amount = Number(data.amount);
+          // Simple conversion for now, ideally fetch current rates
+          const amountEur = data.currency === 'CZK' ? amount / 25 : amount; 
+          
+          return {
+            category_id: categoryId,
+            record_month: newMonth,
+            amount: amount,
+            currency: data.currency,
+            amount_eur: amountEur
+          };
+        });
+
+      if (inserts.length === 0) {
+        alert('Prosím zadajte aspoň jeden príjem');
+        setSaving(false);
+        return;
+      }
+
+      const { error } = await supabase
+        .from('income_records')
+        .insert(inserts);
+
+      if (error) throw error;
+
+      setIsAdding(false);
+      await fetchData();
+      alert('Príjmy boli úspešne uložené');
+    } catch (error) {
+      console.error('Error saving income:', error);
+      alert('Chyba pri ukladaní príjmov');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  if (loading && records.length === 0) {
     return (
       <div className="flex items-center justify-center h-[80vh]">
         <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
@@ -78,11 +135,97 @@ export default function IncomePage() {
           <h1 className="text-3xl font-bold">Príjmy</h1>
           <p className="text-slate-500">Sleduj svoje mesačné prítoky financií.</p>
         </div>
-        <button className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-xl flex items-center gap-2 transition-colors">
-          <Plus size={20} />
-          <span>Pridať príjem</span>
-        </button>
+        {!isAdding && (
+          <button 
+            onClick={() => setIsAdding(true)}
+            className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-xl flex items-center gap-2 transition-colors shadow-lg shadow-emerald-200 dark:shadow-none"
+          >
+            <Plus size={20} />
+            <span>Pridať príjem</span>
+          </button>
+        )}
       </div>
+
+      <AnimatePresence>
+        {isAdding && (
+          <motion.div 
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            className="bg-white dark:bg-slate-900 rounded-2xl p-6 border shadow-sm space-y-6"
+          >
+            <div className="flex items-center justify-between border-b pb-4">
+              <h3 className="text-lg font-bold">Zadať príjmy za mesiac</h3>
+              <div className="flex items-center gap-4">
+                <input 
+                  type="month"
+                  className="bg-slate-50 dark:bg-slate-800 border rounded-lg px-3 py-1.5 text-sm outline-none focus:ring-2 focus:ring-emerald-500"
+                  value={newMonth.substring(0, 7)}
+                  onChange={e => setNewMonth(e.target.value + "-01")}
+                />
+                <button 
+                  onClick={() => setIsAdding(false)}
+                  className="text-slate-400 hover:text-slate-600"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+            </div>
+
+            <form onSubmit={handleAddIncome} className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {categories.map(category => (
+                  <div key={category.id} className="space-y-1.5">
+                    <label className="text-xs font-bold text-slate-500 uppercase">{category.name}</label>
+                    <div className="flex gap-2">
+                      <input 
+                        type="number"
+                        step="0.01"
+                        className="flex-1 bg-slate-50 dark:bg-slate-800 border rounded-xl px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-emerald-500"
+                        value={newRecords[category.id]?.amount || ''}
+                        onChange={e => setNewRecords({
+                          ...newRecords, 
+                          [category.id]: { ...newRecords[category.id], amount: e.target.value }
+                        })}
+                        placeholder="0.00"
+                      />
+                      <select 
+                        className="bg-slate-50 dark:bg-slate-800 border rounded-xl px-2 py-2 text-xs outline-none focus:ring-2 focus:ring-emerald-500"
+                        value={newRecords[category.id]?.currency || 'CZK'}
+                        onChange={e => setNewRecords({
+                          ...newRecords, 
+                          [category.id]: { ...newRecords[category.id], currency: e.target.value }
+                        })}
+                      >
+                        <option value="CZK">CZK</option>
+                        <option value="EUR">EUR</option>
+                      </select>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              
+              <div className="flex justify-end gap-3 pt-6 border-t">
+                <button 
+                  type="button"
+                  onClick={() => setIsAdding(false)}
+                  className="px-6 py-2.5 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-colors font-medium"
+                >
+                  Zrušiť
+                </button>
+                <button 
+                  type="submit"
+                  disabled={saving}
+                  className="bg-emerald-600 text-white px-8 py-2.5 rounded-xl font-bold hover:bg-emerald-700 transition-colors flex items-center gap-2 disabled:opacity-50"
+                >
+                  {saving ? <Loader2 className="animate-spin" size={20} /> : <Save size={20} />}
+                  Uložiť príjmy
+                </button>
+              </div>
+            </form>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl shadow-sm border col-span-1 md:col-span-2">
@@ -160,4 +303,3 @@ export default function IncomePage() {
     </div>
   );
 }
-
