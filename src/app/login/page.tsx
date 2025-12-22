@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
-import { Loader2, Lock, Mail } from 'lucide-react';
+import { Loader2, Lock, Mail, Banknote } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 export default function LoginPage() {
@@ -41,7 +41,7 @@ export default function LoginPage() {
       >
         <div className="text-center space-y-2">
           <div className="w-16 h-16 bg-blue-600 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-blue-200">
-            <Lock className="text-white" size={32} />
+            <Banknote className="text-white" size={32} />
           </div>
           <h1 className="text-2xl font-bold">Majetok</h1>
           <p className="text-slate-500 text-sm">
