@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
+import { Skeleton } from '@/components/skeleton';
 import {
   PieChart,
   Pie,
@@ -164,14 +165,6 @@ export default function ExpensesPage() {
     return acc;
   }, []);
 
-  if (loading && expenses.length === 0) {
-    return (
-      <div className="flex items-center justify-center h-[80vh]">
-        <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-8">
       <div className="flex items-center justify-between">
@@ -181,13 +174,15 @@ export default function ExpensesPage() {
             Sleduj a spravuj svoje mesačné výdavky.
           </p>
         </div>
-        <button
-          onClick={() => setIsAdding(true)}
-          className="bg-rose-600 hover:bg-rose-700 text-white px-4 py-2 rounded-xl flex items-center gap-2 transition-colors"
-        >
-          <Plus size={20} />
-          <span>Pridať výdavok</span>
-        </button>
+        {!loading && (
+          <button
+            onClick={() => setIsAdding(true)}
+            className="bg-rose-600 hover:bg-rose-700 text-white px-4 py-2 rounded-xl flex items-center gap-2 transition-colors"
+          >
+            <Plus size={20} />
+            <span>Pridať výdavok</span>
+          </button>
+        )}
       </div>
 
       <AnimatePresence>
@@ -277,67 +272,76 @@ export default function ExpensesPage() {
             <h3 className="font-semibold">Posledné výdavky</h3>
           </div>
           <div className="overflow-x-auto">
-            <table className="w-full text-sm text-left">
-              <thead className="bg-slate-50 dark:bg-slate-800/50 border-b">
-                <tr>
-                  <th className="px-6 py-4 font-semibold">Dátum</th>
-                  <th className="px-6 py-4 font-semibold">Popis</th>
-                  <th className="px-6 py-4 font-semibold">Kategória</th>
-                  <th className="px-6 py-4 font-semibold text-right">Suma</th>
-                  <th className="px-6 py-4"></th>
-                </tr>
-              </thead>
-              <tbody className="divide-y">
-                {expenses.length === 0 ? (
+            {loading ? (
+              <div className="p-6 space-y-4">
+                <Skeleton className="h-10 w-full" />
+                <Skeleton className="h-10 w-full" />
+                <Skeleton className="h-10 w-full" />
+                <Skeleton className="h-10 w-full" />
+              </div>
+            ) : (
+              <table className="w-full text-sm text-left">
+                <thead className="bg-slate-50 dark:bg-slate-800/50 border-b">
                   <tr>
-                    <td
-                      colSpan={5}
-                      className="px-6 py-12 text-center text-slate-400"
-                    >
-                      Žiadne výdavky nenájdené. Začni pridaním prvého.
-                    </td>
+                    <th className="px-6 py-4 font-semibold">Dátum</th>
+                    <th className="px-6 py-4 font-semibold">Popis</th>
+                    <th className="px-6 py-4 font-semibold">Kategória</th>
+                    <th className="px-6 py-4 font-semibold text-right">Suma</th>
+                    <th className="px-6 py-4"></th>
                   </tr>
-                ) : (
-                  expenses.map((expense) => (
-                    <tr
-                      key={expense.id}
-                      className={`hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors group ${expense.isOptimistic ? 'opacity-50' : ''}`}
-                    >
-                      <td className="px-6 py-4 text-slate-500">
-                        {new Date(expense.record_date).toLocaleDateString(
-                          'sk-SK'
-                        )}
-                      </td>
-                      <td className="px-6 py-4 font-medium">
-                        {expense.description}
-                        {expense.isOptimistic && (
-                          <span className="ml-2 text-[10px] text-slate-400 italic">
-                            (Ukladám...)
-                          </span>
-                        )}
-                      </td>
-                      <td className="px-6 py-4">
-                        <span className="px-2 py-1 bg-slate-100 dark:bg-slate-800 rounded-md text-xs font-medium">
-                          {expense.category}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 text-right font-bold text-rose-500">
-                        -{formatCurrency(expense.amount_eur)}
-                      </td>
-                      <td className="px-6 py-4 text-right">
-                        <button
-                          disabled={expense.isOptimistic}
-                          onClick={() => handleDelete(expense.id)}
-                          className="p-2 text-slate-400 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-all disabled:opacity-0"
-                        >
-                          <Trash2 size={16} />
-                        </button>
+                </thead>
+                <tbody className="divide-y">
+                  {expenses.length === 0 ? (
+                    <tr>
+                      <td
+                        colSpan={5}
+                        className="px-6 py-12 text-center text-slate-400"
+                      >
+                        Žiadne výdavky nenájdené. Začni pridaním prvého.
                       </td>
                     </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
+                  ) : (
+                    expenses.map((expense) => (
+                      <tr
+                        key={expense.id}
+                        className={`hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors group ${expense.isOptimistic ? 'opacity-50' : ''}`}
+                      >
+                        <td className="px-6 py-4 text-slate-500">
+                          {new Date(expense.record_date).toLocaleDateString(
+                            'sk-SK'
+                          )}
+                        </td>
+                        <td className="px-6 py-4 font-medium">
+                          {expense.description}
+                          {expense.isOptimistic && (
+                            <span className="ml-2 text-[10px] text-slate-400 italic">
+                              (Ukladám...)
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-6 py-4">
+                          <span className="px-2 py-1 bg-slate-100 dark:bg-slate-800 rounded-md text-xs font-medium">
+                            {expense.category}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 text-right font-bold text-rose-500">
+                          -{formatCurrency(expense.amount_eur)}
+                        </td>
+                        <td className="px-6 py-4 text-right">
+                          <button
+                            disabled={expense.isOptimistic}
+                            onClick={() => handleDelete(expense.id)}
+                            className="p-2 text-slate-400 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-all disabled:opacity-0"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            )}
           </div>
         </div>
 
@@ -347,7 +351,9 @@ export default function ExpensesPage() {
             Rozdelenie výdavkov
           </h3>
           <div className="h-[250px]">
-            {categoryData.length > 0 ? (
+            {loading ? (
+              <Skeleton className="w-full h-full rounded-full" />
+            ) : categoryData.length > 0 ? (
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie

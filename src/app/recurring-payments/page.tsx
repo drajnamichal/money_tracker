@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
+import { Skeleton } from '@/components/skeleton';
 
 interface RecurringPayment {
   id: string;
@@ -126,14 +127,6 @@ export default function RecurringPaymentsPage() {
   );
   const totalMonthlyEquivalent = totalMonthly + totalYearly / 12;
 
-  if (loading && payments.length === 0) {
-    return (
-      <div className="flex items-center justify-center h-[80vh]">
-        <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-8 pb-12">
       <div className="flex items-center justify-between">
@@ -143,57 +136,71 @@ export default function RecurringPaymentsPage() {
             Správa tvojich fixných mesačných a ročných nákladov.
           </p>
         </div>
-        <button
-          onClick={() => setIsAdding(true)}
-          className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl flex items-center gap-2 transition-colors shadow-lg shadow-blue-200 dark:shadow-none"
-        >
-          <Plus size={20} />
-          <span>Pridať platbu</span>
-        </button>
+        {!loading && (
+          <button
+            onClick={() => setIsAdding(true)}
+            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl flex items-center gap-2 transition-colors shadow-lg shadow-blue-200 dark:shadow-none"
+          >
+            <Plus size={20} />
+            <span>Pridať platbu</span>
+          </button>
+        )}
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl shadow-sm border border-blue-100 dark:border-slate-800">
-          <div className="flex items-center gap-3 mb-4">
-            <div className="p-2 bg-blue-50 dark:bg-blue-900/20 rounded-lg text-blue-600">
-              <CalendarDays size={20} />
+        {loading ? (
+          <>
+            <Skeleton className="h-32 rounded-2xl" />
+            <Skeleton className="h-32 rounded-2xl" />
+            <Skeleton className="h-32 rounded-2xl" />
+          </>
+        ) : (
+          <>
+            <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl shadow-sm border border-blue-100 dark:border-slate-800">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="p-2 bg-blue-50 dark:bg-blue-900/20 rounded-lg text-blue-600">
+                  <CalendarDays size={20} />
+                </div>
+                <h3 className="font-semibold text-slate-600 dark:text-slate-400">
+                  Mesačné fixy
+                </h3>
+              </div>
+              <p className="text-3xl font-bold">
+                {formatCurrency(totalMonthly)}
+              </p>
             </div>
-            <h3 className="font-semibold text-slate-600 dark:text-slate-400">
-              Mesačné fixy
-            </h3>
-          </div>
-          <p className="text-3xl font-bold">{formatCurrency(totalMonthly)}</p>
-        </div>
 
-        <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl shadow-sm border border-emerald-100 dark:border-slate-800">
-          <div className="flex items-center gap-3 mb-4">
-            <div className="p-2 bg-emerald-50 dark:bg-emerald-900/20 rounded-lg text-emerald-600">
-              <CalendarRange size={20} />
+            <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl shadow-sm border border-emerald-100 dark:border-slate-800">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="p-2 bg-emerald-50 dark:bg-emerald-900/20 rounded-lg text-emerald-600">
+                  <CalendarRange size={20} />
+                </div>
+                <h3 className="font-semibold text-slate-600 dark:text-slate-400">
+                  Ročné fixy
+                </h3>
+              </div>
+              <p className="text-3xl font-bold text-emerald-600">
+                {formatCurrency(totalYearly)}
+              </p>
+              <p className="text-xs text-slate-400 mt-1">
+                ({formatCurrency(totalYearly / 12)} / mesiac)
+              </p>
             </div>
-            <h3 className="font-semibold text-slate-600 dark:text-slate-400">
-              Ročné fixy
-            </h3>
-          </div>
-          <p className="text-3xl font-bold text-emerald-600">
-            {formatCurrency(totalYearly)}
-          </p>
-          <p className="text-xs text-slate-400 mt-1">
-            ({formatCurrency(totalYearly / 12)} / mesiac)
-          </p>
-        </div>
 
-        <div className="bg-blue-600 p-6 rounded-2xl shadow-xl shadow-blue-200 dark:shadow-none text-white">
-          <div className="flex items-center gap-3 mb-4 text-blue-100">
-            <Wallet size={20} />
-            <h3 className="font-semibold">Celkové mesačné zaťaženie</h3>
-          </div>
-          <p className="text-3xl font-bold">
-            {formatCurrency(totalMonthlyEquivalent)}
-          </p>
-          <p className="text-xs text-blue-100 mt-1">
-            Vrátane alikvotnej časti ročných platieb
-          </p>
-        </div>
+            <div className="bg-blue-600 p-6 rounded-2xl shadow-xl shadow-blue-200 dark:shadow-none text-white">
+              <div className="flex items-center gap-3 mb-4 text-blue-100">
+                <Wallet size={20} />
+                <h3 className="font-semibold">Celkové mesačné zaťaženie</h3>
+              </div>
+              <p className="text-3xl font-bold">
+                {formatCurrency(totalMonthlyEquivalent)}
+              </p>
+              <p className="text-xs text-blue-100 mt-1">
+                Vrátane alikvotnej časti ročných platieb
+              </p>
+            </div>
+          </>
+        )}
       </div>
 
       <AnimatePresence>
@@ -273,26 +280,38 @@ export default function RecurringPaymentsPage() {
         <div className="space-y-4">
           <div className="flex items-center gap-2 px-2">
             <h2 className="text-xl font-bold">Mesačné platby</h2>
-            <span className="bg-blue-100 text-blue-700 text-xs font-bold px-2 py-0.5 rounded-full">
-              {monthlyPayments.length}
-            </span>
+            {!loading && (
+              <span className="bg-blue-100 text-blue-700 text-xs font-bold px-2 py-0.5 rounded-full">
+                {monthlyPayments.length}
+              </span>
+            )}
           </div>
           <div className="bg-white dark:bg-slate-900 rounded-2xl border shadow-sm divide-y">
-            {monthlyPayments.map((payment) => (
-              <PaymentRow
-                key={payment.id}
-                payment={payment}
-                onDelete={() => handleDelete(payment.id)}
-                onUpdate={(n, a, f) => handleUpdate(payment.id, n, a, f)}
-                isEditing={editingId === payment.id}
-                onEdit={() => setEditingId(payment.id)}
-                onCancel={() => setEditingId(null)}
-              />
-            ))}
-            {monthlyPayments.length === 0 && (
-              <p className="p-8 text-center text-slate-400 italic">
-                Žiadne mesačné platby
-              </p>
+            {loading ? (
+              <div className="p-4 space-y-4">
+                <Skeleton className="h-16 w-full" />
+                <Skeleton className="h-16 w-full" />
+                <Skeleton className="h-16 w-full" />
+              </div>
+            ) : (
+              <>
+                {monthlyPayments.map((payment) => (
+                  <PaymentRow
+                    key={payment.id}
+                    payment={payment}
+                    onDelete={() => handleDelete(payment.id)}
+                    onUpdate={(n, a, f) => handleUpdate(payment.id, n, a, f)}
+                    isEditing={editingId === payment.id}
+                    onEdit={() => setEditingId(payment.id)}
+                    onCancel={() => setEditingId(null)}
+                  />
+                ))}
+                {monthlyPayments.length === 0 && (
+                  <p className="p-8 text-center text-slate-400 italic">
+                    Žiadne mesačné platby
+                  </p>
+                )}
+              </>
             )}
           </div>
         </div>
@@ -301,26 +320,38 @@ export default function RecurringPaymentsPage() {
         <div className="space-y-4">
           <div className="flex items-center gap-2 px-2">
             <h2 className="text-xl font-bold">Ročné platby</h2>
-            <span className="bg-emerald-100 text-emerald-700 text-xs font-bold px-2 py-0.5 rounded-full">
-              {yearlyPayments.length}
-            </span>
+            {!loading && (
+              <span className="bg-emerald-100 text-emerald-700 text-xs font-bold px-2 py-0.5 rounded-full">
+                {yearlyPayments.length}
+              </span>
+            )}
           </div>
           <div className="bg-white dark:bg-slate-900 rounded-2xl border shadow-sm divide-y">
-            {yearlyPayments.map((payment) => (
-              <PaymentRow
-                key={payment.id}
-                payment={payment}
-                onDelete={() => handleDelete(payment.id)}
-                onUpdate={(n, a, f) => handleUpdate(payment.id, n, a, f)}
-                isEditing={editingId === payment.id}
-                onEdit={() => setEditingId(payment.id)}
-                onCancel={() => setEditingId(null)}
-              />
-            ))}
-            {yearlyPayments.length === 0 && (
-              <p className="p-8 text-center text-slate-400 italic">
-                Žiadne ročné platby
-              </p>
+            {loading ? (
+              <div className="p-4 space-y-4">
+                <Skeleton className="h-16 w-full" />
+                <Skeleton className="h-16 w-full" />
+                <Skeleton className="h-16 w-full" />
+              </div>
+            ) : (
+              <>
+                {yearlyPayments.map((payment) => (
+                  <PaymentRow
+                    key={payment.id}
+                    payment={payment}
+                    onDelete={() => handleDelete(payment.id)}
+                    onUpdate={(n, a, f) => handleUpdate(payment.id, n, a, f)}
+                    isEditing={editingId === payment.id}
+                    onEdit={() => setEditingId(payment.id)}
+                    onCancel={() => setEditingId(null)}
+                  />
+                ))}
+                {yearlyPayments.length === 0 && (
+                  <p className="p-8 text-center text-slate-400 italic">
+                    Žiadne ročné platby
+                  </p>
+                )}
+              </>
             )}
           </div>
         </div>

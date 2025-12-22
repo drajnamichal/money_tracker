@@ -9,6 +9,7 @@ import { formatCurrency } from '@/lib/utils';
 import { Loader2, Plus, TrendingUp, Calendar, Save, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
+import { Skeleton } from '@/components/skeleton';
 import {
   BarChart,
   Bar,
@@ -165,14 +166,6 @@ export default function IncomePage() {
     }
   };
 
-  if (loading && records.length === 0) {
-    return (
-      <div className="flex items-center justify-center h-[80vh]">
-        <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
-      </div>
-    );
-  }
-
   const latestMonth = records.length > 0 ? records[0].record_month : null;
   const currentMonthIncome = records
     .filter((r) => r.record_month === latestMonth)
@@ -195,7 +188,7 @@ export default function IncomePage() {
             Sleduj svoje mesačné prítoky financií.
           </p>
         </div>
-        {!isAdding && (
+        {!isAdding && !loading && (
           <button
             onClick={() => setIsAdding(true)}
             className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-xl flex items-center gap-2 transition-colors shadow-lg shadow-emerald-200 dark:shadow-none"
@@ -303,59 +296,67 @@ export default function IncomePage() {
             Trend príjmov (12 mesiacov)
           </h3>
           <div className="h-[250px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={chartData}>
-                <CartesianGrid
-                  strokeDasharray="3 3"
-                  vertical={false}
-                  stroke="#e2e8f0"
-                />
-                <XAxis
-                  dataKey="name"
-                  axisLine={false}
-                  tickLine={false}
-                  tick={{ fontSize: 12 }}
-                />
-                <YAxis hide />
-                <Tooltip
-                  cursor={{ fill: '#f1f5f9' }}
-                  contentStyle={{
-                    backgroundColor: '#fff',
-                    borderRadius: '12px',
-                    border: 'none',
-                    boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)',
-                  }}
-                  formatter={(value: number) => [
-                    formatCurrency(value),
-                    'Príjem',
-                  ]}
-                />
-                <Bar dataKey="total" fill="#10b981" radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
+            {loading ? (
+              <Skeleton className="w-full h-full" />
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={chartData}>
+                  <CartesianGrid
+                    strokeDasharray="3 3"
+                    vertical={false}
+                    stroke="#e2e8f0"
+                  />
+                  <XAxis
+                    dataKey="name"
+                    axisLine={false}
+                    tickLine={false}
+                    tick={{ fontSize: 12 }}
+                  />
+                  <YAxis hide />
+                  <Tooltip
+                    cursor={{ fill: '#f1f5f9' }}
+                    contentStyle={{
+                      backgroundColor: '#fff',
+                      borderRadius: '12px',
+                      border: 'none',
+                      boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)',
+                    }}
+                    formatter={(value: number) => [
+                      formatCurrency(value),
+                      'Príjem',
+                    ]}
+                  />
+                  <Bar dataKey="total" fill="#10b981" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            )}
           </div>
         </div>
 
-        <div className="bg-emerald-600 p-6 rounded-2xl text-white shadow-xl shadow-emerald-200 dark:shadow-none flex flex-col justify-center">
-          <Calendar size={32} className="mb-4 opacity-50" />
-          <p className="text-emerald-100 text-sm font-medium uppercase tracking-wider">
-            Tento mesiac
-          </p>
-          <h2 className="text-4xl font-bold mb-1">
-            {formatCurrency(currentMonthIncome)}
-          </h2>
-          <p className="text-emerald-100 text-xs mt-2">
-            Zatiahnuté z{' '}
-            {
-              new Set(
-                records
-                  .filter((r) => r.record_month === latestMonth)
-                  .map((r) => r.category_id)
-              ).size
-            }{' '}
-            zdrojov
-          </p>
-        </div>
+        {loading ? (
+          <Skeleton className="h-full rounded-2xl" />
+        ) : (
+          <div className="bg-emerald-600 p-6 rounded-2xl text-white shadow-xl shadow-emerald-200 dark:shadow-none flex flex-col justify-center">
+            <Calendar size={32} className="mb-4 opacity-50" />
+            <p className="text-emerald-100 text-sm font-medium uppercase tracking-wider">
+              Tento mesiac
+            </p>
+            <h2 className="text-4xl font-bold mb-1">
+              {formatCurrency(currentMonthIncome)}
+            </h2>
+            <p className="text-emerald-100 text-xs mt-2">
+              Zatiahnuté z{' '}
+              {
+                new Set(
+                  records
+                    .filter((r) => r.record_month === latestMonth)
+                    .map((r) => r.category_id)
+                ).size
+              }{' '}
+              zdrojov
+            </p>
+          </div>
+        )}
       </div>
 
       <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border overflow-hidden">
@@ -363,68 +364,76 @@ export default function IncomePage() {
           <h3 className="font-semibold">História príjmov</h3>
         </div>
         <div className="overflow-x-auto">
-          <table className="w-full text-sm text-left">
-            <thead className="bg-slate-50 dark:bg-slate-800/50 border-b">
-              <tr>
-                <th className="px-6 py-4 font-semibold">Kategória</th>
-                <th className="px-6 py-4 font-semibold">Čiastka (pôvodná)</th>
-                <th className="px-6 py-4 font-semibold text-right">
-                  Čiastka (EUR)
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y">
-              {Object.entries(groupedRecords).map(
-                ([month, monthRecords]: [string, any]) => (
-                  <Fragment key={month}>
-                    <tr className="bg-slate-50/80 dark:bg-slate-800/40">
-                      <td
-                        colSpan={3}
-                        className="px-6 py-3 text-left font-bold text-blue-600 uppercase text-xs tracking-wider border-y border-slate-100 dark:border-slate-800"
-                      >
-                        <div className="flex justify-between items-center">
-                          <span>
-                            {new Date(month).toLocaleDateString('sk-SK', {
-                              month: 'long',
-                              year: 'numeric',
-                            })}
-                          </span>
-                          <span className="text-slate-500 font-semibold">
-                            Celkom:{' '}
-                            {formatCurrency(
-                              monthRecords.reduce(
-                                (sum: number, r: any) =>
-                                  sum + Number(r.amount_eur),
-                                0
-                              )
-                            )}
-                          </span>
-                        </div>
-                      </td>
-                    </tr>
-                    {monthRecords.map((record: any) => (
-                      <motion.tr
-                        key={record.id}
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"
-                      >
-                        <td className="px-6 py-4 text-slate-500 font-medium">
-                          {record.income_categories?.name}
+          {loading ? (
+            <div className="p-6 space-y-4">
+              <Skeleton className="h-10 w-full" />
+              <Skeleton className="h-10 w-full" />
+              <Skeleton className="h-10 w-full" />
+            </div>
+          ) : (
+            <table className="w-full text-sm text-left">
+              <thead className="bg-slate-50 dark:bg-slate-800/50 border-b">
+                <tr>
+                  <th className="px-6 py-4 font-semibold">Kategória</th>
+                  <th className="px-6 py-4 font-semibold">Čiastka (pôvodná)</th>
+                  <th className="px-6 py-4 font-semibold text-right">
+                    Čiastka (EUR)
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y">
+                {Object.entries(groupedRecords).map(
+                  ([month, monthRecords]: [string, any]) => (
+                    <Fragment key={month}>
+                      <tr className="bg-slate-50/80 dark:bg-slate-800/40">
+                        <td
+                          colSpan={3}
+                          className="px-6 py-3 text-left font-bold text-blue-600 uppercase text-xs tracking-wider border-y border-slate-100 dark:border-slate-800"
+                        >
+                          <div className="flex justify-between items-center">
+                            <span>
+                              {new Date(month).toLocaleDateString('sk-SK', {
+                                month: 'long',
+                                year: 'numeric',
+                              })}
+                            </span>
+                            <span className="text-slate-500 font-semibold">
+                              Celkom:{' '}
+                              {formatCurrency(
+                                monthRecords.reduce(
+                                  (sum: number, r: any) =>
+                                    sum + Number(r.amount_eur),
+                                  0
+                                )
+                              )}
+                            </span>
+                          </div>
                         </td>
-                        <td className="px-6 py-4 text-slate-400">
-                          {record.amount} {record.currency}
-                        </td>
-                        <td className="px-6 py-4 text-right font-semibold text-emerald-600">
-                          {formatCurrency(record.amount_eur)}
-                        </td>
-                      </motion.tr>
-                    ))}
-                  </Fragment>
-                )
-              )}
-            </tbody>
-          </table>
+                      </tr>
+                      {monthRecords.map((record: any) => (
+                        <motion.tr
+                          key={record.id}
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 1 }}
+                          className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"
+                        >
+                          <td className="px-6 py-4 text-slate-500 font-medium">
+                            {record.income_categories?.name}
+                          </td>
+                          <td className="px-6 py-4 text-slate-400">
+                            {record.amount} {record.currency}
+                          </td>
+                          <td className="px-6 py-4 text-right font-semibold text-emerald-600">
+                            {formatCurrency(record.amount_eur)}
+                          </td>
+                        </motion.tr>
+                      ))}
+                    </Fragment>
+                  )
+                )}
+              </tbody>
+            </table>
+          )}
         </div>
       </div>
     </div>
