@@ -32,6 +32,9 @@ export function Sidebar() {
   const [isOpen, setIsOpen] = useState(false);
   const router = useRouter();
 
+  // Hide sidebar on login page
+  if (pathname === '/login') return null;
+
   const handleSignOut = async () => {
     await supabase.auth.signOut();
     router.push('/login');
