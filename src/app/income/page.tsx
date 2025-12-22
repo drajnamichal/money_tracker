@@ -1,11 +1,42 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import * as z from 'zod';
 import { supabase } from '@/lib/supabase';
 import { formatCurrency } from '@/lib/utils';
 import { Loader2, Plus, TrendingUp, Calendar, Save, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+} from 'recharts';
+
+const incomeSchema = z.object({
+  recordMonth: z.string().min(1, 'Mesiac je povinný'),
+  records: z.record(
+    z.string(),
+    z.object({
+      amount: z
+        .string()
+        .refine(
+          (val) => val === '' || (!isNaN(Number(val)) && Number(val) >= 0),
+          {
+            message: 'Suma musí byť kladné číslo',
+          }
+        ),
+      currency: z.string().min(1),
+    })
+  ),
+});
+
+type IncomeFormValues = z.infer<typeof incomeSchema>;
 
 export default function IncomePage() {
   const [loading, setLoading] = useState(true);
@@ -16,8 +47,19 @@ export default function IncomePage() {
 
   // Adding state
   const [isAdding, setIsAdding] = useState(false);
-  const [newMonth, setNewMonth] = useState(new Date().toISOString().substring(0, 7) + "-01");
-  const [newRecords, setNewRecords] = useState<Record<string, { amount: string, currency: string }>>({});
+
+  const {
+    register,
+    handleSubmit,
+    reset,
+    formState: { errors },
+  } = useForm<IncomeFormValues>({
+    resolver: zodResolver(incomeSchema),
+    defaultValues: {
+      recordMonth: new Date().toISOString().substring(0, 7),
+      records: {},
+    },
+  });
 
   useEffect(() => {
     fetchData();
@@ -42,7 +84,7 @@ export default function IncomePage() {
 
         // Prepare chart data (last 12 months)
         const monthlyData: any = {};
-        incomeData.forEach(r => {
+        incomeData.forEach((r) => {
           const month = r.record_month.substring(0, 7);
           if (!monthlyData[month]) monthlyData[month] = { month, total: 0 };
           monthlyData[month].total += Number(r.amount_eur);
@@ -52,18 +94,26 @@ export default function IncomePage() {
           .sort((a: any, b: any) => a.month.localeCompare(b.month))
           .slice(-12)
           .map((item: any) => ({
-            name: new Date(item.month).toLocaleDateString('sk-SK', { month: 'short' }),
-            total: item.total
+            name: new Date(item.month).toLocaleDateString('sk-SK', {
+              month: 'short',
+            }),
+            total: item.total,
           }));
-        
+
         setChartData(formattedChartData);
 
         // Initialize new records state
-        const initialRecords: Record<string, { amount: string, currency: string }> = {};
-        categoriesData.forEach(cat => {
+        const initialRecords: Record<
+          string,
+          { amount: string; currency: string }
+        > = {};
+        categoriesData.forEach((cat) => {
           initialRecords[cat.id] = { amount: '', currency: 'CZK' };
         });
-        setNewRecords(initialRecords);
+        reset({
+          recordMonth: new Date().toISOString().substring(0, 7),
+          records: initialRecords,
+        });
       }
     } catch (error) {
       console.error('Error fetching income:', error);
@@ -72,23 +122,24 @@ export default function IncomePage() {
     }
   }
 
-  async function handleAddIncome(e: React.FormEvent) {
-    e.preventDefault();
+  const onSave = async (data: IncomeFormValues) => {
     setSaving(true);
     try {
-      const inserts = Object.entries(newRecords)
-        .filter(([_, data]) => data.amount !== '' && Number(data.amount) !== 0)
-        .map(([categoryId, data]) => {
-          const amount = Number(data.amount);
+      const inserts = Object.entries(data.records)
+        .filter(
+          ([_, record]) => record.amount !== '' && Number(record.amount) !== 0
+        )
+        .map(([categoryId, record]) => {
+          const amount = Number(record.amount);
           // Simple conversion for now, ideally fetch current rates
-          const amountEur = data.currency === 'CZK' ? amount / 25 : amount; 
-          
+          const amountEur = record.currency === 'CZK' ? amount / 25 : amount;
+
           return {
             category_id: categoryId,
-            record_month: newMonth,
+            record_month: data.recordMonth + '-01',
             amount: amount,
-            currency: data.currency,
-            amount_eur: amountEur
+            currency: record.currency,
+            amount_eur: amountEur,
           };
         });
 
@@ -98,9 +149,7 @@ export default function IncomePage() {
         return;
       }
 
-      const { error } = await supabase
-        .from('income_records')
-        .insert(inserts);
+      const { error } = await supabase.from('income_records').insert(inserts);
 
       if (error) throw error;
 
@@ -113,7 +162,7 @@ export default function IncomePage() {
     } finally {
       setSaving(false);
     }
-  }
+  };
 
   if (loading && records.length === 0) {
     return (
@@ -125,7 +174,7 @@ export default function IncomePage() {
 
   const latestMonth = records.length > 0 ? records[0].record_month : null;
   const currentMonthIncome = records
-    .filter(r => r.record_month === latestMonth)
+    .filter((r) => r.record_month === latestMonth)
     .reduce((sum, r) => sum + Number(r.amount_eur), 0);
 
   return (
@@ -133,10 +182,12 @@ export default function IncomePage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold">Príjmy</h1>
-          <p className="text-slate-500">Sleduj svoje mesačné prítoky financií.</p>
+          <p className="text-slate-500">
+            Sleduj svoje mesačné prítoky financií.
+          </p>
         </div>
         {!isAdding && (
-          <button 
+          <button
             onClick={() => setIsAdding(true)}
             className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-xl flex items-center gap-2 transition-colors shadow-lg shadow-emerald-200 dark:shadow-none"
           >
@@ -148,7 +199,7 @@ export default function IncomePage() {
 
       <AnimatePresence>
         {isAdding && (
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -20 }}
@@ -157,13 +208,19 @@ export default function IncomePage() {
             <div className="flex items-center justify-between border-b pb-4">
               <h3 className="text-lg font-bold">Zadať príjmy za mesiac</h3>
               <div className="flex items-center gap-4">
-                <input 
-                  type="month"
-                  className="bg-slate-50 dark:bg-slate-800 border rounded-lg px-3 py-1.5 text-sm outline-none focus:ring-2 focus:ring-emerald-500"
-                  value={newMonth.substring(0, 7)}
-                  onChange={e => setNewMonth(e.target.value + "-01")}
-                />
-                <button 
+                <div className="flex flex-col">
+                  <input
+                    type="month"
+                    className={`bg-slate-50 dark:bg-slate-800 border rounded-lg px-3 py-1.5 text-sm outline-none focus:ring-2 focus:ring-emerald-500 ${errors.recordMonth ? 'border-rose-500 focus:ring-rose-500' : ''}`}
+                    {...register('recordMonth')}
+                  />
+                  {errors.recordMonth && (
+                    <span className="text-[10px] text-rose-500 font-medium mt-0.5">
+                      {errors.recordMonth.message}
+                    </span>
+                  )}
+                </div>
+                <button
                   onClick={() => setIsAdding(false)}
                   className="text-slate-400 hover:text-slate-600"
                 >
@@ -172,53 +229,56 @@ export default function IncomePage() {
               </div>
             </div>
 
-            <form onSubmit={handleAddIncome} className="space-y-4">
+            <form onSubmit={handleSubmit(onSave)} className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {categories.map(category => (
+                {categories.map((category) => (
                   <div key={category.id} className="space-y-1.5">
-                    <label className="text-xs font-bold text-slate-500 uppercase">{category.name}</label>
+                    <label className="text-xs font-bold text-slate-500 uppercase">
+                      {category.name}
+                    </label>
                     <div className="flex gap-2">
-                      <input 
+                      <input
                         type="number"
                         step="0.01"
-                        className="flex-1 bg-slate-50 dark:bg-slate-800 border rounded-xl px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-emerald-500"
-                        value={newRecords[category.id]?.amount || ''}
-                        onChange={e => setNewRecords({
-                          ...newRecords, 
-                          [category.id]: { ...newRecords[category.id], amount: e.target.value }
-                        })}
+                        className={`flex-1 bg-slate-50 dark:bg-slate-800 border rounded-xl px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-emerald-500 ${errors.records?.[category.id]?.amount ? 'border-rose-500 focus:ring-rose-500' : ''}`}
+                        {...register(`records.${category.id}.amount`)}
                         placeholder="0.00"
                       />
-                      <select 
+                      <select
                         className="bg-slate-50 dark:bg-slate-800 border rounded-xl px-2 py-2 text-xs outline-none focus:ring-2 focus:ring-emerald-500"
-                        value={newRecords[category.id]?.currency || 'CZK'}
-                        onChange={e => setNewRecords({
-                          ...newRecords, 
-                          [category.id]: { ...newRecords[category.id], currency: e.target.value }
-                        })}
+                        {...register(`records.${category.id}.currency`)}
                       >
                         <option value="CZK">CZK</option>
                         <option value="EUR">EUR</option>
                       </select>
                     </div>
+                    {errors.records?.[category.id]?.amount && (
+                      <p className="text-[10px] text-rose-500 font-medium">
+                        {errors.records[category.id]?.amount?.message}
+                      </p>
+                    )}
                   </div>
                 ))}
               </div>
-              
+
               <div className="flex justify-end gap-3 pt-6 border-t">
-                <button 
+                <button
                   type="button"
                   onClick={() => setIsAdding(false)}
                   className="px-6 py-2.5 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-colors font-medium"
                 >
                   Zrušiť
                 </button>
-                <button 
+                <button
                   type="submit"
                   disabled={saving}
                   className="bg-emerald-600 text-white px-8 py-2.5 rounded-xl font-bold hover:bg-emerald-700 transition-colors flex items-center gap-2 disabled:opacity-50"
                 >
-                  {saving ? <Loader2 className="animate-spin" size={20} /> : <Save size={20} />}
+                  {saving ? (
+                    <Loader2 className="animate-spin" size={20} />
+                  ) : (
+                    <Save size={20} />
+                  )}
                   Uložiť príjmy
                 </button>
               </div>
@@ -236,13 +296,30 @@ export default function IncomePage() {
           <div className="h-[250px]">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={chartData}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize: 12}} />
+                <CartesianGrid
+                  strokeDasharray="3 3"
+                  vertical={false}
+                  stroke="#e2e8f0"
+                />
+                <XAxis
+                  dataKey="name"
+                  axisLine={false}
+                  tickLine={false}
+                  tick={{ fontSize: 12 }}
+                />
                 <YAxis hide />
-                <Tooltip 
-                  cursor={{fill: '#f1f5f9'}}
-                  contentStyle={{ backgroundColor: '#fff', borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
-                  formatter={(value: number) => [formatCurrency(value), 'Príjem']}
+                <Tooltip
+                  cursor={{ fill: '#f1f5f9' }}
+                  contentStyle={{
+                    backgroundColor: '#fff',
+                    borderRadius: '12px',
+                    border: 'none',
+                    boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)',
+                  }}
+                  formatter={(value: number) => [
+                    formatCurrency(value),
+                    'Príjem',
+                  ]}
                 />
                 <Bar dataKey="total" fill="#10b981" radius={[4, 4, 0, 0]} />
               </BarChart>
@@ -252,10 +329,22 @@ export default function IncomePage() {
 
         <div className="bg-emerald-600 p-6 rounded-2xl text-white shadow-xl shadow-emerald-200 dark:shadow-none flex flex-col justify-center">
           <Calendar size={32} className="mb-4 opacity-50" />
-          <p className="text-emerald-100 text-sm font-medium uppercase tracking-wider">Tento mesiac</p>
-          <h2 className="text-4xl font-bold mb-1">{formatCurrency(currentMonthIncome)}</h2>
+          <p className="text-emerald-100 text-sm font-medium uppercase tracking-wider">
+            Tento mesiac
+          </p>
+          <h2 className="text-4xl font-bold mb-1">
+            {formatCurrency(currentMonthIncome)}
+          </h2>
           <p className="text-emerald-100 text-xs mt-2">
-            Zatiahnuté z {new Set(records.filter(r => r.record_month === latestMonth).map(r => r.category_id)).size} zdrojov
+            Zatiahnuté z{' '}
+            {
+              new Set(
+                records
+                  .filter((r) => r.record_month === latestMonth)
+                  .map((r) => r.category_id)
+              ).size
+            }{' '}
+            zdrojov
           </p>
         </div>
       </div>
@@ -271,19 +360,24 @@ export default function IncomePage() {
                 <th className="px-6 py-4 font-semibold">Mesiac</th>
                 <th className="px-6 py-4 font-semibold">Kategória</th>
                 <th className="px-6 py-4 font-semibold">Čiastka (pôvodná)</th>
-                <th className="px-6 py-4 font-semibold text-right">Čiastka (EUR)</th>
+                <th className="px-6 py-4 font-semibold text-right">
+                  Čiastka (EUR)
+                </th>
               </tr>
             </thead>
             <tbody className="divide-y">
-              {records.slice(0, 20).map(record => (
-                <motion.tr 
+              {records.slice(0, 20).map((record) => (
+                <motion.tr
                   key={record.id}
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"
                 >
                   <td className="px-6 py-4 font-medium">
-                    {new Date(record.record_month).toLocaleDateString('sk-SK', { month: 'long', year: 'numeric' })}
+                    {new Date(record.record_month).toLocaleDateString('sk-SK', {
+                      month: 'long',
+                      year: 'numeric',
+                    })}
                   </td>
                   <td className="px-6 py-4 text-slate-500">
                     {record.income_categories?.name}
