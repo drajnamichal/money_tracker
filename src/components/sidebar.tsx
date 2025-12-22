@@ -9,12 +9,15 @@ import {
   Receipt, 
   Calculator,
   Menu,
-  X
+  X,
+  LogOut
 } from 'lucide-react';
 import { useState } from 'react';
 import { cn } from '@/lib/utils';
 import { ThemeToggle } from './theme-toggle';
 import { motion, AnimatePresence } from 'framer-motion';
+import { supabase } from '@/lib/supabase';
+import { useRouter } from 'next/navigation';
 
 const navigation = [
   { name: 'Dashboard', href: '/', icon: LayoutDashboard },
@@ -27,6 +30,13 @@ const navigation = [
 export function Sidebar() {
   const pathname = usePathname();
   const [isOpen, setIsOpen] = useState(false);
+  const router = useRouter();
+
+  const handleSignOut = async () => {
+    await supabase.auth.signOut();
+    router.push('/login');
+    router.refresh();
+  };
 
   return (
     <>
@@ -64,9 +74,20 @@ export function Sidebar() {
           ))}
         </nav>
 
-        <div className="p-4 border-t flex justify-between items-center">
-          <ThemeToggle />
-          <span className="text-xs text-slate-400">v1.0.0</span>
+        <div className="p-4 border-t space-y-4">
+          <div className="flex justify-between items-center px-4">
+            <ThemeToggle />
+            <button 
+              onClick={handleSignOut}
+              className="text-slate-400 hover:text-rose-500 transition-colors"
+              title="Odhlásiť sa"
+            >
+              <LogOut size={20} />
+            </button>
+          </div>
+          <div className="text-center">
+            <span className="text-[10px] text-slate-400 uppercase tracking-widest font-bold">v1.0.0</span>
+          </div>
         </div>
       </aside>
 
