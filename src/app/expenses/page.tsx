@@ -1,23 +1,67 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import * as z from 'zod';
 import { supabase } from '@/lib/supabase';
 import { formatCurrency } from '@/lib/utils';
-import { Loader2, Plus, Receipt, PieChart as PieChartIcon, Trash2 } from 'lucide-react';
+import {
+  Loader2,
+  Plus,
+  Receipt,
+  PieChart as PieChartIcon,
+  Trash2,
+} from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts';
+import {
+  PieChart,
+  Pie,
+  Cell,
+  ResponsiveContainer,
+  Tooltip,
+  Legend,
+} from 'recharts';
 
-const COLORS = ['#2563eb', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4'];
+const COLORS = [
+  '#2563eb',
+  '#10b981',
+  '#f59e0b',
+  '#ef4444',
+  '#8b5cf6',
+  '#ec4899',
+  '#06b6d4',
+];
+
+const expenseSchema = z.object({
+  description: z.string().min(1, 'Popis je povinný'),
+  category: z.string().min(1, 'Kategória je povinná'),
+  amount: z.string().refine((val) => !isNaN(Number(val)) && Number(val) > 0, {
+    message: 'Suma musí byť kladné číslo',
+  }),
+  record_date: z.string().min(1, 'Dátum je povinný'),
+});
+
+type ExpenseFormValues = z.infer<typeof expenseSchema>;
 
 export default function ExpensesPage() {
   const [loading, setLoading] = useState(true);
   const [expenses, setExpenses] = useState<any[]>([]);
   const [isAdding, setIsAdding] = useState(false);
-  const [newExpense, setNewExpense] = useState({
-    description: '',
-    category: '',
-    amount: '',
-    record_date: new Date().toISOString().split('T')[0]
+
+  const {
+    register,
+    handleSubmit,
+    reset,
+    formState: { errors },
+  } = useForm<ExpenseFormValues>({
+    resolver: zodResolver(expenseSchema),
+    defaultValues: {
+      description: '',
+      category: '',
+      amount: '',
+      record_date: new Date().toISOString().split('T')[0],
+    },
   });
 
   useEffect(() => {
@@ -39,47 +83,82 @@ export default function ExpensesPage() {
     }
   }
 
-  async function handleAddExpense(e: React.FormEvent) {
-    e.preventDefault();
+  const onAddExpense = async (values: ExpenseFormValues) => {
+    const tempId = crypto.randomUUID();
+    const optimisticExpense = {
+      id: tempId,
+      ...values,
+      amount: Number(values.amount),
+      amount_eur: Number(values.amount),
+      currency: 'EUR',
+      isOptimistic: true,
+    };
+
+    // Optimistic update
+    setExpenses((prev) => [optimisticExpense, ...prev]);
+    setIsAdding(false);
+    reset();
+
     try {
-      const { error } = await supabase.from('expense_records').insert([{
-        ...newExpense,
-        amount: Number(newExpense.amount),
-        amount_eur: Number(newExpense.amount), // For now assume EUR
-        currency: 'EUR'
-      }]);
+      const { data, error } = await supabase
+        .from('expense_records')
+        .insert([
+          {
+            description: values.description,
+            category: values.category,
+            amount: Number(values.amount),
+            amount_eur: Number(values.amount),
+            record_date: values.record_date,
+            currency: 'EUR',
+          },
+        ])
+        .select()
+        .single();
 
       if (error) throw error;
-      
-      setNewExpense({
-        description: '',
-        category: '',
-        amount: '',
-        record_date: new Date().toISOString().split('T')[0]
-      });
-      setIsAdding(false);
-      fetchExpenses();
+
+      // Replace optimistic record with real one from server
+      setExpenses((prev) =>
+        prev.map((exp) => (exp.id === tempId ? data : exp))
+      );
     } catch (error) {
-      alert('Chyba pri pridávaní výdavku');
+      // Rollback
+      setExpenses((prev) => prev.filter((exp) => exp.id !== tempId));
+      alert('Chyba pri pridávaní výdavku. Zmeny boli vrátené.');
     }
-  }
+  };
 
   async function handleDelete(id: string) {
     if (!confirm('Naozaj chcete vymazať tento výdavok?')) return;
+
+    const originalExpenses = [...expenses];
+    const expenseToDelete = expenses.find((e) => e.id === id);
+
+    // Optimistic update
+    setExpenses((prev) => prev.filter((e) => e.id !== id));
+
     try {
-      await supabase.from('expense_records').delete().eq('id', id);
-      fetchExpenses();
+      const { error } = await supabase
+        .from('expense_records')
+        .delete()
+        .eq('id', id);
+      if (error) throw error;
     } catch (error) {
-      alert('Chyba pri mazaní');
+      // Rollback
+      setExpenses(originalExpenses);
+      alert('Chyba pri mazaní. Záznam bol vrátený.');
     }
   }
 
   const categoryData = expenses.reduce((acc: any[], curr) => {
-    const existing = acc.find(item => item.name === curr.category);
+    const existing = acc.find((item) => item.name === curr.category);
     if (existing) {
       existing.value += Number(curr.amount_eur);
     } else {
-      acc.push({ name: curr.category || 'Ostatné', value: Number(curr.amount_eur) });
+      acc.push({
+        name: curr.category || 'Ostatné',
+        value: Number(curr.amount_eur),
+      });
     }
     return acc;
   }, []);
@@ -97,9 +176,11 @@ export default function ExpensesPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold">Výdavky</h1>
-          <p className="text-slate-500">Sleduj a spravuj svoje mesačné výdavky.</p>
+          <p className="text-slate-500">
+            Sleduj a spravuj svoje mesačné výdavky.
+          </p>
         </div>
-        <button 
+        <button
           onClick={() => setIsAdding(true)}
           className="bg-rose-600 hover:bg-rose-700 text-white px-4 py-2 rounded-xl flex items-center gap-2 transition-colors"
         >
@@ -110,30 +191,34 @@ export default function ExpensesPage() {
 
       <AnimatePresence>
         {isAdding && (
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: 'auto' }}
             exit={{ opacity: 0, height: 0 }}
             className="bg-white dark:bg-slate-900 rounded-2xl p-6 border shadow-sm overflow-hidden"
           >
-            <form onSubmit={handleAddExpense} className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+            <form
+              onSubmit={handleSubmit(onAddExpense)}
+              className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end"
+            >
               <div className="space-y-2">
                 <label className="text-sm font-medium">Popis</label>
-                <input 
-                  required
-                  className="w-full bg-slate-50 dark:bg-slate-800 border rounded-lg px-4 py-2 focus:ring-2 focus:ring-rose-500 outline-none"
-                  value={newExpense.description}
-                  onChange={e => setNewExpense({...newExpense, description: e.target.value})}
+                <input
+                  className={`w-full bg-slate-50 dark:bg-slate-800 border rounded-lg px-4 py-2 focus:ring-2 focus:ring-rose-500 outline-none ${errors.description ? 'border-rose-500' : ''}`}
+                  {...register('description')}
                   placeholder="napr. Nákup potravín"
                 />
+                {errors.description && (
+                  <p className="text-xs text-rose-500">
+                    {errors.description.message}
+                  </p>
+                )}
               </div>
               <div className="space-y-2">
                 <label className="text-sm font-medium">Kategória</label>
-                <select 
-                  required
-                  className="w-full bg-slate-50 dark:bg-slate-800 border rounded-lg px-4 py-2 focus:ring-2 focus:ring-rose-500 outline-none"
-                  value={newExpense.category}
-                  onChange={e => setNewExpense({...newExpense, category: e.target.value})}
+                <select
+                  className={`w-full bg-slate-50 dark:bg-slate-800 border rounded-lg px-4 py-2 focus:ring-2 focus:ring-rose-500 outline-none ${errors.category ? 'border-rose-500' : ''}`}
+                  {...register('category')}
                 >
                   <option value="">Vybrať...</option>
                   <option value="Bývanie">Bývanie</option>
@@ -143,25 +228,36 @@ export default function ExpensesPage() {
                   <option value="Zdravie">Zdravie</option>
                   <option value="Ostatné">Ostatné</option>
                 </select>
+                {errors.category && (
+                  <p className="text-xs text-rose-500">
+                    {errors.category.message}
+                  </p>
+                )}
               </div>
               <div className="space-y-2">
                 <label className="text-sm font-medium">Čiastka (€)</label>
-                <input 
-                  required
+                <input
                   type="number"
                   step="0.01"
-                  className="w-full bg-slate-50 dark:bg-slate-800 border rounded-lg px-4 py-2 focus:ring-2 focus:ring-rose-500 outline-none"
-                  value={newExpense.amount}
-                  onChange={e => setNewExpense({...newExpense, amount: e.target.value})}
+                  className={`w-full bg-slate-50 dark:bg-slate-800 border rounded-lg px-4 py-2 focus:ring-2 focus:ring-rose-500 outline-none ${errors.amount ? 'border-rose-500' : ''}`}
+                  {...register('amount')}
                   placeholder="0.00"
                 />
+                {errors.amount && (
+                  <p className="text-xs text-rose-500">
+                    {errors.amount.message}
+                  </p>
+                )}
               </div>
               <div className="flex gap-2">
-                <button type="submit" className="flex-1 bg-rose-600 text-white rounded-lg py-2 font-medium hover:bg-rose-700 transition-colors">
+                <button
+                  type="submit"
+                  className="flex-1 bg-rose-600 text-white rounded-lg py-2 font-medium hover:bg-rose-700 transition-colors"
+                >
                   Uložiť
                 </button>
-                <button 
-                  type="button" 
+                <button
+                  type="button"
                   onClick={() => setIsAdding(false)}
                   className="px-4 py-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
                 >
@@ -193,15 +289,32 @@ export default function ExpensesPage() {
               <tbody className="divide-y">
                 {expenses.length === 0 ? (
                   <tr>
-                    <td colSpan={5} className="px-6 py-12 text-center text-slate-400">Žiadne výdavky nenájdené. Začni pridaním prvého.</td>
+                    <td
+                      colSpan={5}
+                      className="px-6 py-12 text-center text-slate-400"
+                    >
+                      Žiadne výdavky nenájdené. Začni pridaním prvého.
+                    </td>
                   </tr>
                 ) : (
-                  expenses.map(expense => (
-                    <tr key={expense.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors group">
+                  expenses.map((expense) => (
+                    <tr
+                      key={expense.id}
+                      className={`hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors group ${expense.isOptimistic ? 'opacity-50' : ''}`}
+                    >
                       <td className="px-6 py-4 text-slate-500">
-                        {new Date(expense.record_date).toLocaleDateString('sk-SK')}
+                        {new Date(expense.record_date).toLocaleDateString(
+                          'sk-SK'
+                        )}
                       </td>
-                      <td className="px-6 py-4 font-medium">{expense.description}</td>
+                      <td className="px-6 py-4 font-medium">
+                        {expense.description}
+                        {expense.isOptimistic && (
+                          <span className="ml-2 text-[10px] text-slate-400 italic">
+                            (Ukladám...)
+                          </span>
+                        )}
+                      </td>
                       <td className="px-6 py-4">
                         <span className="px-2 py-1 bg-slate-100 dark:bg-slate-800 rounded-md text-xs font-medium">
                           {expense.category}
@@ -211,9 +324,10 @@ export default function ExpensesPage() {
                         -{formatCurrency(expense.amount_eur)}
                       </td>
                       <td className="px-6 py-4 text-right">
-                        <button 
+                        <button
+                          disabled={expense.isOptimistic}
                           onClick={() => handleDelete(expense.id)}
-                          className="p-2 text-slate-400 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-all"
+                          className="p-2 text-slate-400 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-all disabled:opacity-0"
                         >
                           <Trash2 size={16} />
                         </button>
@@ -243,14 +357,22 @@ export default function ExpensesPage() {
                     dataKey="value"
                   >
                     {categoryData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                      <Cell
+                        key={`cell-${index}`}
+                        fill={COLORS[index % COLORS.length]}
+                      />
                     ))}
                   </Pie>
-                  <Tooltip 
-                    contentStyle={{ backgroundColor: '#fff', borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: '#fff',
+                      borderRadius: '12px',
+                      border: 'none',
+                      boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)',
+                    }}
                     formatter={(value: number) => formatCurrency(value)}
                   />
-                  <Legend verticalAlign="bottom" height={36}/>
+                  <Legend verticalAlign="bottom" height={36} />
                 </PieChart>
               </ResponsiveContainer>
             ) : (
@@ -264,4 +386,3 @@ export default function ExpensesPage() {
     </div>
   );
 }
-
