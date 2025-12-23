@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -14,6 +14,7 @@ import {
   Trash2,
   Settings2,
   X,
+  Scan,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
@@ -60,11 +61,14 @@ export default function ExpensesPage() {
   const [isAdding, setIsAdding] = useState(false);
   const [isManagingCategories, setIsManagingCategories] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState('');
+  const [isScanning, setIsScanning] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const {
     register,
     handleSubmit,
     reset,
+    setValue,
     formState: { errors },
   } = useForm<ExpenseFormValues>({
     resolver: zodResolver(expenseSchema),
@@ -98,6 +102,54 @@ export default function ExpensesPage() {
       toast.success('Výdavok úspešne pridaný');
     } catch (error) {
       toast.error('Chyba pri pridávaní výdavku');
+    }
+  };
+
+  const handleScanReceipt = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsScanning(true);
+    setIsAdding(true); // Open the form if it's closed
+
+    try {
+      const reader = new FileReader();
+      const base64Promise = new Promise<string>((resolve) => {
+        reader.onload = () => resolve(reader.result as string);
+        reader.readAsDataURL(file);
+      });
+
+      const base64Image = await base64Promise;
+
+      const response = await fetch('/api/ocr', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ image: base64Image }),
+      });
+
+      const data = await response.json();
+
+      if (data.error) throw new Error(data.error);
+
+      if (data.description) setValue('description', data.description);
+      if (data.amount) setValue('amount', data.amount.toString());
+      if (data.category) {
+        // Only set if category exists in our categories list
+        const exists = categories.some((c) => c.name === data.category);
+        if (exists) {
+          setValue('category', data.category);
+        } else {
+          setValue('category', 'Ostatné');
+        }
+      }
+
+      toast.success('Bloček úspešne naskenovaný!');
+    } catch (error: any) {
+      console.error('OCR Error:', error);
+      toast.error('Chyba pri skenovaní bločku: ' + error.message);
+    } finally {
+      setIsScanning(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
     }
   };
 
@@ -186,6 +238,27 @@ export default function ExpensesPage() {
           </p>
         </div>
         <div className="flex gap-2">
+          <input
+            type="file"
+            ref={fileInputRef}
+            onChange={handleScanReceipt}
+            accept="image/*"
+            className="hidden"
+          />
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            disabled={isScanning}
+            className="p-2 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-xl transition-colors border border-blue-100 dark:border-blue-900/30 flex items-center gap-2 px-4"
+            title="Skenovať bloček"
+          >
+            {isScanning ? (
+              <Loader2 size={20} className="animate-spin" />
+            ) : (
+              <Scan size={20} />
+            )}
+            <span className="text-sm font-medium">Skenovať</span>
+          </button>
+
           <button
             onClick={() => setIsManagingCategories(!isManagingCategories)}
             className="p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-colors"

@@ -1,0 +1,63 @@
+import { OpenAI } from 'openai';
+import { NextResponse } from 'next/server';
+
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+});
+
+export async function POST(req: Request) {
+  try {
+    const { image } = await req.json();
+
+    if (!image) {
+      return NextResponse.json({ error: 'Image is required' }, { status: 400 });
+    }
+
+    if (!process.env.OPENAI_API_KEY) {
+      return NextResponse.json(
+        { error: 'OpenAI API key is missing' },
+        { status: 500 }
+      );
+    }
+
+    const response = await openai.chat.completions.create({
+      model: 'gpt-4o-mini',
+      messages: [
+        {
+          role: 'system',
+          content:
+            'You are a receipt OCR assistant. Extract the total amount, the store name (description), and a likely category (Bývanie, Strava, Doprava, Voľný čas, Zdravie, Ostatné) from the receipt image. Respond ONLY with a JSON object like this: {"amount": 12.34, "description": "Tesco", "category": "Strava"}. If you cannot find a value, use null.',
+        },
+        {
+          role: 'user',
+          content: [
+            {
+              type: 'text',
+              text: 'Extract info from this receipt:',
+            },
+            {
+              type: 'image_url',
+              image_url: {
+                url: image,
+              },
+            },
+          ],
+        },
+      ],
+      response_format: { type: 'json_object' },
+    });
+
+    const content = response.choices[0].message.content;
+    if (!content) {
+      throw new Error('Empty response from OpenAI');
+    }
+
+    return NextResponse.json(JSON.parse(content));
+  } catch (error: any) {
+    console.error('OCR Error:', error);
+    return NextResponse.json(
+      { error: error.message || 'Failed to process receipt' },
+      { status: 500 }
+    );
+  }
+}

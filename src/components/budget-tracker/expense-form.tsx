@@ -1,5 +1,12 @@
 import React, { useState, useRef } from 'react';
-import { MoneyEmoji, PlusEmoji, AttachmentIcon, XIcon } from './icons';
+import {
+  MoneyEmoji,
+  PlusEmoji,
+  AttachmentIcon,
+  XIcon,
+  ChartIcon,
+} from './icons';
+import { toast } from 'sonner';
 
 interface ExpenseFormProps {
   onAddExpense: (expense: {
@@ -15,6 +22,7 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ onAddExpense }) => {
   const [error, setError] = useState('');
   const [file, setFile] = useState<File | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isScanning, setIsScanning] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -58,6 +66,41 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ onAddExpense }) => {
       }
       setFile(selectedFile);
       setError('');
+    }
+  };
+
+  const handleScanReceipt = async () => {
+    if (!file) return;
+
+    setIsScanning(true);
+    try {
+      const reader = new FileReader();
+      const base64Promise = new Promise<string>((resolve) => {
+        reader.onload = () => resolve(reader.result as string);
+        reader.readAsDataURL(file);
+      });
+
+      const base64Image = await base64Promise;
+
+      const response = await fetch('/api/ocr', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ image: base64Image }),
+      });
+
+      const data = await response.json();
+
+      if (data.error) throw new Error(data.error);
+
+      if (data.description) setDescription(data.description);
+      if (data.amount) setAmount(data.amount.toString());
+
+      toast.success('Bloček úspešne naskenovaný!');
+    } catch (error: any) {
+      console.error('OCR Error:', error);
+      toast.error('Chyba pri skenovaní bločku: ' + error.message);
+    } finally {
+      setIsScanning(false);
     }
   };
 
@@ -116,7 +159,7 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ onAddExpense }) => {
             <AttachmentIcon className="w-4 h-4" />
             Príloha (blok/faktúra)
           </label>
-          <div className="mt-1 flex items-center gap-2">
+          <div className="mt-1 space-y-2">
             <input
               type="file"
               ref={fileInputRef}
@@ -133,20 +176,42 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ onAddExpense }) => {
                 Klikni pre nahranie súboru
               </label>
             ) : (
-              <div className="flex items-center justify-between w-full bg-slate-50 dark:bg-slate-800 px-3 py-2 rounded-md border border-slate-200 dark:border-slate-700">
-                <span className="text-sm text-slate-600 dark:text-slate-400 truncate max-w-[200px]">
-                  {file.name}
-                </span>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setFile(null);
-                    if (fileInputRef.current) fileInputRef.current.value = '';
-                  }}
-                  className="text-slate-400 hover:text-rose-500"
-                >
-                  <XIcon className="w-4 h-4" />
-                </button>
+              <div className="space-y-2">
+                <div className="flex items-center justify-between w-full bg-slate-50 dark:bg-slate-800 px-3 py-2 rounded-md border border-slate-200 dark:border-slate-700">
+                  <span className="text-sm text-slate-600 dark:text-slate-400 truncate max-w-[200px]">
+                    {file.name}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setFile(null);
+                      if (fileInputRef.current) fileInputRef.current.value = '';
+                    }}
+                    className="text-slate-400 hover:text-rose-500"
+                  >
+                    <XIcon className="w-4 h-4" />
+                  </button>
+                </div>
+                {file.type.startsWith('image/') && (
+                  <button
+                    type="button"
+                    onClick={handleScanReceipt}
+                    disabled={isScanning}
+                    className="w-full flex items-center justify-center gap-2 py-2 px-4 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 rounded-md text-sm font-medium hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition-colors disabled:opacity-50"
+                  >
+                    {isScanning ? (
+                      <>
+                        <div className="animate-spin rounded-full h-4 w-4 border-2 border-indigo-600 border-t-transparent"></div>
+                        Skenujem...
+                      </>
+                    ) : (
+                      <>
+                        <ChartIcon className="w-4 h-4" />
+                        Skenovať pomocou AI
+                      </>
+                    )}
+                  </button>
+                )}
               </div>
             )}
           </div>
@@ -155,7 +220,7 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ onAddExpense }) => {
         {error && <p className="text-sm text-red-600">{error}</p>}
         <button
           type="submit"
-          disabled={isSubmitting}
+          disabled={isSubmitting || isScanning}
           className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {isSubmitting ? 'Ukladám...' : 'Pridať výdavok'}
