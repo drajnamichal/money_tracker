@@ -155,52 +155,46 @@ export default function BudgetTrackerPage() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-black font-sans text-slate-800 dark:text-slate-200 p-4 sm:p-6 lg:p-8">
-      <div className="max-w-4xl mx-auto">
-        <header className="mb-8 text-center">
-          <h1 className="text-4xl sm:text-5xl font-bold text-slate-900 dark:text-white">
-            Sledovanie rozpočtu bytu
-          </h1>
-          <p className="text-slate-600 dark:text-slate-400 mt-2">
-            Majte prehľad o svojich investíciách do nového bývania.
-          </p>
-        </header>
+    <div className="max-w-4xl mx-auto">
+      <header className="mb-8 text-center">
+        <h1 className="text-4xl sm:text-5xl font-bold text-slate-900 dark:text-white">
+          Sledovanie rozpočtu bytu
+        </h1>
+        <p className="text-slate-600 dark:text-slate-400 mt-2">
+          Majte prehľad o svojich investíciách do nového bývania.
+        </p>
+      </header>
 
-        <main className="space-y-8">
-          <Summary
-            totalBudget={TOTAL_BUDGET}
-            totalSpent={totalSpent}
-            remainingBudget={remainingBudget}
-          />
+      <main className="space-y-8">
+        <Summary
+          totalBudget={TOTAL_BUDGET}
+          totalSpent={totalSpent}
+          remainingBudget={remainingBudget}
+        />
 
-          <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
-            <div className="lg:col-span-2">
-              <ExpenseForm onAddExpense={addExpense} />
-            </div>
-            <div className="lg:col-span-3">
-              <ExpenseList
-                expenses={expenses}
-                onDeleteExpense={deleteExpense}
-                onUpdateExpense={updateExpense}
-                totalBudget={TOTAL_BUDGET}
-                totalSpent={totalSpent}
-                remainingBudget={remainingBudget}
-              />
-            </div>
-            <div className="lg:col-span-5">
-              <ToDoList
-                items={todoItems}
-                onAddItem={addToDoItem}
-                onDeleteItem={deleteToDoItem}
-              />
-            </div>
+        <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
+          <div className="lg:col-span-2">
+            <ExpenseForm onAddExpense={addExpense} />
           </div>
-        </main>
-
-        <footer className="text-center mt-12 text-sm text-slate-500 dark:text-slate-400">
-          <p>Vytvorené s láskou pre spoločné ciele ❤️</p>
-        </footer>
-      </div>
+          <div className="lg:col-span-3">
+            <ExpenseList
+              expenses={expenses}
+              onDeleteExpense={deleteExpense}
+              onUpdateExpense={updateExpense}
+              totalBudget={TOTAL_BUDGET}
+              totalSpent={totalSpent}
+              remainingBudget={remainingBudget}
+            />
+          </div>
+          <div className="lg:col-span-5">
+            <ToDoList
+              items={todoItems}
+              onAddItem={addToDoItem}
+              onDeleteItem={deleteToDoItem}
+            />
+          </div>
+        </div>
+      </main>
     </div>
   );
 }

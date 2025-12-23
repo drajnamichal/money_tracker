@@ -32,8 +32,11 @@ export default function RootLayout({
             <div className="flex min-h-screen bg-background text-foreground">
               <Sidebar />
               <main className="flex-1 overflow-y-auto">
-                <div className="container mx-auto p-4 md:p-8 pt-16 md:pt-8">
-                  {children}
+                <div className="container mx-auto p-4 md:p-8 pt-16 md:pt-8 min-h-screen flex flex-col">
+                  <div className="flex-1">{children}</div>
+                  <footer className="text-center py-8 text-sm text-slate-500 dark:text-slate-400">
+                    <p>Vytvorené s láskou pre spoločné ciele ❤️</p>
+                  </footer>
                 </div>
               </main>
             </div>
