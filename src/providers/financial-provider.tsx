@@ -13,6 +13,8 @@ interface FinancialContextType {
   wealthRecords: any[];
   incomeRecords: any[];
   expenseRecords: any[];
+  budgetExpenses: any[];
+  budgetTodoItems: any[];
   assetAccounts: any[];
   incomeCategories: any[];
   exchangeRate: number;
@@ -20,6 +22,7 @@ interface FinancialContextType {
   refreshWealth: () => Promise<void>;
   refreshIncome: () => Promise<void>;
   refreshExpenses: () => Promise<void>;
+  refreshBudget: () => Promise<void>;
   refreshAll: () => Promise<void>;
 }
 
@@ -31,6 +34,8 @@ export function FinancialProvider({ children }: { children: React.ReactNode }) {
   const [wealthRecords, setWealthRecords] = useState<any[]>([]);
   const [incomeRecords, setIncomeRecords] = useState<any[]>([]);
   const [expenseRecords, setExpenseRecords] = useState<any[]>([]);
+  const [budgetExpenses, setBudgetExpenses] = useState<any[]>([]);
+  const [budgetTodoItems, setBudgetTodoItems] = useState<any[]>([]);
   const [assetAccounts, setAssetAccounts] = useState<any[]>([]);
   const [incomeCategories, setIncomeCategories] = useState<any[]>([]);
   const [exchangeRate, setExchangeRate] = useState<number>(25.0); // Default fallback
@@ -84,16 +89,30 @@ export function FinancialProvider({ children }: { children: React.ReactNode }) {
     if (data) setExpenseRecords(data);
   }, []);
 
+  const fetchBudget = useCallback(async () => {
+    const { data: expenses } = await supabase
+      .from('budget_expenses')
+      .select('*')
+      .order('created_at', { ascending: false });
+    const { data: todoItems } = await supabase
+      .from('budget_todo_items')
+      .select('*')
+      .order('created_at', { ascending: false });
+    if (expenses) setBudgetExpenses(expenses);
+    if (todoItems) setBudgetTodoItems(todoItems);
+  }, []);
+
   const refreshAll = useCallback(async () => {
     setLoading(true);
     await Promise.all([
       fetchWealth(),
       fetchIncome(),
       fetchExpenses(),
+      fetchBudget(),
       fetchExchangeRate(),
     ]);
     setLoading(false);
-  }, [fetchWealth, fetchIncome, fetchExpenses, fetchExchangeRate]);
+  }, [fetchWealth, fetchIncome, fetchExpenses, fetchBudget, fetchExchangeRate]);
 
   useEffect(() => {
     refreshAll();
@@ -105,6 +124,8 @@ export function FinancialProvider({ children }: { children: React.ReactNode }) {
         wealthRecords,
         incomeRecords,
         expenseRecords,
+        budgetExpenses,
+        budgetTodoItems,
         assetAccounts,
         incomeCategories,
         exchangeRate,
@@ -112,6 +133,7 @@ export function FinancialProvider({ children }: { children: React.ReactNode }) {
         refreshWealth: fetchWealth,
         refreshIncome: fetchIncome,
         refreshExpenses: fetchExpenses,
+        refreshBudget: fetchBudget,
         refreshAll,
       }}
     >

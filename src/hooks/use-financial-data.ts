@@ -39,3 +39,14 @@ export function useExpenseData() {
     refresh: refreshExpenses,
   };
 }
+
+export function useBudgetData() {
+  const { budgetExpenses, budgetTodoItems, loading, refreshBudget } =
+    useFinancialData();
+  return {
+    expenses: budgetExpenses,
+    todoItems: budgetTodoItems,
+    loading,
+    refresh: refreshBudget,
+  };
+}

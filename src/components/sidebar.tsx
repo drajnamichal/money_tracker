@@ -12,6 +12,7 @@ import {
   X,
   LogOut,
   CreditCard,
+  Building2,
 } from 'lucide-react';
 import { useState } from 'react';
 import { cn } from '@/lib/utils';
@@ -25,6 +26,7 @@ const navigation = [
   { name: 'Majetok', href: '/assets', icon: Wallet },
   { name: 'Príjmy', href: '/income', icon: TrendingUp },
   { name: 'Výdaje', href: '/expenses', icon: Receipt },
+  { name: 'Rozpočet bytu', href: '/budget-tracker', icon: Building2 },
   { name: 'Platby', href: '/recurring-payments', icon: CreditCard },
   { name: 'Kalkulačka', href: '/calculator', icon: Calculator },
 ];
