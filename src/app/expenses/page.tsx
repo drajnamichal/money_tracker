@@ -12,6 +12,8 @@ import {
   Receipt,
   PieChart as PieChartIcon,
   Trash2,
+  Settings2,
+  X,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
@@ -48,8 +50,16 @@ const expenseSchema = z.object({
 type ExpenseFormValues = z.infer<typeof expenseSchema>;
 
 export default function ExpensesPage() {
-  const { records: expenses, loading, refresh } = useExpenseData();
+  const {
+    records: expenses,
+    categories,
+    loading,
+    refresh,
+    refreshCategories,
+  } = useExpenseData();
   const [isAdding, setIsAdding] = useState(false);
+  const [isManagingCategories, setIsManagingCategories] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState('');
 
   const {
     register,
@@ -67,39 +77,20 @@ export default function ExpensesPage() {
   });
 
   const onAddExpense = async (values: ExpenseFormValues) => {
-    const tempId = crypto.randomUUID();
-    const optimisticExpense = {
-      id: tempId,
-      ...values,
-      amount: Number(values.amount),
-      amount_eur: Number(values.amount),
-      currency: 'EUR',
-      isOptimistic: true,
-    };
-
-    // Optimistic update would ideally be handled by a global state manager (like React Query or SWR)
-    // For now, we manually handle it in the provider if we want it global,
-    // or keep it local but it won't be shared with the dashboard until refresh.
-    // The user specifically asked for custom hooks to share data.
-
     setIsAdding(false);
     reset();
 
     try {
-      const { data, error } = await supabase
-        .from('expense_records')
-        .insert([
-          {
-            description: values.description,
-            category: values.category,
-            amount: Number(values.amount),
-            amount_eur: Number(values.amount),
-            record_date: values.record_date,
-            currency: 'EUR',
-          },
-        ])
-        .select()
-        .single();
+      const { error } = await supabase.from('expense_records').insert([
+        {
+          description: values.description,
+          category: values.category,
+          amount: Number(values.amount),
+          amount_eur: Number(values.amount),
+          record_date: values.record_date,
+          currency: 'EUR',
+        },
+      ]);
 
       if (error) throw error;
 
@@ -107,6 +98,49 @@ export default function ExpensesPage() {
       toast.success('Výdavok úspešne pridaný');
     } catch (error) {
       toast.error('Chyba pri pridávaní výdavku');
+    }
+  };
+
+  const handleAddCategory = async () => {
+    if (!newCategoryName.trim()) return;
+
+    try {
+      const { error } = await supabase
+        .from('expense_categories')
+        .insert([{ name: newCategoryName.trim() }]);
+
+      if (error) {
+        if (error.code === '23505') {
+          toast.error('Táto kategória už existuje');
+        } else {
+          throw error;
+        }
+        return;
+      }
+
+      setNewCategoryName('');
+      await refreshCategories();
+      toast.success('Kategória pridaná');
+    } catch (error) {
+      toast.error('Chyba pri pridávaní kategórie');
+    }
+  };
+
+  const handleDeleteCategory = async (id: string, name: string) => {
+    if (!confirm(`Naozaj chcete vymazať kategóriu "${name}"?`)) return;
+
+    try {
+      const { error } = await supabase
+        .from('expense_categories')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+
+      await refreshCategories();
+      toast.success('Kategória vymazaná');
+    } catch (error) {
+      toast.error('Chyba pri mazaní kategórie');
     }
   };
 
@@ -144,23 +178,84 @@ export default function ExpensesPage() {
 
   return (
     <div className="space-y-8">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold">Výdavky</h1>
           <p className="text-slate-500">
             Sleduj a spravuj svoje mesačné výdavky.
           </p>
         </div>
-        {!loading && (
+        <div className="flex gap-2">
           <button
-            onClick={() => setIsAdding(true)}
-            className="bg-rose-600 hover:bg-rose-700 text-white px-4 py-2 rounded-xl flex items-center gap-2 transition-colors"
+            onClick={() => setIsManagingCategories(!isManagingCategories)}
+            className="p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-colors"
+            title="Spravovať kategórie"
           >
-            <Plus size={20} />
-            <span>Pridať výdavok</span>
+            <Settings2 size={24} />
           </button>
-        )}
+          {!loading && (
+            <button
+              onClick={() => setIsAdding(true)}
+              className="bg-rose-600 hover:bg-rose-700 text-white px-4 py-2 rounded-xl flex items-center gap-2 transition-colors"
+            >
+              <Plus size={20} />
+              <span>Pridať výdavok</span>
+            </button>
+          )}
+        </div>
       </div>
+
+      <AnimatePresence>
+        {isManagingCategories && (
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            className="bg-white dark:bg-slate-900 rounded-2xl p-6 border shadow-sm"
+          >
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-semibold">Spravovať kategórie</h3>
+              <button
+                onClick={() => setIsManagingCategories(false)}
+                className="text-slate-400 hover:text-slate-600"
+              >
+                <X size={20} />
+              </button>
+            </div>
+            <div className="flex gap-2 mb-6">
+              <input
+                type="text"
+                value={newCategoryName}
+                onChange={(e) => setNewCategoryName(e.target.value)}
+                placeholder="Nová kategória..."
+                className="flex-1 bg-slate-50 dark:bg-slate-800 border rounded-lg px-4 py-2 outline-none focus:ring-2 focus:ring-rose-500"
+              />
+              <button
+                onClick={handleAddCategory}
+                className="bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 px-4 py-2 rounded-lg font-medium hover:opacity-90 transition-opacity"
+              >
+                Pridať
+              </button>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {categories.map((cat) => (
+                <div
+                  key={cat.id}
+                  className="flex items-center gap-2 bg-slate-100 dark:bg-slate-800 px-3 py-1.5 rounded-full group"
+                >
+                  <span className="text-sm">{cat.name}</span>
+                  <button
+                    onClick={() => handleDeleteCategory(cat.id, cat.name)}
+                    className="text-slate-400 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-all"
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <AnimatePresence>
         {isAdding && (
@@ -194,12 +289,11 @@ export default function ExpensesPage() {
                   {...register('category')}
                 >
                   <option value="">Vybrať...</option>
-                  <option value="Bývanie">Bývanie</option>
-                  <option value="Strava">Strava</option>
-                  <option value="Doprava">Doprava</option>
-                  <option value="Voľný čas">Voľný čas</option>
-                  <option value="Zdravie">Zdravie</option>
-                  <option value="Ostatné">Ostatné</option>
+                  {categories.map((cat) => (
+                    <option key={cat.id} value={cat.name}>
+                      {cat.name}
+                    </option>
+                  ))}
                 </select>
                 {errors.category && (
                   <p className="text-xs text-rose-500">
@@ -354,7 +448,7 @@ export default function ExpensesPage() {
                       border: 'none',
                       boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)',
                     }}
-                    formatter={(value: number) => formatCurrency(value)}
+                    formatter={(value: number) => formatCurrency(value || 0)}
                   />
                   <Legend verticalAlign="bottom" height={36} />
                 </PieChart>

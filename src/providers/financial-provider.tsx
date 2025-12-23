@@ -17,11 +17,13 @@ interface FinancialContextType {
   budgetTodoItems: any[];
   assetAccounts: any[];
   incomeCategories: any[];
+  expenseCategories: any[];
   exchangeRate: number;
   loading: boolean;
   refreshWealth: () => Promise<void>;
   refreshIncome: () => Promise<void>;
   refreshExpenses: () => Promise<void>;
+  refreshExpenseCategories: () => Promise<void>;
   refreshBudget: () => Promise<void>;
   refreshAll: () => Promise<void>;
 }
@@ -38,6 +40,7 @@ export function FinancialProvider({ children }: { children: React.ReactNode }) {
   const [budgetTodoItems, setBudgetTodoItems] = useState<any[]>([]);
   const [assetAccounts, setAssetAccounts] = useState<any[]>([]);
   const [incomeCategories, setIncomeCategories] = useState<any[]>([]);
+  const [expenseCategories, setExpenseCategories] = useState<any[]>([]);
   const [exchangeRate, setExchangeRate] = useState<number>(25.0); // Default fallback
   const [loading, setLoading] = useState(true);
 
@@ -89,6 +92,14 @@ export function FinancialProvider({ children }: { children: React.ReactNode }) {
     if (data) setExpenseRecords(data);
   }, []);
 
+  const fetchExpenseCategories = useCallback(async () => {
+    const { data } = await supabase
+      .from('expense_categories')
+      .select('*')
+      .order('name');
+    if (data) setExpenseCategories(data);
+  }, []);
+
   const fetchBudget = useCallback(async () => {
     const { data: expenses } = await supabase
       .from('budget_expenses')
@@ -108,11 +119,19 @@ export function FinancialProvider({ children }: { children: React.ReactNode }) {
       fetchWealth(),
       fetchIncome(),
       fetchExpenses(),
+      fetchExpenseCategories(),
       fetchBudget(),
       fetchExchangeRate(),
     ]);
     setLoading(false);
-  }, [fetchWealth, fetchIncome, fetchExpenses, fetchBudget, fetchExchangeRate]);
+  }, [
+    fetchWealth,
+    fetchIncome,
+    fetchExpenses,
+    fetchExpenseCategories,
+    fetchBudget,
+    fetchExchangeRate,
+  ]);
 
   useEffect(() => {
     refreshAll();
@@ -128,11 +147,13 @@ export function FinancialProvider({ children }: { children: React.ReactNode }) {
         budgetTodoItems,
         assetAccounts,
         incomeCategories,
+        expenseCategories,
         exchangeRate,
         loading,
         refreshWealth: fetchWealth,
         refreshIncome: fetchIncome,
         refreshExpenses: fetchExpenses,
+        refreshExpenseCategories: fetchExpenseCategories,
         refreshBudget: fetchBudget,
         refreshAll,
       }}

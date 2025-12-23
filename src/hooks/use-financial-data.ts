@@ -32,11 +32,19 @@ export function useIncomeData() {
 }
 
 export function useExpenseData() {
-  const { expenseRecords, loading, refreshExpenses } = useFinancialData();
+  const {
+    expenseRecords,
+    expenseCategories,
+    loading,
+    refreshExpenses,
+    refreshExpenseCategories,
+  } = useFinancialData();
   return {
     records: expenseRecords,
+    categories: expenseCategories,
     loading,
     refresh: refreshExpenses,
+    refreshCategories: refreshExpenseCategories,
   };
 }
 
