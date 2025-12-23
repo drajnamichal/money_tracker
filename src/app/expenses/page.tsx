@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useMemo, useRef } from 'react';
+import { useState, useMemo, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -49,6 +49,12 @@ const expenseSchema = z.object({
 });
 
 type ExpenseFormValues = z.infer<typeof expenseSchema>;
+
+interface CategoryTotal {
+  name: string;
+  value: number;
+  [key: string]: string | number;
+}
 
 export default function ExpensesPage() {
   const {
@@ -100,7 +106,8 @@ export default function ExpensesPage() {
 
       await refresh();
       toast.success('Výdavok úspešne pridaný');
-    } catch (error) {
+    } catch (err: unknown) {
+      console.error('Error adding expense:', err);
       toast.error('Chyba pri pridávaní výdavku');
     }
   };
@@ -134,7 +141,6 @@ export default function ExpensesPage() {
       if (data.description) setValue('description', data.description);
       if (data.amount) setValue('amount', data.amount.toString());
       if (data.category) {
-        // Only set if category exists in our categories list
         const exists = categories.some((c) => c.name === data.category);
         if (exists) {
           setValue('category', data.category);
@@ -144,9 +150,10 @@ export default function ExpensesPage() {
       }
 
       toast.success('Bloček úspešne naskenovaný!');
-    } catch (error: any) {
-      console.error('OCR Error:', error);
-      toast.error('Chyba pri skenovaní bločku: ' + error.message);
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : 'Neznáma chyba';
+      console.error('OCR Error:', err);
+      toast.error('Chyba pri skenovaní bločku: ' + errorMessage);
     } finally {
       setIsScanning(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
@@ -173,7 +180,8 @@ export default function ExpensesPage() {
       setNewCategoryName('');
       await refreshCategories();
       toast.success('Kategória pridaná');
-    } catch (error) {
+    } catch (err: unknown) {
+      console.error('Error adding category:', err);
       toast.error('Chyba pri pridávaní kategórie');
     }
   };
@@ -191,7 +199,8 @@ export default function ExpensesPage() {
 
       await refreshCategories();
       toast.success('Kategória vymazaná');
-    } catch (error) {
+    } catch (err: unknown) {
+      console.error('Error deleting category:', err);
       toast.error('Chyba pri mazaní kategórie');
     }
   };
@@ -208,13 +217,14 @@ export default function ExpensesPage() {
 
       await refresh();
       toast.success('Výdavok bol vymazaný');
-    } catch (error) {
+    } catch (err: unknown) {
+      console.error('Error deleting expense:', err);
       toast.error('Chyba pri mazaní');
     }
   }
 
   const categoryData = useMemo(() => {
-    return expenses.reduce((acc: any[], curr) => {
+    return expenses.reduce((acc: CategoryTotal[], curr) => {
       const existing = acc.find((item) => item.name === curr.category);
       if (existing) {
         existing.value += Number(curr.amount_eur);
@@ -507,7 +517,7 @@ export default function ExpensesPage() {
                     paddingAngle={5}
                     dataKey="value"
                   >
-                    {categoryData.map((entry, index) => (
+                    {categoryData.map((_entry, index) => (
                       <Cell
                         key={`cell-${index}`}
                         fill={COLORS[index % COLORS.length]}
@@ -521,7 +531,9 @@ export default function ExpensesPage() {
                       border: 'none',
                       boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)',
                     }}
-                    formatter={(value: number) => formatCurrency(value || 0)}
+                    formatter={(value: string | number | undefined) =>
+                      formatCurrency(Number(value) || 0)
+                    }
                   />
                   <Legend verticalAlign="bottom" height={36} />
                 </PieChart>
