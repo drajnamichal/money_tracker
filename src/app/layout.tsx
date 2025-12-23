@@ -4,6 +4,7 @@ import './globals.css';
 import { ThemeProvider } from '@/components/theme-provider';
 import { Sidebar } from '@/components/sidebar';
 import { Toaster } from 'sonner';
+import { FinancialProvider } from '@/providers/financial-provider';
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -27,15 +28,17 @@ export default function RootLayout({
           enableSystem={false}
           disableTransitionOnChange
         >
-          <div className="flex min-h-screen bg-background text-foreground">
-            <Sidebar />
-            <main className="flex-1 overflow-y-auto">
-              <div className="container mx-auto p-4 md:p-8 pt-16 md:pt-8">
-                {children}
-              </div>
-            </main>
-          </div>
-          <Toaster position="top-right" richColors />
+          <FinancialProvider>
+            <div className="flex min-h-screen bg-background text-foreground">
+              <Sidebar />
+              <main className="flex-1 overflow-y-auto">
+                <div className="container mx-auto p-4 md:p-8 pt-16 md:pt-8">
+                  {children}
+                </div>
+              </main>
+            </div>
+            <Toaster position="top-right" richColors />
+          </FinancialProvider>
         </ThemeProvider>
       </body>
     </html>

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -10,6 +10,7 @@ import { Loader2, Plus, ArrowRight, Download, Save, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
 import { Skeleton } from '@/components/skeleton';
+import { useWealthData } from '@/hooks/use-financial-data';
 
 const assetSchema = z.object({
   recordDate: z.string().min(1, 'Dátum je povinný'),
@@ -29,20 +30,20 @@ const assetSchema = z.object({
 type AssetFormValues = z.infer<typeof assetSchema>;
 
 export default function AssetsPage() {
-  const [loading, setLoading] = useState(true);
+  const {
+    records: wealthData,
+    accounts,
+    exchangeRate,
+    loading,
+    refresh,
+  } = useWealthData();
   const [saving, setSaving] = useState(false);
-  const [accounts, setAccounts] = useState<any[]>([]);
-  const [dates, setDates] = useState<string[]>([]);
-  const [records, setRecords] = useState<any>({});
-
-  // Adding state
   const [isAdding, setIsAdding] = useState(false);
 
   const {
     register,
     handleSubmit,
     reset,
-    setValue,
     formState: { errors },
   } = useForm<AssetFormValues>({
     resolver: zodResolver(assetSchema),
@@ -52,71 +53,54 @@ export default function AssetsPage() {
     },
   });
 
+  const { dates, recordMap } = useMemo(() => {
+    const uniqueDates = Array.from(
+      new Set(wealthData.map((r) => r.record_date))
+    )
+      .sort()
+      .reverse();
+
+    const map: any = {};
+    wealthData.forEach((r) => {
+      if (!map[r.record_date]) map[r.record_date] = {};
+      map[r.record_date][r.account_id] = r.amount_eur;
+    });
+
+    return { dates: uniqueDates, recordMap: map };
+  }, [wealthData]);
+
   useEffect(() => {
-    fetchData();
-  }, []);
-
-  async function fetchData() {
-    setLoading(true);
-    try {
-      const { data: accountsData } = await supabase
-        .from('asset_accounts')
-        .select('*')
-        .order('name');
-
-      const { data: wealthData } = await supabase
-        .from('wealth_records')
-        .select('*')
-        .order('record_date', { ascending: false });
-
-      if (accountsData && wealthData) {
-        setAccounts(accountsData);
-
-        const uniqueDates = Array.from(
-          new Set(wealthData.map((r) => r.record_date))
-        )
-          .sort()
-          .reverse();
-        setDates(uniqueDates);
-
-        const recordMap: any = {};
-        wealthData.forEach((r) => {
-          if (!recordMap[r.record_date]) recordMap[r.record_date] = {};
-          recordMap[r.record_date][r.account_id] = r.amount_eur;
-        });
-        setRecords(recordMap);
-
-        // Pre-fill new amounts with latest values
-        if (uniqueDates.length > 0) {
-          const latest = recordMap[uniqueDates[0]];
-          const initialAmounts: Record<string, string> = {};
-          accountsData.forEach((acc) => {
-            initialAmounts[acc.id] = latest[acc.id]?.toString() || '0';
-          });
-          reset({
-            recordDate: new Date().toISOString().split('T')[0],
-            amounts: initialAmounts,
-          });
-        }
-      }
-    } catch (error) {
-      console.error('Error fetching assets:', error);
-    } finally {
-      setLoading(false);
+    if (dates.length > 0 && accounts.length > 0) {
+      const latest = recordMap[dates[0]];
+      const initialAmounts: Record<string, string> = {};
+      accounts.forEach((acc) => {
+        initialAmounts[acc.id] = latest[acc.id]?.toString() || '0';
+      });
+      reset({
+        recordDate: new Date().toISOString().split('T')[0],
+        amounts: initialAmounts,
+      });
     }
-  }
+  }, [dates, accounts, recordMap, reset]);
 
   const onSave = async (data: AssetFormValues) => {
     setSaving(true);
     try {
       const inserts = Object.entries(data.amounts)
         .filter(([_, amount]) => amount !== '')
-        .map(([accountId, amount]) => ({
-          account_id: accountId,
-          record_date: data.recordDate,
-          amount: Number(amount),
-          amount_eur: Number(amount), // Assuming EUR for now
-        }));
+        .map(([accountId, amount]) => {
+          const account = accounts.find((a) => a.id === accountId);
+          const numAmount = Number(amount);
+          const amountEur =
+            account?.currency === 'CZK' ? numAmount / exchangeRate : numAmount;
+
+          return {
+            account_id: accountId,
+            record_date: data.recordDate,
+            amount: numAmount,
+            amount_eur: amountEur,
+          };
+        });
 
       if (inserts.length === 0) {
         toast.error('Prosím zadajte aspoň jednu sumu');
@@ -128,7 +112,7 @@ export default function AssetsPage() {
       if (error) throw error;
 
       setIsAdding(false);
-      await fetchData();
+      await refresh();
       toast.success('Záznamy boli úspešne uložené');
     } catch (error) {
       console.error('Error saving records:', error);
@@ -146,6 +130,11 @@ export default function AssetsPage() {
           <p className="text-slate-500">
             Detailný prehľad tvojich finančných aktív.
           </p>
+          {!loading && exchangeRate && (
+            <p className="text-[10px] text-slate-400 mt-1 uppercase tracking-wider font-bold">
+              Aktuálny kurz: 1 EUR = {exchangeRate.toFixed(2)} CZK
+            </p>
+          )}
         </div>
         {!isAdding && !loading && (
           <button
@@ -275,8 +264,8 @@ export default function AssetsPage() {
               </thead>
               <tbody className="divide-y">
                 {accounts.map((account) => {
-                  const latestAmount = records[dates[0]]?.[account.id] || 0;
-                  const prevAmount = records[dates[1]]?.[account.id] || 0;
+                  const latestAmount = recordMap[dates[0]]?.[account.id] || 0;
+                  const prevAmount = recordMap[dates[1]]?.[account.id] || 0;
                   const diff = latestAmount - prevAmount;
 
                   return (
@@ -296,7 +285,7 @@ export default function AssetsPage() {
                       </td>
                       {dates.slice(0, 5).map((date) => (
                         <td key={date} className="px-6 py-4">
-                          {formatCurrency(records[date]?.[account.id] || 0)}
+                          {formatCurrency(recordMap[date]?.[account.id] || 0)}
                         </td>
                       ))}
                       <td className="px-6 py-4 text-right">
@@ -323,7 +312,7 @@ export default function AssetsPage() {
                   </td>
                   {dates.slice(0, 5).map((date) => {
                     const total = accounts.reduce(
-                      (sum, acc) => sum + (records[date]?.[acc.id] || 0),
+                      (sum, acc) => sum + (recordMap[date]?.[acc.id] || 0),
                       0
                     );
                     return (
@@ -354,13 +343,13 @@ export default function AssetsPage() {
               accounts
                 .map((acc) => ({
                   ...acc,
-                  amount: records[dates[0]]?.[acc.id] || 0,
+                  amount: recordMap[dates[0]]?.[acc.id] || 0,
                 }))
                 .filter((acc) => acc.amount > 0)
                 .sort((a, b) => b.amount - a.amount)
                 .map((acc) => {
                   const total = accounts.reduce(
-                    (sum, a) => sum + (records[dates[0]]?.[a.id] || 0),
+                    (sum, a) => sum + (recordMap[dates[0]]?.[a.id] || 0),
                     0
                   );
                   const percentage = (acc.amount / total) * 100;

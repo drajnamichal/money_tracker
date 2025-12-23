@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, Fragment } from 'react';
+import { useEffect, useState, Fragment, useMemo } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -10,6 +10,7 @@ import { Loader2, Plus, TrendingUp, Calendar, Save, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
 import { Skeleton } from '@/components/skeleton';
+import { useIncomeData } from '@/hooks/use-financial-data';
 import {
   BarChart,
   Bar,
@@ -41,13 +42,9 @@ const incomeSchema = z.object({
 type IncomeFormValues = z.infer<typeof incomeSchema>;
 
 export default function IncomePage() {
-  const [loading, setLoading] = useState(true);
+  const { records, categories, exchangeRate, loading, refresh } =
+    useIncomeData();
   const [saving, setSaving] = useState(false);
-  const [categories, setCategories] = useState<any[]>([]);
-  const [records, setRecords] = useState<any[]>([]);
-  const [chartData, setChartData] = useState<any[]>([]);
-
-  // Adding state
   const [isAdding, setIsAdding] = useState(false);
 
   const {
@@ -63,66 +60,40 @@ export default function IncomePage() {
     },
   });
 
+  const chartData = useMemo(() => {
+    const monthlyData: any = {};
+    records.forEach((r) => {
+      const month = r.record_month.substring(0, 7);
+      if (!monthlyData[month]) monthlyData[month] = { month, total: 0 };
+      monthlyData[month].total += Number(r.amount_eur);
+    });
+
+    return Object.values(monthlyData)
+      .sort((a: any, b: any) => a.month.localeCompare(b.month))
+      .slice(-12)
+      .map((item: any) => ({
+        name: new Date(item.month).toLocaleDateString('sk-SK', {
+          month: 'short',
+        }),
+        total: item.total,
+      }));
+  }, [records]);
+
   useEffect(() => {
-    fetchData();
-  }, []);
-
-  async function fetchData() {
-    setLoading(true);
-    try {
-      const { data: categoriesData } = await supabase
-        .from('income_categories')
-        .select('*')
-        .order('name');
-
-      const { data: incomeData } = await supabase
-        .from('income_records')
-        .select('*, income_categories(name)')
-        .order('record_month', { ascending: false });
-
-      if (categoriesData && incomeData) {
-        setCategories(categoriesData);
-        setRecords(incomeData);
-
-        // Prepare chart data (last 12 months)
-        const monthlyData: any = {};
-        incomeData.forEach((r) => {
-          const month = r.record_month.substring(0, 7);
-          if (!monthlyData[month]) monthlyData[month] = { month, total: 0 };
-          monthlyData[month].total += Number(r.amount_eur);
-        });
-
-        const formattedChartData = Object.values(monthlyData)
-          .sort((a: any, b: any) => a.month.localeCompare(b.month))
-          .slice(-12)
-          .map((item: any) => ({
-            name: new Date(item.month).toLocaleDateString('sk-SK', {
-              month: 'short',
-            }),
-            total: item.total,
-          }));
-
-        setChartData(formattedChartData);
-
-        // Initialize new records state
-        const initialRecords: Record<
-          string,
-          { amount: string; currency: string }
-        > = {};
-        categoriesData.forEach((cat) => {
-          initialRecords[cat.id] = { amount: '', currency: 'CZK' };
-        });
-        reset({
-          recordMonth: new Date().toISOString().substring(0, 7),
-          records: initialRecords,
-        });
-      }
-    } catch (error) {
-      console.error('Error fetching income:', error);
-    } finally {
-      setLoading(false);
+    if (categories.length > 0) {
+      const initialRecords: Record<
+        string,
+        { amount: string; currency: string }
+      > = {};
+      categories.forEach((cat) => {
+        initialRecords[cat.id] = { amount: '', currency: 'CZK' };
+      });
+      reset({
+        recordMonth: new Date().toISOString().substring(0, 7),
+        records: initialRecords,
+      });
     }
-  }
+  }, [categories, reset]);
 
   const onSave = async (data: IncomeFormValues) => {
     setSaving(true);
@@ -133,8 +104,8 @@ export default function IncomePage() {
         )
         .map(([categoryId, record]) => {
           const amount = Number(record.amount);
-          // Simple conversion for now, ideally fetch current rates
-          const amountEur = record.currency === 'CZK' ? amount / 25 : amount;
+          const amountEur =
+            record.currency === 'CZK' ? amount / exchangeRate : amount;
 
           return {
             category_id: categoryId,
@@ -146,7 +117,7 @@ export default function IncomePage() {
         });
 
       if (inserts.length === 0) {
-        toast.error('Prosím zadajte aspoň jeden príjem');
+        toast.error('Prosím zadajte aspoň jednu sumu');
         setSaving(false);
         return;
       }
@@ -156,7 +127,7 @@ export default function IncomePage() {
       if (error) throw error;
 
       setIsAdding(false);
-      await fetchData();
+      await refresh();
       toast.success('Príjmy boli úspešne uložené');
     } catch (error) {
       console.error('Error saving income:', error);
@@ -171,13 +142,14 @@ export default function IncomePage() {
     .filter((r) => r.record_month === latestMonth)
     .reduce((sum, r) => sum + Number(r.amount_eur), 0);
 
-  // Group records by month
-  const groupedRecords = records.reduce((acc: any, record) => {
-    const month = record.record_month;
-    if (!acc[month]) acc[month] = [];
-    acc[month].push(record);
-    return acc;
-  }, {});
+  const groupedRecords = useMemo(() => {
+    return records.reduce((acc: any, record) => {
+      const month = record.record_month;
+      if (!acc[month]) acc[month] = [];
+      acc[month].push(record);
+      return acc;
+    }, {});
+  }, [records]);
 
   return (
     <div className="space-y-8">
@@ -187,6 +159,11 @@ export default function IncomePage() {
           <p className="text-slate-500">
             Sleduj svoje mesačné prítoky financií.
           </p>
+          {!loading && exchangeRate && (
+            <p className="text-[10px] text-slate-400 mt-1 uppercase tracking-wider font-bold">
+              Aktuálny kurz: 1 EUR = {exchangeRate.toFixed(2)} CZK
+            </p>
+          )}
         </div>
         {!isAdding && !loading && (
           <button

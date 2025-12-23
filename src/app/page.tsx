@@ -1,7 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { supabase } from '@/lib/supabase';
+import { useEffect, useState, useMemo } from 'react';
 import { formatCurrency } from '@/lib/utils';
 import { TrendingUp, TrendingDown, Wallet } from 'lucide-react';
 import {
@@ -18,120 +17,126 @@ import {
 } from 'recharts';
 import { motion } from 'framer-motion';
 import { Skeleton } from '@/components/skeleton';
+import {
+  useWealthData,
+  useIncomeData,
+  useExpenseData,
+} from '@/hooks/use-financial-data';
 
 export default function Dashboard() {
-  const [loading, setLoading] = useState(true);
-  const [stats, setStats] = useState({
-    totalAssets: 0,
-    monthlyIncome: 0,
-    monthlyExpenses: 0,
-    assetsGrowth: 0,
-    incomeChange: 0,
-  });
-  const [assetsHistory, setAssetsHistory] = useState<any[]>([]);
-  const [incomeVsExpenses, setIncomeVsExpenses] = useState<any[]>([]);
+  const { records: wealthData, loading: wealthLoading } = useWealthData();
+  const { records: incomeData, loading: incomeLoading } = useIncomeData();
+  const { records: expenseData, loading: expenseLoading } = useExpenseData();
 
-  useEffect(() => {
-    async function fetchData() {
-      try {
-        const { data: wealthData } = await supabase
-          .from('wealth_records')
-          .select('amount_eur, record_date')
-          .order('record_date', { ascending: false });
+  const loading = wealthLoading || incomeLoading || expenseLoading;
 
-        if (wealthData && wealthData.length > 0) {
-          const totalsByDate = wealthData.reduce((acc: any, curr: any) => {
-            acc[curr.record_date] =
-              (acc[curr.record_date] || 0) + Number(curr.amount_eur);
-            return acc;
-          }, {});
+  const stats = useMemo(() => {
+    let totalAssets = 0;
+    let growth = 0;
+    let monthlyIncome = 0;
+    let monthlyExpenses = 0;
 
-          const sortedDates = Object.keys(totalsByDate).sort();
-          const latestDate = sortedDates[sortedDates.length - 1];
-          const previousDate = sortedDates[sortedDates.length - 2];
+    if (wealthData && wealthData.length > 0) {
+      const totalsByDate = wealthData.reduce((acc: any, curr: any) => {
+        acc[curr.record_date] =
+          (acc[curr.record_date] || 0) + Number(curr.amount_eur);
+        return acc;
+      }, {});
 
-          const currentTotal = totalsByDate[latestDate];
-          const previousTotal = totalsByDate[previousDate] || currentTotal;
-          const growth =
-            previousTotal !== 0
-              ? ((currentTotal - previousTotal) / previousTotal) * 100
-              : 0;
+      const sortedDates = Object.keys(totalsByDate).sort();
+      const latestDate = sortedDates[sortedDates.length - 1];
+      const previousDate = sortedDates[sortedDates.length - 2];
 
-          setStats((prev) => ({
-            ...prev,
-            totalAssets: currentTotal,
-            assetsGrowth: growth,
-          }));
-
-          setAssetsHistory(
-            sortedDates.map((date) => ({
-              date: new Date(date).toLocaleDateString('sk-SK', {
-                month: 'short',
-                year: '2-digit',
-              }),
-              total: totalsByDate[date],
-            }))
-          );
-        }
-
-        const { data: incomeData } = await supabase
-          .from('income_records')
-          .select('amount_eur, record_month');
-
-        const { data: expenseData } = await supabase
-          .from('expense_records')
-          .select('amount_eur, record_date');
-
-        const monthlyData: any = {};
-
-        if (incomeData) {
-          incomeData.forEach((item: any) => {
-            const month = item.record_month.substring(0, 7);
-            if (!monthlyData[month])
-              monthlyData[month] = { month, income: 0, expenses: 0 };
-            monthlyData[month].income += Number(item.amount_eur);
-          });
-        }
-
-        if (expenseData) {
-          expenseData.forEach((item: any) => {
-            const month = item.record_date.substring(0, 7);
-            if (!monthlyData[month])
-              monthlyData[month] = { month, income: 0, expenses: 0 };
-            monthlyData[month].expenses += Number(item.amount_eur);
-          });
-        }
-
-        const combinedData = Object.values(monthlyData)
-          .sort((a: any, b: any) => a.month.localeCompare(b.month))
-          .map((item: any) => ({
-            name: new Date(item.month).toLocaleDateString('sk-SK', {
-              month: 'short',
-              year: '2-digit',
-            }),
-            income: item.income,
-            expenses: item.expenses,
-          }));
-
-        setIncomeVsExpenses(combinedData);
-
-        const latestMonth = combinedData[combinedData.length - 1];
-        if (latestMonth) {
-          setStats((prev) => ({
-            ...prev,
-            monthlyIncome: latestMonth.income,
-            monthlyExpenses: latestMonth.expenses,
-          }));
-        }
-      } catch (error) {
-        console.error('Error fetching dashboard data:', error);
-      } finally {
-        setLoading(false);
-      }
+      totalAssets = totalsByDate[latestDate];
+      const previousTotal = totalsByDate[previousDate] || totalAssets;
+      growth =
+        previousTotal !== 0
+          ? ((totalAssets - previousTotal) / previousTotal) * 100
+          : 0;
     }
 
-    fetchData();
-  }, []);
+    const monthlyData: any = {};
+    if (incomeData) {
+      incomeData.forEach((item: any) => {
+        const month = item.record_month.substring(0, 7);
+        if (!monthlyData[month])
+          monthlyData[month] = { month, income: 0, expenses: 0 };
+        monthlyData[month].income += Number(item.amount_eur);
+      });
+    }
+
+    if (expenseData) {
+      expenseData.forEach((item: any) => {
+        const month = item.record_date.substring(0, 7);
+        if (!monthlyData[month])
+          monthlyData[month] = { month, income: 0, expenses: 0 };
+        monthlyData[month].expenses += Number(item.amount_eur);
+      });
+    }
+
+    const combinedSorted = Object.values(monthlyData).sort((a: any, b: any) =>
+      a.month.localeCompare(b.month)
+    );
+
+    const latestMonth: any = combinedSorted[combinedSorted.length - 1];
+    if (latestMonth) {
+      monthlyIncome = latestMonth.income;
+      monthlyExpenses = latestMonth.expenses;
+    }
+
+    return { totalAssets, growth, monthlyIncome, monthlyExpenses };
+  }, [wealthData, incomeData, expenseData]);
+
+  const assetsHistory = useMemo(() => {
+    if (!wealthData || wealthData.length === 0) return [];
+    const totalsByDate = wealthData.reduce((acc: any, curr: any) => {
+      acc[curr.record_date] =
+        (acc[curr.record_date] || 0) + Number(curr.amount_eur);
+      return acc;
+    }, {});
+
+    return Object.keys(totalsByDate)
+      .sort()
+      .map((date) => ({
+        date: new Date(date).toLocaleDateString('sk-SK', {
+          month: 'short',
+          year: '2-digit',
+        }),
+        total: totalsByDate[date],
+      }));
+  }, [wealthData]);
+
+  const incomeVsExpenses = useMemo(() => {
+    const monthlyData: any = {};
+    if (incomeData) {
+      incomeData.forEach((item: any) => {
+        const month = item.record_month.substring(0, 7);
+        if (!monthlyData[month])
+          monthlyData[month] = { month, income: 0, expenses: 0 };
+        monthlyData[month].income += Number(item.amount_eur);
+      });
+    }
+
+    if (expenseData) {
+      expenseData.forEach((item: any) => {
+        const month = item.record_date.substring(0, 7);
+        if (!monthlyData[month])
+          monthlyData[month] = { month, income: 0, expenses: 0 };
+        monthlyData[month].expenses += Number(item.amount_eur);
+      });
+    }
+
+    return Object.values(monthlyData)
+      .sort((a: any, b: any) => a.month.localeCompare(b.month))
+      .map((item: any) => ({
+        name: new Date(item.month).toLocaleDateString('sk-SK', {
+          month: 'short',
+          year: '2-digit',
+        }),
+        income: item.income,
+        expenses: item.expenses,
+      }));
+  }, [incomeData, expenseData]);
 
   return (
     <div className="space-y-8">

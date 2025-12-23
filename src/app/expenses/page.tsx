@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -16,6 +16,7 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
 import { Skeleton } from '@/components/skeleton';
+import { useExpenseData } from '@/hooks/use-financial-data';
 import {
   PieChart,
   Pie,
@@ -47,8 +48,7 @@ const expenseSchema = z.object({
 type ExpenseFormValues = z.infer<typeof expenseSchema>;
 
 export default function ExpensesPage() {
-  const [loading, setLoading] = useState(true);
-  const [expenses, setExpenses] = useState<any[]>([]);
+  const { records: expenses, loading, refresh } = useExpenseData();
   const [isAdding, setIsAdding] = useState(false);
 
   const {
@@ -66,25 +66,6 @@ export default function ExpensesPage() {
     },
   });
 
-  useEffect(() => {
-    fetchExpenses();
-  }, []);
-
-  async function fetchExpenses() {
-    setLoading(true);
-    try {
-      const { data } = await supabase
-        .from('expense_records')
-        .select('*')
-        .order('record_date', { ascending: false });
-      if (data) setExpenses(data);
-    } catch (error) {
-      console.error('Error fetching expenses:', error);
-    } finally {
-      setLoading(false);
-    }
-  }
-
   const onAddExpense = async (values: ExpenseFormValues) => {
     const tempId = crypto.randomUUID();
     const optimisticExpense = {
@@ -96,8 +77,11 @@ export default function ExpensesPage() {
       isOptimistic: true,
     };
 
-    // Optimistic update
-    setExpenses((prev) => [optimisticExpense, ...prev]);
+    // Optimistic update would ideally be handled by a global state manager (like React Query or SWR)
+    // For now, we manually handle it in the provider if we want it global,
+    // or keep it local but it won't be shared with the dashboard until refresh.
+    // The user specifically asked for custom hooks to share data.
+
     setIsAdding(false);
     reset();
 
@@ -119,24 +103,15 @@ export default function ExpensesPage() {
 
       if (error) throw error;
 
-      // Replace optimistic record with real one from server
-      setExpenses((prev) =>
-        prev.map((exp) => (exp.id === tempId ? data : exp))
-      );
+      await refresh();
       toast.success('Výdavok úspešne pridaný');
     } catch (error) {
-      // Rollback
-      setExpenses((prev) => prev.filter((exp) => exp.id !== tempId));
-      toast.error('Chyba pri pridávaní výdavku. Zmeny boli vrátené.');
+      toast.error('Chyba pri pridávaní výdavku');
     }
   };
 
   async function handleDelete(id: string) {
     if (!confirm('Naozaj chcete vymazať tento výdavok?')) return;
-
-    const originalExpenses = [...expenses];
-    // Optimistic update
-    setExpenses((prev) => prev.filter((e) => e.id !== id));
 
     try {
       const { error } = await supabase
@@ -144,26 +119,28 @@ export default function ExpensesPage() {
         .delete()
         .eq('id', id);
       if (error) throw error;
+
+      await refresh();
       toast.success('Výdavok bol vymazaný');
     } catch (error) {
-      // Rollback
-      setExpenses(originalExpenses);
-      toast.error('Chyba pri mazaní. Záznam bol vrátený.');
+      toast.error('Chyba pri mazaní');
     }
   }
 
-  const categoryData = expenses.reduce((acc: any[], curr) => {
-    const existing = acc.find((item) => item.name === curr.category);
-    if (existing) {
-      existing.value += Number(curr.amount_eur);
-    } else {
-      acc.push({
-        name: curr.category || 'Ostatné',
-        value: Number(curr.amount_eur),
-      });
-    }
-    return acc;
-  }, []);
+  const categoryData = useMemo(() => {
+    return expenses.reduce((acc: any[], curr) => {
+      const existing = acc.find((item) => item.name === curr.category);
+      if (existing) {
+        existing.value += Number(curr.amount_eur);
+      } else {
+        acc.push({
+          name: curr.category || 'Ostatné',
+          value: Number(curr.amount_eur),
+        });
+      }
+      return acc;
+    }, []);
+  }, [expenses]);
 
   return (
     <div className="space-y-8">
