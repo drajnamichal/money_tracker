@@ -10,6 +10,8 @@ import {
   BarChart3,
   Plus,
   Home,
+  Paperclip,
+  FileImage,
 } from 'lucide-react';
 
 export const TrashIcon = Trash2;
@@ -21,6 +23,8 @@ export const MoneyIcon = Coins;
 export const CategoryIcon = LayoutGrid;
 export const ChartIcon = BarChart3;
 export const AddIcon = Plus;
+export const AttachmentIcon = Paperclip;
+export const ImageIcon = FileImage;
 
 // Emoji Components for Visual Enhancement
 export const MoneyEmoji: React.FC<{ className?: string }> = ({

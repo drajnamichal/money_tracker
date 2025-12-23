@@ -8,6 +8,8 @@ import {
   XIcon,
   CategoryEmoji,
   MoneyEmoji,
+  AttachmentIcon,
+  ImageIcon,
 } from './icons';
 
 interface ExpenseListProps {
@@ -119,16 +121,29 @@ const ExpenseList: React.FC<ExpenseListProps> = ({
                 </>
               ) : (
                 <>
-                  <div>
-                    <p className="font-medium text-slate-800 dark:text-slate-200">
-                      {expense.description}
-                    </p>
+                  <div className="flex-grow min-w-0">
+                    <div className="flex items-center gap-2">
+                      <p className="font-medium text-slate-800 dark:text-slate-200 truncate">
+                        {expense.description}
+                      </p>
+                      {expense.attachment_url && (
+                        <a
+                          href={expense.attachment_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-indigo-500 hover:text-indigo-600 transition-colors p-1"
+                          title="Zobraziť prílohu"
+                        >
+                          <ImageIcon className="w-4 h-4" />
+                        </a>
+                      )}
+                    </div>
                     <p className="text-sm text-slate-600 dark:text-slate-400 flex items-center gap-1">
                       <MoneyEmoji className="w-3 h-3" />
                       {formatCurrency(expense.amount)}
                     </p>
                   </div>
-                  <div className="flex items-center">
+                  <div className="flex items-center ml-4 shrink-0">
                     {expense.is_fixed ? (
                       <span
                         className="p-2 text-slate-400 dark:text-slate-500"

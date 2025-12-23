@@ -1,16 +1,23 @@
-import React, { useState } from 'react';
-import { MoneyEmoji, PlusEmoji } from './icons';
+import React, { useState, useRef } from 'react';
+import { MoneyEmoji, PlusEmoji, AttachmentIcon, XIcon } from './icons';
 
 interface ExpenseFormProps {
-  onAddExpense: (expense: { description: string; amount: number }) => void;
+  onAddExpense: (expense: {
+    description: string;
+    amount: number;
+    file?: File;
+  }) => Promise<void>;
 }
 
 const ExpenseForm: React.FC<ExpenseFormProps> = ({ onAddExpense }) => {
   const [description, setDescription] = useState('');
   const [amount, setAmount] = useState('');
   const [error, setError] = useState('');
+  const [file, setFile] = useState<File | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const numericAmount = parseFloat(amount);
 
@@ -23,10 +30,35 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ onAddExpense }) => {
       return;
     }
 
-    onAddExpense({ description, amount: numericAmount });
-    setDescription('');
-    setAmount('');
-    setError('');
+    setIsSubmitting(true);
+    try {
+      await onAddExpense({
+        description,
+        amount: numericAmount,
+        file: file || undefined,
+      });
+      setDescription('');
+      setAmount('');
+      setFile(null);
+      setError('');
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    } catch (e) {
+      setError('Chyba pri ukladaní výdavku.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      const selectedFile = e.target.files[0];
+      if (selectedFile.size > 5 * 1024 * 1024) {
+        setError('Súbor je príliš veľký (max 5MB).');
+        return;
+      }
+      setFile(selectedFile);
+      setError('');
+    }
   };
 
   return (
@@ -78,12 +110,55 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ onAddExpense }) => {
             />
           </div>
         </div>
+
+        <div>
+          <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 flex items-center gap-1">
+            <AttachmentIcon className="w-4 h-4" />
+            Príloha (blok/faktúra)
+          </label>
+          <div className="mt-1 flex items-center gap-2">
+            <input
+              type="file"
+              ref={fileInputRef}
+              onChange={handleFileChange}
+              accept="image/*,application/pdf"
+              className="hidden"
+              id="file-upload"
+            />
+            {!file ? (
+              <label
+                htmlFor="file-upload"
+                className="cursor-pointer flex items-center justify-center px-4 py-2 border border-dashed border-slate-300 dark:border-slate-700 rounded-md text-sm text-slate-500 hover:border-indigo-500 hover:text-indigo-500 transition-colors w-full"
+              >
+                Klikni pre nahranie súboru
+              </label>
+            ) : (
+              <div className="flex items-center justify-between w-full bg-slate-50 dark:bg-slate-800 px-3 py-2 rounded-md border border-slate-200 dark:border-slate-700">
+                <span className="text-sm text-slate-600 dark:text-slate-400 truncate max-w-[200px]">
+                  {file.name}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setFile(null);
+                    if (fileInputRef.current) fileInputRef.current.value = '';
+                  }}
+                  className="text-slate-400 hover:text-rose-500"
+                >
+                  <XIcon className="w-4 h-4" />
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+
         {error && <p className="text-sm text-red-600">{error}</p>}
         <button
           type="submit"
-          className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors"
+          disabled={isSubmitting}
+          className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          Pridať výdavok
+          {isSubmitting ? 'Ukladám...' : 'Pridať výdavok'}
         </button>
       </form>
     </div>

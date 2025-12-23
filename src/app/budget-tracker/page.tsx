@@ -15,11 +15,37 @@ export default function BudgetTrackerPage() {
   const { expenses, todoItems, loading, refresh } = useBudgetData();
 
   const addExpense = useCallback(
-    async (expense: { description: string; amount: number }) => {
+    async (expense: { description: string; amount: number; file?: File }) => {
       try {
-        const { error } = await supabase
-          .from('budget_expenses')
-          .insert([expense]);
+        let attachment_url = null;
+
+        if (expense.file) {
+          const fileExt = expense.file.name.split('.').pop();
+          const fileName = `${Math.random()}.${fileExt}`;
+          const filePath = `${fileName}`;
+
+          const { error: uploadError } = await supabase.storage
+            .from('expense-attachments')
+            .upload(filePath, expense.file);
+
+          if (uploadError) throw uploadError;
+
+          const {
+            data: { publicUrl },
+          } = supabase.storage
+            .from('expense-attachments')
+            .getPublicUrl(filePath);
+
+          attachment_url = publicUrl;
+        }
+
+        const { error } = await supabase.from('budget_expenses').insert([
+          {
+            description: expense.description,
+            amount: expense.amount,
+            attachment_url,
+          },
+        ]);
 
         if (error) throw error;
 
@@ -51,6 +77,7 @@ export default function BudgetTrackerPage() {
       } catch (e) {
         console.error('Error adding expense: ', e);
         toast.error('Chyba pri pridávaní výdavku');
+        throw e;
       }
     },
     [refresh]
@@ -59,6 +86,16 @@ export default function BudgetTrackerPage() {
   const deleteExpense = useCallback(
     async (id: string) => {
       try {
+        // Find if there's an attachment to delete
+        const expenseToDelete = expenses.find((e) => e.id === id);
+        if (expenseToDelete?.attachment_url) {
+          const url = new URL(expenseToDelete.attachment_url);
+          const path = url.pathname.split('/').pop();
+          if (path) {
+            await supabase.storage.from('expense-attachments').remove([path]);
+          }
+        }
+
         const { error } = await supabase
           .from('budget_expenses')
           .delete()
@@ -73,7 +110,7 @@ export default function BudgetTrackerPage() {
         toast.error('Chyba pri odstraňovaní výdavku');
       }
     },
-    [refresh]
+    [expenses, refresh]
   );
 
   const updateExpense = useCallback(
