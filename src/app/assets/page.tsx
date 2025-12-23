@@ -6,7 +6,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { supabase } from '@/lib/supabase';
 import { formatCurrency } from '@/lib/utils';
-import { Loader2, Plus, ArrowRight, Download, Save, X } from 'lucide-react';
+import { Loader2, Plus, ArrowRight, Save, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
 import { Skeleton } from '@/components/skeleton';
@@ -373,18 +373,6 @@ export default function AssetsPage() {
                 })
             )}
           </div>
-        </div>
-
-        <div className="bg-blue-600 p-8 rounded-2xl text-white shadow-xl shadow-blue-200 dark:shadow-none flex flex-col justify-center items-center text-center">
-          <Download size={48} className="mb-4 opacity-50" />
-          <h3 className="text-xl font-bold mb-2">Exportuj svoje dáta</h3>
-          <p className="text-blue-100 mb-6 max-w-xs text-sm">
-            Stiahni si kompletný prehľad vo formáte Excel alebo CSV pre vlastnú
-            analýzu.
-          </p>
-          <button className="bg-white text-blue-600 px-6 py-3 rounded-xl font-bold hover:bg-blue-50 transition-colors">
-            Stiahnuť report
-          </button>
         </div>
       </div>
     </div>
