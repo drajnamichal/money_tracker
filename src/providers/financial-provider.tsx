@@ -8,16 +8,26 @@ import React, {
   useCallback,
 } from 'react';
 import { supabase } from '@/lib/supabase';
+import {
+  AssetAccount,
+  WealthRecord,
+  IncomeCategory,
+  IncomeRecord,
+  ExpenseCategory,
+  ExpenseRecord,
+  BudgetExpense,
+  BudgetTodoItem,
+} from '@/types/financial';
 
 interface FinancialContextType {
-  wealthRecords: any[];
-  incomeRecords: any[];
-  expenseRecords: any[];
-  budgetExpenses: any[];
-  budgetTodoItems: any[];
-  assetAccounts: any[];
-  incomeCategories: any[];
-  expenseCategories: any[];
+  wealthRecords: WealthRecord[];
+  incomeRecords: IncomeRecord[];
+  expenseRecords: ExpenseRecord[];
+  budgetExpenses: BudgetExpense[];
+  budgetTodoItems: BudgetTodoItem[];
+  assetAccounts: AssetAccount[];
+  incomeCategories: IncomeCategory[];
+  expenseCategories: ExpenseCategory[];
   exchangeRate: number;
   loading: boolean;
   refreshWealth: () => Promise<void>;
@@ -33,14 +43,18 @@ const FinancialContext = createContext<FinancialContextType | undefined>(
 );
 
 export function FinancialProvider({ children }: { children: React.ReactNode }) {
-  const [wealthRecords, setWealthRecords] = useState<any[]>([]);
-  const [incomeRecords, setIncomeRecords] = useState<any[]>([]);
-  const [expenseRecords, setExpenseRecords] = useState<any[]>([]);
-  const [budgetExpenses, setBudgetExpenses] = useState<any[]>([]);
-  const [budgetTodoItems, setBudgetTodoItems] = useState<any[]>([]);
-  const [assetAccounts, setAssetAccounts] = useState<any[]>([]);
-  const [incomeCategories, setIncomeCategories] = useState<any[]>([]);
-  const [expenseCategories, setExpenseCategories] = useState<any[]>([]);
+  const [wealthRecords, setWealthRecords] = useState<WealthRecord[]>([]);
+  const [incomeRecords, setIncomeRecords] = useState<IncomeRecord[]>([]);
+  const [expenseRecords, setExpenseRecords] = useState<ExpenseRecord[]>([]);
+  const [budgetExpenses, setBudgetExpenses] = useState<BudgetExpense[]>([]);
+  const [budgetTodoItems, setBudgetTodoItems] = useState<BudgetTodoItem[]>([]);
+  const [assetAccounts, setAssetAccounts] = useState<AssetAccount[]>([]);
+  const [incomeCategories, setIncomeCategories] = useState<IncomeCategory[]>(
+    []
+  );
+  const [expenseCategories, setExpenseCategories] = useState<ExpenseCategory[]>(
+    []
+  );
   const [exchangeRate, setExchangeRate] = useState<number>(25.0); // Default fallback
   const [loading, setLoading] = useState(true);
 
@@ -67,8 +81,8 @@ export function FinancialProvider({ children }: { children: React.ReactNode }) {
       .from('wealth_records')
       .select('*')
       .order('record_date', { ascending: false });
-    if (accounts) setAssetAccounts(accounts);
-    if (records) setWealthRecords(records);
+    if (accounts) setAssetAccounts(accounts as AssetAccount[]);
+    if (records) setWealthRecords(records as WealthRecord[]);
   }, []);
 
   const fetchIncome = useCallback(async () => {
@@ -80,8 +94,8 @@ export function FinancialProvider({ children }: { children: React.ReactNode }) {
       .from('income_records')
       .select('*, income_categories(name)')
       .order('record_month', { ascending: false });
-    if (categories) setIncomeCategories(categories);
-    if (records) setIncomeRecords(records);
+    if (categories) setIncomeCategories(categories as IncomeCategory[]);
+    if (records) setIncomeRecords(records as IncomeRecord[]);
   }, []);
 
   const fetchExpenses = useCallback(async () => {
@@ -89,7 +103,7 @@ export function FinancialProvider({ children }: { children: React.ReactNode }) {
       .from('expense_records')
       .select('*')
       .order('record_date', { ascending: false });
-    if (data) setExpenseRecords(data);
+    if (data) setExpenseRecords(data as ExpenseRecord[]);
   }, []);
 
   const fetchExpenseCategories = useCallback(async () => {
@@ -97,7 +111,7 @@ export function FinancialProvider({ children }: { children: React.ReactNode }) {
       .from('expense_categories')
       .select('*')
       .order('name');
-    if (data) setExpenseCategories(data);
+    if (data) setExpenseCategories(data as ExpenseCategory[]);
   }, []);
 
   const fetchBudget = useCallback(async () => {
@@ -109,8 +123,8 @@ export function FinancialProvider({ children }: { children: React.ReactNode }) {
       .from('budget_todo_items')
       .select('*')
       .order('created_at', { ascending: false });
-    if (expenses) setBudgetExpenses(expenses);
-    if (todoItems) setBudgetTodoItems(todoItems);
+    if (expenses) setBudgetExpenses(expenses as BudgetExpense[]);
+    if (todoItems) setBudgetTodoItems(todoItems as BudgetTodoItem[]);
   }, []);
 
   const refreshAll = useCallback(async () => {

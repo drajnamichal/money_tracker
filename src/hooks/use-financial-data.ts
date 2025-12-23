@@ -1,13 +1,23 @@
 'use client';
 
 import { useFinancialData } from '@/providers/financial-provider';
+import {
+  WealthRecord,
+  AssetAccount,
+  IncomeRecord,
+  IncomeCategory,
+  ExpenseRecord,
+  ExpenseCategory,
+  BudgetExpense,
+  BudgetTodoItem,
+} from '@/types/financial';
 
 export function useWealthData() {
   const { wealthRecords, assetAccounts, exchangeRate, loading, refreshWealth } =
     useFinancialData();
   return {
-    records: wealthRecords,
-    accounts: assetAccounts,
+    records: wealthRecords as WealthRecord[],
+    accounts: assetAccounts as AssetAccount[],
     exchangeRate,
     loading,
     refresh: refreshWealth,
@@ -23,8 +33,8 @@ export function useIncomeData() {
     refreshIncome,
   } = useFinancialData();
   return {
-    records: incomeRecords,
-    categories: incomeCategories,
+    records: incomeRecords as IncomeRecord[],
+    categories: incomeCategories as IncomeCategory[],
     exchangeRate,
     loading,
     refresh: refreshIncome,
@@ -40,8 +50,8 @@ export function useExpenseData() {
     refreshExpenseCategories,
   } = useFinancialData();
   return {
-    records: expenseRecords,
-    categories: expenseCategories,
+    records: expenseRecords as ExpenseRecord[],
+    categories: expenseCategories as ExpenseCategory[],
     loading,
     refresh: refreshExpenses,
     refreshCategories: refreshExpenseCategories,
@@ -52,8 +62,8 @@ export function useBudgetData() {
   const { budgetExpenses, budgetTodoItems, loading, refreshBudget } =
     useFinancialData();
   return {
-    expenses: budgetExpenses,
-    todoItems: budgetTodoItems,
+    expenses: budgetExpenses as BudgetExpense[],
+    todoItems: budgetTodoItems as BudgetTodoItem[],
     loading,
     refresh: refreshBudget,
   };
