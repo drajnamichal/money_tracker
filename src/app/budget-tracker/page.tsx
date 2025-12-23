@@ -185,12 +185,6 @@ export default function BudgetTrackerPage() {
                 totalBudget={TOTAL_BUDGET}
                 totalSpent={totalSpent}
                 remainingBudget={remainingBudget}
-                onExportSuccess={(message) =>
-                  toast.success('Export úspešný!', { description: message })
-                }
-                onExportError={(message) =>
-                  toast.error('Chyba pri exporte', { description: message })
-                }
               />
             </div>
             <div className="lg:col-span-5">

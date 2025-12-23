@@ -9,7 +9,6 @@ import {
   CategoryEmoji,
   MoneyEmoji,
 } from './icons';
-import ExportButton from './export-button';
 
 interface ExpenseListProps {
   expenses: any[];
@@ -21,8 +20,6 @@ interface ExpenseListProps {
   totalBudget: number;
   totalSpent: number;
   remainingBudget: number;
-  onExportSuccess?: (message: string) => void;
-  onExportError?: (message: string) => void;
 }
 
 const ExpenseList: React.FC<ExpenseListProps> = ({
@@ -32,8 +29,6 @@ const ExpenseList: React.FC<ExpenseListProps> = ({
   totalBudget,
   totalSpent,
   remainingBudget,
-  onExportSuccess,
-  onExportError,
 }) => {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editedDescription, setEditedDescription] = useState('');
@@ -165,20 +160,6 @@ const ExpenseList: React.FC<ExpenseListProps> = ({
             </div>
           ))
         )}
-      </div>
-
-      {/* Export Button */}
-      <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-800">
-        <div className="flex justify-center">
-          <ExportButton
-            expenses={expenses}
-            totalBudget={totalBudget}
-            totalSpent={totalSpent}
-            remainingBudget={remainingBudget}
-            onSuccess={onExportSuccess}
-            onError={onExportError}
-          />
-        </div>
       </div>
     </div>
   );

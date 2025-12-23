@@ -9,7 +9,6 @@ import {
   LayoutGrid,
   BarChart3,
   Plus,
-  Download,
   Home,
 } from 'lucide-react';
 
@@ -22,7 +21,6 @@ export const MoneyIcon = Coins;
 export const CategoryIcon = LayoutGrid;
 export const ChartIcon = BarChart3;
 export const AddIcon = Plus;
-export const ExportIcon = Download;
 
 // Emoji Components for Visual Enhancement
 export const MoneyEmoji: React.FC<{ className?: string }> = ({
