@@ -2,7 +2,14 @@
 
 import { useEffect, useState, useMemo } from 'react';
 import { formatCurrency } from '@/lib/utils';
-import { TrendingUp, TrendingDown, Wallet } from 'lucide-react';
+import {
+  TrendingUp,
+  TrendingDown,
+  Wallet,
+  ArrowUpRight,
+  ArrowDownRight,
+  Lightbulb,
+} from 'lucide-react';
 import {
   AreaChart,
   Area,
@@ -15,7 +22,7 @@ import {
   Bar,
   Legend,
 } from 'recharts';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { Skeleton } from '@/components/skeleton';
 import {
   useWealthData,
@@ -35,6 +42,11 @@ export default function Dashboard() {
     let growth = 0;
     let monthlyIncome = 0;
     let monthlyExpenses = 0;
+    let incomeChange = 0;
+    let expenseChange = 0;
+    let savingsChange = 0;
+    let insight: { text: string; type: 'warning' | 'success' | 'info' } | null =
+      null;
 
     if (wealthData && wealthData.length > 0) {
       const totalsByDate = wealthData.reduce((acc: any, curr: any) => {
@@ -60,7 +72,12 @@ export default function Dashboard() {
       incomeData.forEach((item: any) => {
         const month = item.record_month.substring(0, 7);
         if (!monthlyData[month])
-          monthlyData[month] = { month, income: 0, expenses: 0 };
+          monthlyData[month] = {
+            month,
+            income: 0,
+            expenses: 0,
+            categories: {},
+          };
         monthlyData[month].income += Number(item.amount_eur);
       });
     }
@@ -69,8 +86,20 @@ export default function Dashboard() {
       expenseData.forEach((item: any) => {
         const month = item.record_date.substring(0, 7);
         if (!monthlyData[month])
-          monthlyData[month] = { month, income: 0, expenses: 0 };
+          monthlyData[month] = {
+            month,
+            income: 0,
+            expenses: 0,
+            categories: {},
+          };
         monthlyData[month].expenses += Number(item.amount_eur);
+
+        // Track category spending
+        const cat = item.category || 'Ostatné';
+        if (!monthlyData[month].categories[cat]) {
+          monthlyData[month].categories[cat] = 0;
+        }
+        monthlyData[month].categories[cat] += Number(item.amount_eur);
       });
     }
 
@@ -79,12 +108,74 @@ export default function Dashboard() {
     );
 
     const latestMonth: any = combinedSorted[combinedSorted.length - 1];
+    const prevMonth: any = combinedSorted[combinedSorted.length - 2];
+
     if (latestMonth) {
       monthlyIncome = latestMonth.income;
       monthlyExpenses = latestMonth.expenses;
+
+      if (prevMonth) {
+        // Calculate % changes
+        incomeChange =
+          prevMonth.income !== 0
+            ? ((latestMonth.income - prevMonth.income) / prevMonth.income) * 100
+            : 0;
+        expenseChange =
+          prevMonth.expenses !== 0
+            ? ((latestMonth.expenses - prevMonth.expenses) /
+                prevMonth.expenses) *
+              100
+            : 0;
+
+        const latestSavings = latestMonth.income - latestMonth.expenses;
+        const prevSavings = prevMonth.income - prevMonth.expenses;
+        savingsChange =
+          prevSavings !== 0
+            ? ((latestSavings - prevSavings) / Math.abs(prevSavings)) * 100
+            : 0;
+
+        // Generate Insights
+        const categoryInsights: string[] = [];
+        Object.entries(latestMonth.categories).forEach(
+          ([cat, amount]: [string, any]) => {
+            const prevAmount = prevMonth.categories[cat] || 0;
+            if (prevAmount > 0) {
+              const diff = ((amount - prevAmount) / prevAmount) * 100;
+              if (diff > 20) {
+                categoryInsights.push(
+                  `Tento mesiac míňaš o ${diff.toFixed(0)}% viac na ${cat.toLowerCase()} ako minulý mesiac.`
+                );
+              }
+            }
+          }
+        );
+
+        if (categoryInsights.length > 0) {
+          insight = { text: categoryInsights[0], type: 'warning' };
+        } else if (savingsChange > 10) {
+          insight = {
+            text: `Skvelá práca! Tento mesiac si ušetril o ${savingsChange.toFixed(0)}% viac ako naposledy.`,
+            type: 'success',
+          };
+        } else if (expenseChange < -10) {
+          insight = {
+            text: `Tvoje výdavky klesli o ${Math.abs(expenseChange).toFixed(0)}%. Len tak ďalej!`,
+            type: 'success',
+          };
+        }
+      }
     }
 
-    return { totalAssets, growth, monthlyIncome, monthlyExpenses };
+    return {
+      totalAssets,
+      growth,
+      monthlyIncome,
+      monthlyExpenses,
+      incomeChange,
+      expenseChange,
+      savingsChange,
+      insight,
+    };
   }, [wealthData, incomeData, expenseData]);
 
   const assetsHistory = useMemo(() => {
@@ -176,29 +267,62 @@ export default function Dashboard() {
             <StatCard
               title="Mesačný Príjem"
               value={formatCurrency(stats.monthlyIncome)}
-              change={0}
+              change={stats.incomeChange}
               icon={<TrendingUp className="text-emerald-500" />}
               color="emerald"
             />
             <StatCard
               title="Mesačné Výdavky"
               value={formatCurrency(stats.monthlyExpenses)}
-              change={0}
+              change={stats.expenseChange}
               icon={<TrendingDown className="text-rose-500" />}
               color="rose"
+              reverse
             />
             <StatCard
               title="Mesačná Úspora"
               value={formatCurrency(
                 stats.monthlyIncome - stats.monthlyExpenses
               )}
-              change={0}
+              change={stats.savingsChange}
               icon={<TrendingUp className="text-blue-500" />}
               color="blue"
             />
           </>
         )}
       </div>
+
+      <AnimatePresence>
+        {!loading && stats.insight && (
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className={`p-4 rounded-2xl border flex items-start gap-4 ${
+              stats.insight.type === 'warning'
+                ? 'bg-amber-50 border-amber-100 text-amber-900 dark:bg-amber-950/20 dark:border-amber-900/30 dark:text-amber-200'
+                : stats.insight.type === 'success'
+                  ? 'bg-emerald-50 border-emerald-100 text-emerald-900 dark:bg-emerald-950/20 dark:border-emerald-900/30 dark:text-emerald-200'
+                  : 'bg-blue-50 border-blue-100 text-blue-900 dark:bg-blue-950/20 dark:border-blue-900/30 dark:text-blue-200'
+            }`}
+          >
+            <div
+              className={`p-2 rounded-lg ${
+                stats.insight.type === 'warning'
+                  ? 'bg-amber-100 dark:bg-amber-900/40'
+                  : stats.insight.type === 'success'
+                    ? 'bg-emerald-100 dark:bg-emerald-900/40'
+                    : 'bg-blue-100 dark:bg-blue-900/40'
+              }`}
+            >
+              <Lightbulb size={20} />
+            </div>
+            <div className="flex-1">
+              <p className="font-semibold text-sm">Inteligentný postreh</p>
+              <p className="text-sm opacity-90">{stats.insight.text}</p>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl shadow-sm border">
@@ -305,26 +429,38 @@ export default function Dashboard() {
   );
 }
 
-function StatCard({ title, value, change, icon, color }: any) {
+function StatCard({ title, value, change, icon, color, reverse }: any) {
+  const isPositive = change > 0;
+  const isGood = reverse ? !isPositive : isPositive;
+
   return (
     <motion.div
       whileHover={{ y: -4 }}
-      className="bg-white dark:bg-slate-900 p-6 rounded-2xl shadow-sm border flex items-center gap-6"
+      className="bg-white dark:bg-slate-900 p-6 rounded-2xl shadow-sm border flex items-center gap-6 relative overflow-hidden"
     >
-      <div className={`p-4 rounded-xl bg-${color}-50 dark:bg-${color}-950`}>
+      <div className={`p-4 rounded-xl bg-${color}-50 dark:bg-${color}-950/30`}>
         {icon}
       </div>
-      <div>
+      <div className="flex-1">
         <p className="text-sm text-slate-500 font-medium">{title}</p>
         <div className="flex items-baseline gap-2">
           <h3 className="text-2xl font-bold">{value}</h3>
           {change !== 0 && (
-            <span
-              className={`text-xs font-bold ${change > 0 ? 'text-emerald-500' : 'text-rose-500'}`}
+            <div
+              className={`flex items-center text-xs font-bold ${isGood ? 'text-emerald-500' : 'text-rose-500'}`}
             >
-              {change > 0 ? '+' : ''}
-              {change.toFixed(1)}%
-            </span>
+              {isPositive ? (
+                <ArrowUpRight size={14} />
+              ) : (
+                <ArrowDownRight size={14} />
+              )}
+              <span>
+                {Math.abs(change).toFixed(1)}%
+                <span className="text-[10px] opacity-60 ml-1 font-normal">
+                  vs min. m.
+                </span>
+              </span>
+            </div>
           )}
         </div>
       </div>
