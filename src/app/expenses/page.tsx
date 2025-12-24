@@ -45,6 +45,7 @@ const expenseSchema = z.object({
   amount: z.string().refine((val) => !isNaN(Number(val)) && Number(val) > 0, {
     message: 'Suma musí byť kladné číslo',
   }),
+  currency: z.string().min(1),
   record_date: z.string().min(1, 'Dátum je povinný'),
 });
 
@@ -60,6 +61,7 @@ export default function ExpensesPage() {
   const {
     records: expenses,
     categories,
+    exchangeRate,
     loading,
     refresh,
     refreshCategories,
@@ -82,23 +84,32 @@ export default function ExpensesPage() {
       description: '',
       category: '',
       amount: '',
+      currency: 'EUR',
       record_date: new Date().toISOString().split('T')[0],
     },
   });
 
   const onAddExpense = async (values: ExpenseFormValues) => {
     setIsAdding(false);
-    reset();
+    reset({
+      ...values,
+      description: '',
+      amount: '',
+    });
 
     try {
+      const amount = Number(values.amount);
+      const amountEur =
+        values.currency === 'CZK' ? amount / exchangeRate : amount;
+
       const { error } = await supabase.from('expense_records').insert([
         {
           description: values.description,
           category: values.category,
-          amount: Number(values.amount),
-          amount_eur: Number(values.amount),
+          amount: amount,
+          currency: values.currency,
+          amount_eur: amountEur,
           record_date: values.record_date,
-          currency: 'EUR',
         },
       ]);
 
@@ -246,6 +257,11 @@ export default function ExpensesPage() {
           <p className="text-slate-500">
             Sleduj a spravuj svoje mesačné výdavky.
           </p>
+          {!loading && exchangeRate && (
+            <p className="text-[10px] text-slate-400 mt-1 uppercase tracking-wider font-bold">
+              Aktuálny kurz: 1 EUR = {exchangeRate.toFixed(2)} CZK
+            </p>
+          )}
         </div>
         <div className="flex gap-2">
           <input
@@ -350,7 +366,7 @@ export default function ExpensesPage() {
           >
             <form
               onSubmit={handleSubmit(onAddExpense)}
-              className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end"
+              className="grid grid-cols-1 md:grid-cols-5 gap-4 items-end"
             >
               <div className="space-y-2">
                 <label className="text-sm font-medium">Popis</label>
@@ -385,19 +401,36 @@ export default function ExpensesPage() {
                 )}
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-medium">Čiastka (€)</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  className={`w-full bg-slate-50 dark:bg-slate-800 border rounded-lg px-4 py-2 focus:ring-2 focus:ring-rose-500 outline-none ${errors.amount ? 'border-rose-500' : ''}`}
-                  {...register('amount')}
-                  placeholder="0.00"
-                />
+                <label className="text-sm font-medium">Čiastka</label>
+                <div className="flex gap-2">
+                  <input
+                    type="number"
+                    step="0.01"
+                    className={`flex-1 bg-slate-50 dark:bg-slate-800 border rounded-lg px-4 py-2 focus:ring-2 focus:ring-rose-500 outline-none ${errors.amount ? 'border-rose-500' : ''}`}
+                    {...register('amount')}
+                    placeholder="0.00"
+                  />
+                  <select
+                    className="bg-slate-50 dark:bg-slate-800 border rounded-lg px-2 py-2 text-sm outline-none focus:ring-2 focus:ring-rose-500"
+                    {...register('currency')}
+                  >
+                    <option value="EUR">EUR</option>
+                    <option value="CZK">CZK</option>
+                  </select>
+                </div>
                 {errors.amount && (
                   <p className="text-xs text-rose-500">
                     {errors.amount.message}
                   </p>
                 )}
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Dátum</label>
+                <input
+                  type="date"
+                  className={`w-full bg-slate-50 dark:bg-slate-800 border rounded-lg px-4 py-2 focus:ring-2 focus:ring-rose-500 outline-none ${errors.record_date ? 'border-rose-500' : ''}`}
+                  {...register('record_date')}
+                />
               </div>
               <div className="flex gap-2">
                 <button
@@ -440,7 +473,12 @@ export default function ExpensesPage() {
                     <th className="px-6 py-4 font-semibold">Dátum</th>
                     <th className="px-6 py-4 font-semibold">Popis</th>
                     <th className="px-6 py-4 font-semibold">Kategória</th>
-                    <th className="px-6 py-4 font-semibold text-right">Suma</th>
+                    <th className="px-6 py-4 font-semibold">
+                      Čiastka (pôvodná)
+                    </th>
+                    <th className="px-6 py-4 font-semibold text-right">
+                      Suma (EUR)
+                    </th>
                     <th className="px-6 py-4"></th>
                   </tr>
                 </thead>
@@ -448,7 +486,7 @@ export default function ExpensesPage() {
                   {expenses.length === 0 ? (
                     <tr>
                       <td
-                        colSpan={5}
+                        colSpan={6}
                         className="px-6 py-12 text-center text-slate-400"
                       >
                         Žiadne výdavky nenájdené. Začni pridaním prvého.
@@ -477,6 +515,9 @@ export default function ExpensesPage() {
                           <span className="px-2 py-1 bg-slate-100 dark:bg-slate-800 rounded-md text-xs font-medium">
                             {expense.category}
                           </span>
+                        </td>
+                        <td className="px-6 py-4 text-slate-400">
+                          {expense.amount} {expense.currency}
                         </td>
                         <td className="px-6 py-4 text-right font-bold text-rose-500">
                           -{formatCurrency(expense.amount_eur)}

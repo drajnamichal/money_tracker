@@ -57,6 +57,8 @@ export interface BudgetExpense {
   id: string;
   description: string;
   amount: number;
+  amount_eur: number;
+  currency: 'EUR' | 'CZK';
   is_fixed: boolean;
   attachment_url: string | null;
   created_at: string;

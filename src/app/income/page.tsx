@@ -86,7 +86,7 @@ export default function IncomePage() {
         { amount: string; currency: string }
       > = {};
       categories.forEach((cat) => {
-        initialRecords[cat.id] = { amount: '', currency: 'CZK' };
+        initialRecords[cat.id] = { amount: '', currency: 'EUR' };
       });
       reset({
         recordMonth: new Date().toISOString().substring(0, 7),
