@@ -7,6 +7,7 @@ import { Loader2, Calculator, Save, RefreshCw } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { toast } from 'sonner';
 import { Skeleton } from '@/components/skeleton';
+import { calculateSalaryResults } from '@/lib/calculations';
 
 export default function CalculatorPage() {
   const [loading, setLoading] = useState(true);
@@ -54,25 +55,7 @@ export default function CalculatorPage() {
     }
   }
 
-  const results = [
-    {
-      name: 'Fixné náklady (Domácnosť, účty)',
-      percent: split.fixed_costs,
-      color: 'blue',
-    },
-    {
-      name: 'Investície (ETF, Akcie)',
-      percent: split.investments,
-      color: 'emerald',
-    },
-    {
-      name: 'Krátkodobé sporenie (Rezerva)',
-      percent: split.savings,
-      color: 'amber',
-    },
-    { name: 'Zábava a radosť', percent: split.fun, color: 'rose' },
-  ];
-
+  const results = calculateSalaryResults(salary, split);
   const totalPercent = Object.values(split).reduce((a, b) => a + b, 0);
 
   return (
@@ -169,7 +152,6 @@ export default function CalculatorPage() {
           ) : (
             <>
               {results.map((item, index) => {
-                const amount = (salary * item.percent) / 100;
                 return (
                   <motion.div
                     key={item.name}
@@ -187,7 +169,7 @@ export default function CalculatorPage() {
                       <div>
                         <p className="text-sm text-slate-500">{item.name}</p>
                         <h4 className="text-xl font-bold">
-                          {formatCurrency(amount)}
+                          {formatCurrency(item.amount)}
                         </h4>
                       </div>
                     </div>

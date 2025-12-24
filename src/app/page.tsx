@@ -29,6 +29,12 @@ import {
   useIncomeData,
   useExpenseData,
 } from '@/hooks/use-financial-data';
+import {
+  calculatePercentageChange,
+  aggregateMonthlyData,
+  calculateWealthGrowth,
+  generateSpendingInsight,
+} from '@/lib/calculations';
 
 export default function Dashboard() {
   const { records: wealthData, loading: wealthLoading } = useWealthData();
@@ -38,131 +44,38 @@ export default function Dashboard() {
   const loading = wealthLoading || incomeLoading || expenseLoading;
 
   const stats = useMemo(() => {
-    let totalAssets = 0;
-    let growth = 0;
+    const { totalAssets, growth } = calculateWealthGrowth(wealthData);
+    const combinedMonthlyData = aggregateMonthlyData(incomeData, expenseData);
+
     let monthlyIncome = 0;
     let monthlyExpenses = 0;
     let incomeChange = 0;
     let expenseChange = 0;
     let savingsChange = 0;
-    let insight: { text: string; type: 'warning' | 'success' | 'info' } | null =
-      null;
+    let insight = null;
 
-    if (wealthData && wealthData.length > 0) {
-      const totalsByDate = wealthData.reduce((acc: any, curr: any) => {
-        acc[curr.record_date] =
-          (acc[curr.record_date] || 0) + Number(curr.amount_eur);
-        return acc;
-      }, {});
-
-      const sortedDates = Object.keys(totalsByDate).sort();
-      const latestDate = sortedDates[sortedDates.length - 1];
-      const previousDate = sortedDates[sortedDates.length - 2];
-
-      totalAssets = totalsByDate[latestDate];
-      const previousTotal = totalsByDate[previousDate] || totalAssets;
-      growth =
-        previousTotal !== 0
-          ? ((totalAssets - previousTotal) / previousTotal) * 100
-          : 0;
-    }
-
-    const monthlyData: any = {};
-    if (incomeData) {
-      incomeData.forEach((item: any) => {
-        const month = item.record_month.substring(0, 7);
-        if (!monthlyData[month])
-          monthlyData[month] = {
-            month,
-            income: 0,
-            expenses: 0,
-            categories: {},
-          };
-        monthlyData[month].income += Number(item.amount_eur);
-      });
-    }
-
-    if (expenseData) {
-      expenseData.forEach((item: any) => {
-        const month = item.record_date.substring(0, 7);
-        if (!monthlyData[month])
-          monthlyData[month] = {
-            month,
-            income: 0,
-            expenses: 0,
-            categories: {},
-          };
-        monthlyData[month].expenses += Number(item.amount_eur);
-
-        // Track category spending
-        const cat = item.category || 'Ostatné';
-        if (!monthlyData[month].categories[cat]) {
-          monthlyData[month].categories[cat] = 0;
-        }
-        monthlyData[month].categories[cat] += Number(item.amount_eur);
-      });
-    }
-
-    const combinedSorted = Object.values(monthlyData).sort((a: any, b: any) =>
-      a.month.localeCompare(b.month)
-    );
-
-    const latestMonth: any = combinedSorted[combinedSorted.length - 1];
-    const prevMonth: any = combinedSorted[combinedSorted.length - 2];
+    const latestMonth = combinedMonthlyData[combinedMonthlyData.length - 1];
+    const prevMonth = combinedMonthlyData[combinedMonthlyData.length - 2];
 
     if (latestMonth) {
       monthlyIncome = latestMonth.income;
       monthlyExpenses = latestMonth.expenses;
 
       if (prevMonth) {
-        // Calculate % changes
-        incomeChange =
-          prevMonth.income !== 0
-            ? ((latestMonth.income - prevMonth.income) / prevMonth.income) * 100
-            : 0;
-        expenseChange =
-          prevMonth.expenses !== 0
-            ? ((latestMonth.expenses - prevMonth.expenses) /
-                prevMonth.expenses) *
-              100
-            : 0;
+        incomeChange = calculatePercentageChange(
+          latestMonth.income,
+          prevMonth.income
+        );
+        expenseChange = calculatePercentageChange(
+          latestMonth.expenses,
+          prevMonth.expenses
+        );
 
         const latestSavings = latestMonth.income - latestMonth.expenses;
         const prevSavings = prevMonth.income - prevMonth.expenses;
-        savingsChange =
-          prevSavings !== 0
-            ? ((latestSavings - prevSavings) / Math.abs(prevSavings)) * 100
-            : 0;
+        savingsChange = calculatePercentageChange(latestSavings, prevSavings);
 
-        // Generate Insights
-        const categoryInsights: string[] = [];
-        Object.entries(latestMonth.categories).forEach(
-          ([cat, amount]: [string, any]) => {
-            const prevAmount = prevMonth.categories[cat] || 0;
-            if (prevAmount > 0) {
-              const diff = ((amount - prevAmount) / prevAmount) * 100;
-              if (diff > 20) {
-                categoryInsights.push(
-                  `Tento mesiac míňaš o ${diff.toFixed(0)}% viac na ${cat.toLowerCase()} ako minulý mesiac.`
-                );
-              }
-            }
-          }
-        );
-
-        if (categoryInsights.length > 0) {
-          insight = { text: categoryInsights[0], type: 'warning' };
-        } else if (savingsChange > 10) {
-          insight = {
-            text: `Skvelá práca! Tento mesiac si ušetril o ${savingsChange.toFixed(0)}% viac ako naposledy.`,
-            type: 'success',
-          };
-        } else if (expenseChange < -10) {
-          insight = {
-            text: `Tvoje výdavky klesli o ${Math.abs(expenseChange).toFixed(0)}%. Len tak ďalej!`,
-            type: 'success',
-          };
-        }
+        insight = generateSpendingInsight(latestMonth, prevMonth);
       }
     }
 
@@ -197,36 +110,15 @@ export default function Dashboard() {
       }));
   }, [wealthData]);
 
-  const incomeVsExpenses = useMemo(() => {
-    const monthlyData: any = {};
-    if (incomeData) {
-      incomeData.forEach((item: any) => {
-        const month = item.record_month.substring(0, 7);
-        if (!monthlyData[month])
-          monthlyData[month] = { month, income: 0, expenses: 0 };
-        monthlyData[month].income += Number(item.amount_eur);
-      });
-    }
-
-    if (expenseData) {
-      expenseData.forEach((item: any) => {
-        const month = item.record_date.substring(0, 7);
-        if (!monthlyData[month])
-          monthlyData[month] = { month, income: 0, expenses: 0 };
-        monthlyData[month].expenses += Number(item.amount_eur);
-      });
-    }
-
-    return Object.values(monthlyData)
-      .sort((a: any, b: any) => a.month.localeCompare(b.month))
-      .map((item: any) => ({
-        name: new Date(item.month).toLocaleDateString('sk-SK', {
-          month: 'short',
-          year: '2-digit',
-        }),
-        income: item.income,
-        expenses: item.expenses,
-      }));
+  const incomeVsExpensesChartData = useMemo(() => {
+    return aggregateMonthlyData(incomeData, expenseData).map((item) => ({
+      name: new Date(item.month).toLocaleDateString('sk-SK', {
+        month: 'short',
+        year: '2-digit',
+      }),
+      income: item.income,
+      expenses: item.expenses,
+    }));
   }, [incomeData, expenseData]);
 
   return (
@@ -384,7 +276,7 @@ export default function Dashboard() {
               <Skeleton className="w-full h-full" />
             ) : (
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={incomeVsExpenses}>
+                <BarChart data={incomeVsExpensesChartData}>
                   <CartesianGrid
                     strokeDasharray="3 3"
                     vertical={false}
