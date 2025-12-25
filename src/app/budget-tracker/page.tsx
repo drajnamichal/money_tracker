@@ -11,7 +11,7 @@ import TodoList from '@/components/budget-tracker/todo-list';
 import { Building2 } from 'lucide-react';
 import { motion } from 'framer-motion';
 
-const TOTAL_BUDGET = 26500;
+const TOTAL_BUDGET = 250000;
 
 const BudgetTrackerPage = () => {
   const { expenses, todoItems, exchangeRate, loading, refresh } =
