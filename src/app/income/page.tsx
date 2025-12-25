@@ -6,6 +6,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { supabase } from '@/lib/supabase';
 import { formatCurrency } from '@/lib/utils';
+import { mergeIncomeItems } from '@/lib/calculations';
 import {
   Loader2,
   Plus,
@@ -99,16 +100,22 @@ export default function IncomePage() {
     setSaving(true);
     try {
       const inserts = [];
+      const mergedItems = mergeIncomeItems(data.items);
+      const localCategoriesMap = new Map<string, string>();
 
-      for (const item of data.items) {
+      // Pre-fill local map with existing categories
+      categories.forEach((cat) => {
+        localCategoriesMap.set(cat.name.toLowerCase(), cat.id);
+      });
+
+      for (const item of mergedItems) {
         let categoryId;
-        const existing = categories.find(
-          (c) => c.name.toLowerCase() === item.categoryName.trim().toLowerCase()
-        );
+        const normalizedName = item.categoryName.trim().toLowerCase();
 
-        if (existing) {
-          categoryId = existing.id;
+        if (localCategoriesMap.has(normalizedName)) {
+          categoryId = localCategoriesMap.get(normalizedName);
         } else {
+          // Create new category if it doesn't exist
           const { data: newCat, error: catError } = await supabase
             .from('income_categories')
             .insert({ name: item.categoryName.trim() })
@@ -117,6 +124,7 @@ export default function IncomePage() {
 
           if (catError) throw catError;
           categoryId = newCat.id;
+          localCategoriesMap.set(normalizedName, categoryId);
         }
 
         const amount = Number(item.amount);
@@ -132,7 +140,10 @@ export default function IncomePage() {
         });
       }
 
-      const { error } = await supabase.from('income_records').insert(inserts);
+      // Use upsert to handle cases where user might be updating a month
+      const { error } = await supabase.from('income_records').upsert(inserts, {
+        onConflict: 'category_id,record_month',
+      });
 
       if (error) throw error;
 

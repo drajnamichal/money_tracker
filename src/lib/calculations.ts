@@ -157,3 +157,63 @@ export function calculateSalaryResults(
     },
   ];
 }
+
+export interface AssetItem {
+  accountName: string;
+  amount: string;
+  currency: string;
+}
+
+export function mergeAssetItems(items: AssetItem[]): {
+  accountName: string;
+  amount: number;
+  currency: string;
+}[] {
+  const merged: Record<string, { amount: number; currency: string }> = {};
+
+  items.forEach((item) => {
+    const name = item.accountName.trim();
+    if (!name) return;
+
+    const amount = Number(item.amount) || 0;
+    if (!merged[name]) {
+      merged[name] = { amount: 0, currency: item.currency };
+    }
+    merged[name].amount += amount;
+  });
+
+  return Object.entries(merged).map(([accountName, data]) => ({
+    accountName,
+    ...data,
+  }));
+}
+
+export interface IncomeItem {
+  categoryName: string;
+  amount: string;
+  currency: string;
+}
+
+export function mergeIncomeItems(items: IncomeItem[]): {
+  categoryName: string;
+  amount: number;
+  currency: string;
+}[] {
+  const merged: Record<string, { amount: number; currency: string }> = {};
+
+  items.forEach((item) => {
+    const name = item.categoryName.trim();
+    if (!name) return;
+
+    const amount = Number(item.amount) || 0;
+    if (!merged[name]) {
+      merged[name] = { amount: 0, currency: item.currency };
+    }
+    merged[name].amount += amount;
+  });
+
+  return Object.entries(merged).map(([categoryName, data]) => ({
+    categoryName,
+    ...data,
+  }));
+}

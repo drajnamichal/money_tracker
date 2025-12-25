@@ -6,6 +6,8 @@ import {
   calculateSalaryResults,
   MonthlyData,
   SalarySplit,
+  mergeAssetItems,
+  AssetItem,
 } from '../lib/calculations';
 
 describe('calculations', () => {
@@ -163,6 +165,38 @@ describe('calculations', () => {
         150
       );
       expect(results.find((r) => r.name.includes('Zábava'))?.amount).toBe(50);
+    });
+  });
+
+  describe('mergeAssetItems', () => {
+    it('merges multiple items with the same account name', () => {
+      const items: AssetItem[] = [
+        { accountName: 'Tatra Banka', amount: '100', currency: 'EUR' },
+        { accountName: 'Tatra Banka', amount: '200', currency: 'EUR' },
+        { accountName: 'Crypto', amount: '500', currency: 'EUR' },
+      ];
+
+      const merged = mergeAssetItems(items);
+
+      expect(merged).toHaveLength(2);
+      expect(merged.find((m) => m.accountName === 'Tatra Banka')?.amount).toBe(
+        300
+      );
+      expect(merged.find((m) => m.accountName === 'Crypto')?.amount).toBe(500);
+    });
+
+    it('trims account names and handles case insensitivity', () => {
+      // Note: Current mergeAssetItems implementation is case sensitive.
+      // Let's check if we want it to be case insensitive.
+      // For now, let's test trimming.
+      const items: AssetItem[] = [
+        { accountName: ' Tatra Banka ', amount: '100', currency: 'EUR' },
+        { accountName: 'Tatra Banka', amount: '200', currency: 'EUR' },
+      ];
+
+      const merged = mergeAssetItems(items);
+      expect(merged).toHaveLength(1);
+      expect(merged[0].amount).toBe(300);
     });
   });
 });

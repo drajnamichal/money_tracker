@@ -6,6 +6,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { supabase } from '@/lib/supabase';
 import { formatCurrency } from '@/lib/utils';
+import { mergeAssetItems } from '@/lib/calculations';
 import { Loader2, Plus, ArrowRight, Save, X, Trash2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
@@ -84,16 +85,22 @@ export default function AssetsPage() {
     setSaving(true);
     try {
       const inserts = [];
+      const mergedItems = mergeAssetItems(data.items);
+      const localAccountsMap = new Map<string, string>();
 
-      for (const item of data.items) {
+      // Pre-fill local map with existing accounts
+      accounts.forEach((acc) => {
+        localAccountsMap.set(acc.name.toLowerCase(), acc.id);
+      });
+
+      for (const item of mergedItems) {
         let accountId;
-        const existing = accounts.find(
-          (a) => a.name.toLowerCase() === item.accountName.trim().toLowerCase()
-        );
+        const normalizedName = item.accountName.trim().toLowerCase();
 
-        if (existing) {
-          accountId = existing.id;
+        if (localAccountsMap.has(normalizedName)) {
+          accountId = localAccountsMap.get(normalizedName);
         } else {
+          // Create new account if it doesn't exist
           const { data: newAccount, error: accError } = await supabase
             .from('asset_accounts')
             .insert({
@@ -106,6 +113,7 @@ export default function AssetsPage() {
 
           if (accError) throw accError;
           accountId = newAccount.id;
+          localAccountsMap.set(normalizedName, accountId);
         }
 
         const amount = Number(item.amount);
@@ -120,7 +128,10 @@ export default function AssetsPage() {
         });
       }
 
-      const { error } = await supabase.from('wealth_records').insert(inserts);
+      // Use upsert to prevent unique constraint errors if record already exists for this date
+      const { error } = await supabase.from('wealth_records').upsert(inserts, {
+        onConflict: 'account_id,record_date',
+      });
 
       if (error) throw error;
 
