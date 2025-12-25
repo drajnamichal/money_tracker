@@ -105,7 +105,7 @@ export default function AssetsPage() {
             .from('asset_accounts')
             .insert({
               name: item.accountName.trim(),
-              type: 'Ostatné',
+              type: 'other',
               currency: item.currency as 'EUR' | 'CZK',
             })
             .select()
