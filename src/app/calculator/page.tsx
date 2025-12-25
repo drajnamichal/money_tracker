@@ -14,10 +14,10 @@ export default function CalculatorPage() {
   const [saving, setSaving] = useState(false);
   const [salary, setSalary] = useState(7000);
   const [split, setSplit] = useState({
-    fixed_costs: 55,
-    investments: 25,
-    savings: 15,
-    fun: 5,
+    fixed_costs: 50,
+    investments: 20,
+    savings: 10,
+    fun: 20,
   });
 
   useEffect(() => {
