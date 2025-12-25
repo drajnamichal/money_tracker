@@ -64,13 +64,13 @@ export default function CalculatorPage() {
       !loading &&
       salary === 7000
     ) {
-      setSalary(latestMonthIncome);
+      setSalary(Math.round(latestMonthIncome));
     }
   }, [incomeLoading, latestMonthIncome, loading, salary]);
 
   const handleSyncFromIncome = () => {
     if (latestMonthIncome > 0) {
-      setSalary(latestMonthIncome);
+      setSalary(Math.round(latestMonthIncome));
       toast.success('Príjem bol aktualizovaný podľa aktuálnych dát');
     } else {
       toast.error('Nenašli sa žiadne príjmy pre aktuálny mesiac');
@@ -129,7 +129,7 @@ export default function CalculatorPage() {
                 type="number"
                 className="w-full text-3xl font-bold bg-transparent border-b-2 border-slate-100 dark:border-slate-800 focus:border-blue-600 outline-none pb-2 transition-colors"
                 value={salary}
-                onChange={(e) => setSalary(Number(e.target.value))}
+                onChange={(e) => setSalary(Math.round(Number(e.target.value)))}
               />
             )}
           </div>
