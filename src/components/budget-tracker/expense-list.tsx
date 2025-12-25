@@ -155,18 +155,10 @@ const ExpenseList: React.FC<ExpenseListProps> = ({
                     <div className="flex flex-col text-[10px] sm:text-xs">
                       <p className="text-slate-600 dark:text-slate-400 flex items-center gap-1">
                         <MoneyEmoji className="w-3 h-3" />
-                        {expense.amount} {expense.currency || 'EUR'}
+                        {expense.currency === 'CZK'
+                          ? `${expense.amount} CZK (${formatCurrency(expense.amount_eur)})`
+                          : formatCurrency(expense.amount)}
                       </p>
-                      {expense.currency === 'CZK' && (
-                        <p className="text-rose-500 font-semibold italic">
-                          ({formatCurrency(expense.amount_eur)})
-                        </p>
-                      )}
-                      {expense.currency !== 'CZK' && (
-                        <p className="text-rose-500 font-semibold italic">
-                          ({formatCurrency(expense.amount)})
-                        </p>
-                      )}
                     </div>
                   </div>
                   <div className="flex items-center ml-4 shrink-0">
