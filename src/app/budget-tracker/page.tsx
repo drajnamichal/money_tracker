@@ -177,7 +177,7 @@ const BudgetTrackerPage = () => {
             <Summary
               totalBudget={TOTAL_BUDGET}
               totalSpent={totalSpent}
-              remaining={TOTAL_BUDGET - totalSpent}
+              remainingBudget={TOTAL_BUDGET - totalSpent}
             />
           </motion.div>
 
