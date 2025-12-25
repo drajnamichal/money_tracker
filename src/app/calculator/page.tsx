@@ -11,7 +11,7 @@ import {
   RefreshCw,
   ArrowDownLeft,
 } from 'lucide-react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
 import { Skeleton } from '@/components/skeleton';
 import { calculateSalaryResults } from '@/lib/calculations';
@@ -94,6 +94,29 @@ export default function CalculatorPage() {
 
   const results = calculateSalaryResults(salary, split);
   const totalPercent = Object.values(split).reduce((a, b) => a + b, 0);
+
+  const tips = useMemo(
+    () => [
+      `Pravidlo 50/30/20 je základ. Ak však dokážeš znížiť fixné náklady pod 40 %, tvoja cesta k finančnej slobode sa výrazne zrýchli.`,
+      `Tvoje nastavenie (${split.fixed_costs}/${split.investments + split.savings}/${split.fun}) je skvelým krokom k budovaniu bohatstva!`,
+      'Investuj najskôr do seba. Vzdelávanie a nové zručnosti majú často vyššiu návratnosť ako akciový trh.',
+      'Vytvor si rezervu na 3-6 mesiacov života. To ti dodá pokoj pri investovaní a odvahu robiť lepšie kariérne rozhodnutia.',
+      'Zložené úročenie je ôsmy div sveta. Čím skôr začneš pravidelne investovať, tým menej musíš odkladať neskôr.',
+      'Nezabúdaj na infláciu. Peniaze na bežnom účte strácajú hodnotu. Rozmýšľaj nad nízkonákladovými indexovými fondmi (ETF).',
+      'Automatizuj svoje financie. Nastav si trvalé príkazy na investície hneď po výplate, aby si nemusel bojovať s pokušením míňať.',
+      'Zvyšuj svoje investície pri každom zvýšení platu. Vyhneš sa tak "inflácii životného štýlu".',
+    ],
+    [split]
+  );
+
+  const [activeTipIndex, setActiveTipIndex] = useState(0);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setActiveTipIndex((prev) => (prev + 1) % tips.length);
+    }, 10000); // Change tip every 10 seconds
+    return () => clearInterval(interval);
+  }, [tips.length]);
 
   return (
     <div className="max-w-4xl mx-auto space-y-8">
@@ -229,16 +252,40 @@ export default function CalculatorPage() {
                 );
               })}
 
-              <div className="bg-blue-600 p-6 rounded-2xl text-white shadow-lg shadow-blue-200 dark:shadow-none">
-                <div className="flex items-center gap-3 mb-4">
-                  <Calculator size={24} className="opacity-70" />
-                  <h3 className="font-bold">Rýchly tip</h3>
+              <div className="bg-blue-600 p-6 rounded-2xl text-white shadow-lg shadow-blue-200 dark:shadow-none min-h-[160px] flex flex-col justify-between relative overflow-hidden group">
+                <div>
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-3">
+                      <Calculator size={24} className="opacity-70" />
+                      <h3 className="font-bold">Rýchly tip</h3>
+                    </div>
+                    <button
+                      onClick={() =>
+                        setActiveTipIndex((prev) => (prev + 1) % tips.length)
+                      }
+                      className="p-1.5 hover:bg-white/20 rounded-lg transition-colors"
+                      title="Ďalší tip"
+                    >
+                      <RefreshCw size={16} className="opacity-70" />
+                    </button>
+                  </div>
+                  <AnimatePresence mode="wait">
+                    <motion.p
+                      key={activeTipIndex}
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -10 }}
+                      className="text-blue-100 text-sm leading-relaxed pr-4"
+                    >
+                      {tips[activeTipIndex]}
+                    </motion.p>
+                  </AnimatePresence>
                 </div>
-                <p className="text-blue-100 text-sm leading-relaxed">
-                  Pravidlo 50/30/20 je dobrý štart, ale tvoje nastavenie (
-                  {split.fixed_costs}/{split.investments + split.savings}/
-                  {split.fun}) je ešte ambicióznejšie pre budovanie bohatstva!
-                </p>
+                <div
+                  className="absolute bottom-0 left-0 h-1 bg-white/20 transition-all duration-[10000ms] ease-linear"
+                  style={{ width: '100%' }}
+                  key={`progress-${activeTipIndex}`}
+                />
               </div>
             </>
           )}
