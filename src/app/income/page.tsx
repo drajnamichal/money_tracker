@@ -225,8 +225,8 @@ export default function IncomePage() {
             <form onSubmit={handleSubmit(onSave)} className="space-y-4">
               <div className="space-y-4">
                 {fields.map((field, index) => (
-                  <div key={field.id} className="flex gap-4 items-start">
-                    <div className="flex-1 space-y-1">
+                  <div key={field.id} className="flex gap-3 items-start">
+                    <div className="flex-[3] space-y-1">
                       <input
                         {...register(`items.${index}.categoryName`)}
                         placeholder="Odkiaľ je príjem (napr. Výplata)"
@@ -238,17 +238,17 @@ export default function IncomePage() {
                         </p>
                       )}
                     </div>
-                    <div className="w-32 sm:w-48 space-y-1">
-                      <div className="flex gap-2">
+                    <div className="flex-[2] space-y-1">
+                      <div className="flex border rounded-xl bg-slate-50 dark:bg-slate-800 focus-within:ring-2 focus-within:ring-emerald-500 overflow-hidden">
                         <input
                           type="number"
                           step="0.01"
-                          className={`flex-1 bg-slate-50 dark:bg-slate-800 border rounded-xl px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-emerald-500 ${errors.items?.[index]?.amount ? 'border-rose-500 focus:ring-rose-500' : ''}`}
+                          className={`flex-1 bg-transparent px-4 py-2 text-sm outline-none ${errors.items?.[index]?.amount ? 'border-rose-500' : ''}`}
                           {...register(`items.${index}.amount`)}
                           placeholder="0.00"
                         />
                         <select
-                          className="bg-slate-50 dark:bg-slate-800 border rounded-xl px-2 py-2 text-xs outline-none focus:ring-2 focus:ring-emerald-500"
+                          className="bg-slate-100 dark:bg-slate-700 px-3 py-2 text-xs outline-none border-l dark:border-slate-600 font-bold"
                           {...register(`items.${index}.currency`)}
                         >
                           <option value="EUR">EUR</option>
@@ -265,7 +265,7 @@ export default function IncomePage() {
                       <button
                         type="button"
                         onClick={() => remove(index)}
-                        className="text-slate-400 hover:text-rose-500 p-2 mt-0.5"
+                        className="text-slate-400 hover:text-rose-500 p-2 mt-0.5 shrink-0"
                       >
                         <Trash2 size={18} />
                       </button>
