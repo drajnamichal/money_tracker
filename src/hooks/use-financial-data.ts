@@ -10,6 +10,8 @@ import {
   ExpenseCategory,
   BudgetExpense,
   BudgetTodoItem,
+  Mortgage,
+  MortgagePayment,
 } from '@/types/financial';
 
 export function useWealthData() {
@@ -74,5 +76,16 @@ export function useBudgetData() {
     exchangeRate,
     loading,
     refresh: refreshBudget,
+  };
+}
+
+export function useMortgageData() {
+  const { mortgages, mortgagePayments, loading, refreshMortgage } =
+    useFinancialData();
+  return {
+    mortgage: mortgages[0] as Mortgage | undefined,
+    payments: mortgagePayments as MortgagePayment[],
+    loading,
+    refresh: refreshMortgage,
   };
 }

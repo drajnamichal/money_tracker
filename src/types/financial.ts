@@ -69,3 +69,27 @@ export interface BudgetTodoItem {
   text: string;
   created_at: string;
 }
+
+export interface Mortgage {
+  id: string;
+  loan_number: string;
+  original_amount: number;
+  current_principal: number;
+  interest_rate: number;
+  monthly_payment: number;
+  start_date: string;
+  maturity_date: string;
+  fixation_until: string;
+  created_at?: string;
+}
+
+export interface MortgagePayment {
+  id: string;
+  mortgage_id: string;
+  payment_date: string;
+  amount: number;
+  principal_paid: number;
+  interest_paid: number;
+  remaining_principal: number;
+  created_at?: string;
+}

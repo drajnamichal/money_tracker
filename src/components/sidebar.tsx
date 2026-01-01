@@ -13,6 +13,7 @@ import {
   LogOut,
   CreditCard,
   Building2,
+  Home,
 } from 'lucide-react';
 import { useState } from 'react';
 import { cn } from '@/lib/utils';
@@ -28,6 +29,7 @@ const navigation = [
   { name: 'Výdaje', href: '/expenses', icon: Receipt },
   { name: 'Rozpočet bytu', href: '/budget-tracker', icon: Building2 },
   { name: 'Platby', href: '/recurring-payments', icon: CreditCard },
+  { name: 'Hypotéka', href: '/mortgage', icon: Home },
   { name: 'Kalkulačka', href: '/calculator', icon: Calculator },
 ];
 
