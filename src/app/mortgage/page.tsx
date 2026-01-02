@@ -299,16 +299,75 @@ export default function MortgagePage() {
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border shadow-sm col-span-1 md:col-span-2 flex flex-col justify-between">
           <div className="flex justify-between items-start mb-6">
-            <div>
+            <div className="flex-1">
               <p className="text-sm font-medium text-slate-500 uppercase tracking-wider mb-1">
                 Zostatok istiny
               </p>
               <h2 className="text-4xl font-black text-slate-900 dark:text-white">
                 {formatCurrency(mortgage.current_principal)}
               </h2>
+              <div className="mt-4 p-3 bg-blue-600/10 dark:bg-blue-400/10 rounded-xl border border-blue-100 dark:border-blue-900/30 w-fit">
+                <div className="flex items-center gap-2 text-blue-600 dark:text-blue-400">
+                  <TrendingDown size={18} />
+                  <span className="text-sm font-bold">Splácanie v procese</span>
+                </div>
+              </div>
             </div>
-            <div className="p-3 bg-blue-600 rounded-xl text-white shadow-lg shadow-blue-200 dark:shadow-none">
-              <TrendingDown size={24} />
+
+            <div className="shrink-0 flex flex-col items-center gap-2">
+              <div className="relative w-24 h-24 md:w-32 md:h-32">
+                <svg
+                  viewBox="0 0 100 100"
+                  className="w-full h-full drop-shadow-xl overflow-visible"
+                >
+                  <defs>
+                    <clipPath id="house-clip">
+                      <path d="M50 5 L95 45 L85 45 L85 95 L15 95 L15 45 L5 45 Z" />
+                    </clipPath>
+                  </defs>
+
+                  {/* Bank part (Red/Background) */}
+                  <path
+                    d="M50 5 L95 45 L85 45 L85 95 L15 95 L15 45 L5 45 Z"
+                    className="fill-rose-500"
+                  />
+
+                  {/* Owned part (Green) - Animated from bottom */}
+                  <motion.rect
+                    initial={{ height: 0, y: 100 }}
+                    animate={{
+                      height: `${progressPercentage}%`,
+                      y: 100 - progressPercentage,
+                    }}
+                    width="100"
+                    x="0"
+                    className="fill-emerald-500"
+                    clipPath="url(#house-clip)"
+                    transition={{ duration: 2, ease: 'easeOut' }}
+                  />
+
+                  {/* Outline and Window for detail */}
+                  <path
+                    d="M50 5 L95 45 L85 45 L85 95 L15 95 L15 45 L5 45 Z"
+                    fill="none"
+                    className="stroke-white/20"
+                    strokeWidth="1"
+                  />
+
+                  {/* Simple Window */}
+                  <rect
+                    x="42"
+                    y="60"
+                    width="16"
+                    height="16"
+                    className="fill-white/30"
+                    rx="2"
+                  />
+                </svg>
+                <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 px-2 py-0.5 bg-white dark:bg-slate-800 rounded-full border shadow-sm text-[10px] font-black whitespace-nowrap uppercase tracking-tighter">
+                  {progressPercentage.toFixed(0)}% tvoje
+                </div>
+              </div>
             </div>
           </div>
 
