@@ -256,28 +256,15 @@ export default function Dashboard() {
         {loading ? (
           <Skeleton className="h-16 w-48 rounded-2xl" />
         ) : (
-          <div className="flex gap-4">
-            <div className="bg-slate-900 text-white px-6 py-3 rounded-2xl shadow-lg flex items-center gap-4 border border-slate-800">
-              <Wallet size={24} className="text-slate-400" />
-              <div>
-                <p className="text-xs opacity-60 uppercase font-bold tracking-wider">
-                  Čistý Majetok
-                </p>
-                <p className="text-xl font-bold">
-                  {formatCurrency(stats.netWorth)}
-                </p>
-              </div>
-            </div>
-            <div className="bg-blue-600 text-white px-6 py-3 rounded-2xl shadow-lg shadow-blue-200 dark:shadow-blue-900/20 flex items-center gap-4">
-              <TrendingUp size={24} />
-              <div>
-                <p className="text-xs opacity-80 uppercase font-bold tracking-wider">
-                  Celkové Aktíva
-                </p>
-                <p className="text-xl font-bold">
-                  {formatCurrency(stats.totalAssets)}
-                </p>
-              </div>
+          <div className="bg-slate-900 text-white px-6 py-3 rounded-2xl shadow-lg flex items-center gap-4 border border-slate-800">
+            <Wallet size={24} className="text-slate-400" />
+            <div>
+              <p className="text-xs opacity-60 uppercase font-bold tracking-wider">
+                Čistý Majetok
+              </p>
+              <p className="text-xl font-bold">
+                {formatCurrency(stats.netWorth)}
+              </p>
             </div>
           </div>
         )}
