@@ -15,6 +15,10 @@ import {
   Settings2,
   X,
   Scan,
+  Edit2,
+  Check,
+  Calendar,
+  ChevronRight,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
@@ -68,6 +72,8 @@ export default function ExpensesPage() {
   const [isManagingCategories, setIsManagingCategories] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState('');
   const [isScanning, setIsScanning] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editValues, setEditValues] = useState<any>({});
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const {
@@ -222,6 +228,62 @@ export default function ExpensesPage() {
       toast.error('Chyba pri mazaní');
     }
   }
+
+  const groupedExpenses = useMemo(() => {
+    const groups: Record<string, any[]> = {};
+    expenses.forEach((expense) => {
+      const date = new Date(expense.record_date);
+      const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+      if (!groups[monthKey]) {
+        groups[monthKey] = [];
+      }
+      groups[monthKey].push(expense);
+    });
+
+    return Object.keys(groups)
+      .sort((a, b) => b.localeCompare(a))
+      .map((key) => ({
+        month: key,
+        records: groups[key].sort((a, b) =>
+          b.record_date.localeCompare(a.record_date)
+        ),
+        total: groups[key].reduce((sum, r) => sum + Number(r.amount_eur), 0),
+      }));
+  }, [expenses]);
+
+  const handleEdit = (expense: any) => {
+    setEditingId(expense.id);
+    setEditValues({
+      description: expense.description,
+      category: expense.category,
+      amount: expense.amount,
+      record_date: expense.record_date,
+    });
+  };
+
+  const handleUpdate = async (id: string) => {
+    try {
+      const { error } = await supabase
+        .from('expense_records')
+        .update({
+          description: editValues.description,
+          category: editValues.category,
+          amount: Number(editValues.amount),
+          amount_eur: Number(editValues.amount),
+          record_date: editValues.record_date,
+        })
+        .eq('id', id);
+
+      if (error) throw error;
+
+      setEditingId(null);
+      await refresh();
+      toast.success('Výdavok aktualizovaný');
+    } catch (err) {
+      console.error('Error updating expense:', err);
+      toast.error('Chyba pri aktualizácii');
+    }
+  };
 
   const categoryData = useMemo(() => {
     return expenses.reduce((acc: CategoryTotal[], curr) => {
@@ -420,83 +482,181 @@ export default function ExpensesPage() {
       </AnimatePresence>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-        <div className="md:col-span-2 bg-white dark:bg-slate-900 rounded-2xl shadow-sm border overflow-hidden">
-          <div className="p-6 border-b flex items-center gap-2">
-            <Receipt size={20} className="text-rose-500" />
-            <h3 className="font-semibold">Posledné výdavky</h3>
-          </div>
-          <div className="overflow-x-auto">
-            {loading ? (
-              <div className="p-6 space-y-4">
-                <Skeleton className="h-10 w-full" />
-                <Skeleton className="h-10 w-full" />
-                <Skeleton className="h-10 w-full" />
-                <Skeleton className="h-10 w-full" />
-              </div>
-            ) : (
-              <table className="w-full text-sm text-left">
-                <thead className="bg-slate-50 dark:bg-slate-800/50 border-b">
-                  <tr>
-                    <th className="px-6 py-4 font-semibold">Dátum</th>
-                    <th className="px-6 py-4 font-semibold">Popis</th>
-                    <th className="px-6 py-4 font-semibold">Kategória</th>
-                    <th className="px-6 py-4 font-semibold text-right">Suma</th>
-                    <th className="px-6 py-4"></th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y">
-                  {expenses.length === 0 ? (
-                    <tr>
-                      <td
-                        colSpan={5}
-                        className="px-6 py-12 text-center text-slate-400"
-                      >
-                        Žiadne výdavky nenájdené. Začni pridaním prvého.
-                      </td>
-                    </tr>
-                  ) : (
-                    expenses.map((expense) => (
-                      <tr
-                        key={expense.id}
-                        className={`hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors group ${expense.isOptimistic ? 'opacity-50' : ''}`}
-                      >
-                        <td className="px-6 py-4 text-slate-500">
-                          {new Date(expense.record_date).toLocaleDateString(
-                            'sk-SK'
-                          )}
-                        </td>
-                        <td className="px-6 py-4 font-medium">
-                          {expense.description}
-                          {expense.isOptimistic && (
-                            <span className="ml-2 text-[10px] text-slate-400 italic">
-                              (Ukladám...)
-                            </span>
-                          )}
-                        </td>
-                        <td className="px-6 py-4">
-                          <span className="px-2 py-1 bg-slate-100 dark:bg-slate-800 rounded-md text-xs font-medium">
-                            {expense.category}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 text-right font-bold text-rose-500">
-                          -{formatCurrency(expense.amount_eur)}
-                        </td>
-                        <td className="px-6 py-4 text-right">
-                          <button
-                            disabled={expense.isOptimistic}
-                            onClick={() => handleDelete(expense.id)}
-                            className="p-2 text-slate-400 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-all disabled:opacity-0"
-                          >
-                            <Trash2 size={16} />
-                          </button>
-                        </td>
+        <div className="md:col-span-2 space-y-6">
+          {loading ? (
+            <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border p-6 space-y-4">
+              <Skeleton className="h-10 w-full" />
+              <Skeleton className="h-10 w-full" />
+              <Skeleton className="h-10 w-full" />
+              <Skeleton className="h-10 w-full" />
+            </div>
+          ) : groupedExpenses.length === 0 ? (
+            <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border p-12 text-center text-slate-400">
+              Žiadne výdavky nenájdené. Začni pridaním prvého.
+            </div>
+          ) : (
+            groupedExpenses.map((group) => (
+              <div
+                key={group.month}
+                className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border overflow-hidden"
+              >
+                <div className="p-4 bg-slate-50 dark:bg-slate-800/50 border-b flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Calendar size={18} className="text-rose-500" />
+                    <h3 className="font-bold text-slate-900 dark:text-white capitalize">
+                      {new Date(group.month).toLocaleDateString('sk-SK', {
+                        month: 'long',
+                        year: 'numeric',
+                      })}
+                    </h3>
+                  </div>
+                  <div className="text-sm font-black text-rose-600 bg-rose-50 dark:bg-rose-950/30 px-3 py-1 rounded-full border border-rose-100 dark:border-rose-900/50">
+                    Spolu: {formatCurrency(group.total)}
+                  </div>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm text-left">
+                    <thead className="text-slate-500 font-bold uppercase text-[10px] tracking-widest border-b bg-slate-50/30 dark:bg-slate-800/20">
+                      <tr>
+                        <th className="px-6 py-3">Dátum</th>
+                        <th className="px-6 py-3">Popis</th>
+                        <th className="px-6 py-3">Kategória</th>
+                        <th className="px-6 py-3 text-right">Suma</th>
+                        <th className="px-6 py-3"></th>
                       </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            )}
-          </div>
+                    </thead>
+                    <tbody className="divide-y">
+                      {group.records.map((expense) => (
+                        <tr
+                          key={expense.id}
+                          className={`hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-colors group ${expense.isOptimistic ? 'opacity-50' : ''}`}
+                        >
+                          {editingId === expense.id ? (
+                            <>
+                              <td className="px-4 py-2">
+                                <input
+                                  type="date"
+                                  value={editValues.record_date}
+                                  onChange={(e) =>
+                                    setEditValues({
+                                      ...editValues,
+                                      record_date: e.target.value,
+                                    })
+                                  }
+                                  className="w-full bg-white dark:bg-slate-800 border rounded px-2 py-1 outline-none focus:ring-1 focus:ring-rose-500"
+                                />
+                              </td>
+                              <td className="px-4 py-2">
+                                <input
+                                  type="text"
+                                  value={editValues.description}
+                                  onChange={(e) =>
+                                    setEditValues({
+                                      ...editValues,
+                                      description: e.target.value,
+                                    })
+                                  }
+                                  className="w-full bg-white dark:bg-slate-800 border rounded px-2 py-1 outline-none focus:ring-1 focus:ring-rose-500"
+                                />
+                              </td>
+                              <td className="px-4 py-2">
+                                <select
+                                  value={editValues.category}
+                                  onChange={(e) =>
+                                    setEditValues({
+                                      ...editValues,
+                                      category: e.target.value,
+                                    })
+                                  }
+                                  className="w-full bg-white dark:bg-slate-800 border rounded px-2 py-1 outline-none focus:ring-1 focus:ring-rose-500"
+                                >
+                                  {categories.map((cat) => (
+                                    <option key={cat.id} value={cat.name}>
+                                      {cat.name}
+                                    </option>
+                                  ))}
+                                </select>
+                              </td>
+                              <td className="px-4 py-2">
+                                <input
+                                  type="number"
+                                  step="0.01"
+                                  value={editValues.amount}
+                                  onChange={(e) =>
+                                    setEditValues({
+                                      ...editValues,
+                                      amount: e.target.value,
+                                    })
+                                  }
+                                  className="w-full bg-white dark:bg-slate-800 border rounded px-2 py-1 text-right outline-none focus:ring-1 focus:ring-rose-500 font-bold"
+                                />
+                              </td>
+                              <td className="px-4 py-2 text-right">
+                                <div className="flex gap-1 justify-end">
+                                  <button
+                                    onClick={() => handleUpdate(expense.id)}
+                                    className="p-1.5 bg-emerald-100 text-emerald-600 rounded-md hover:bg-emerald-200 transition-colors"
+                                  >
+                                    <Check size={14} />
+                                  </button>
+                                  <button
+                                    onClick={() => setEditingId(null)}
+                                    className="p-1.5 bg-slate-100 text-slate-600 rounded-md hover:bg-slate-200 transition-colors"
+                                  >
+                                    <X size={14} />
+                                  </button>
+                                </div>
+                              </td>
+                            </>
+                          ) : (
+                            <>
+                              <td className="px-6 py-4 text-slate-500 font-medium">
+                                {new Date(
+                                  expense.record_date
+                                ).toLocaleDateString('sk-SK', {
+                                  day: '2-digit',
+                                  month: '2-digit',
+                                })}
+                              </td>
+                              <td className="px-6 py-4 font-semibold text-slate-900 dark:text-slate-100">
+                                {expense.description}
+                              </td>
+                              <td className="px-6 py-4">
+                                <span className="px-2 py-0.5 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 rounded-full text-[10px] font-black uppercase tracking-tighter">
+                                  {expense.category}
+                                </span>
+                              </td>
+                              <td className="px-6 py-4 text-right font-black text-rose-600">
+                                -{formatCurrency(expense.amount_eur)}
+                              </td>
+                              <td className="px-6 py-4 text-right">
+                                <div className="flex gap-1 justify-end opacity-0 group-hover:opacity-100 transition-opacity">
+                                  <button
+                                    disabled={expense.isOptimistic}
+                                    onClick={() => handleEdit(expense)}
+                                    className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/30 rounded-md transition-all"
+                                  >
+                                    <Edit2 size={14} />
+                                  </button>
+                                  <button
+                                    disabled={expense.isOptimistic}
+                                    onClick={() => handleDelete(expense.id)}
+                                    className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30 rounded-md transition-all"
+                                  >
+                                    <Trash2 size={14} />
+                                  </button>
+                                </div>
+                              </td>
+                            </>
+                          )}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            ))
+          )}
         </div>
 
         <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl shadow-sm border h-fit">
