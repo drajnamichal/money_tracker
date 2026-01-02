@@ -41,6 +41,20 @@ export default function CalculatorPage() {
     fun: 20,
   });
 
+  const SPLIT_LABELS: Record<string, string> = {
+    fixed_costs: 'Fixné náklady',
+    investments: 'Investície',
+    savings: 'Rezerva',
+    fun: 'Zábava',
+  };
+
+  const SPLIT_COLORS: Record<string, string> = {
+    fixed_costs: 'blue',
+    investments: 'emerald',
+    savings: 'amber',
+    fun: 'rose',
+  };
+
   const [investmentHorizon, setInvestmentHorizon] = useState(20);
   const expectedReturn = 10; // 10% for S&P 500
 
@@ -134,26 +148,26 @@ export default function CalculatorPage() {
 
   const results = [
     {
-      name: 'Fixné náklady (Domácnosť, účty)',
-      percent: split.fixed_costs,
-      color: 'blue',
+      key: 'fixed_costs',
+      name: 'Fixné náklady',
+      desc: 'Domácnosť, bývanie, strava',
     },
     {
+      key: 'investments',
+      name: 'Investície',
+      desc: 'S&P 500, ETF, Budovanie bohatstva',
+    },
+    {
+      key: 'fun',
       name: 'Zábava a radosť',
-      percent: split.fun,
-      color: 'rose',
+      desc: 'Zážitky, hobby, voľný čas',
     },
     {
-      name: 'Investície (ETF, Akcie)',
-      percent: split.investments,
-      color: 'emerald',
+      key: 'savings',
+      name: 'Rezerva',
+      desc: 'Udržiavacia rezerva 6-12 mes.',
     },
-    {
-      name: 'Rezerva (udržiavacia)',
-      percent: split.savings,
-      color: 'amber',
-    },
-  ];
+  ] as const;
 
   const totalPercent = Object.values(split).reduce((a, b) => a + b, 0);
 
@@ -161,24 +175,23 @@ export default function CalculatorPage() {
     <div className="max-w-5xl mx-auto space-y-8 pb-12">
       <div>
         <h1 className="text-3xl font-bold">Kalkulačka mzdy</h1>
-        <p className="text-slate-500">
+        <p className="text-slate-500 text-sm">
           Optimalizácia rozdelenia príjmu a simulácia bohatstva.
         </p>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
         {/* Left Column: Inputs */}
-        <div className="lg:col-span-1 bg-white dark:bg-slate-900 p-8 rounded-2xl shadow-sm border space-y-6 h-fit">
-          <div className="space-y-2">
+        <div className="lg:col-span-4 bg-white dark:bg-slate-900 p-8 rounded-3xl shadow-sm border space-y-8 h-fit">
+          <div className="space-y-3">
             <div className="flex justify-between items-center">
-              <label className="text-sm font-semibold text-slate-500 uppercase tracking-wider">
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">
                 Mesačný príjem (€)
               </label>
               {latestMonthIncome > 0 && (
-                <div className="flex items-center gap-1.5 px-2 py-0.5 bg-emerald-50 dark:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400 rounded-md border border-emerald-100 dark:border-emerald-900/50">
+                <div className="flex items-center gap-1.5 px-2 py-1 bg-emerald-50 dark:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400 rounded-full border border-emerald-100 dark:border-emerald-900/50">
                   <TrendingUp size={10} />
-                  <span className="text-[10px] font-bold uppercase tracking-tight">
-                    Automaticky z{' '}
+                  <span className="text-[9px] font-bold uppercase tracking-tight">
                     {new Date(
                       incomeRecords[0]?.record_month
                     ).toLocaleDateString('sk-SK', {
@@ -190,19 +203,22 @@ export default function CalculatorPage() {
               )}
             </div>
             {loading ? (
-              <Skeleton className="h-12 w-full" />
+              <Skeleton className="h-12 w-full rounded-xl" />
             ) : (
-              <input
-                type="number"
-                className="w-full text-3xl font-bold bg-transparent border-b-2 border-slate-100 dark:border-slate-800 focus:border-blue-600 outline-none pb-2 transition-colors"
-                value={salary}
-                onChange={(e) => setSalary(Number(e.target.value))}
-              />
+              <div className="relative group">
+                <input
+                  type="number"
+                  className="w-full text-4xl font-black bg-transparent border-none focus:ring-0 outline-none p-0 transition-colors"
+                  value={salary}
+                  onChange={(e) => setSalary(Number(e.target.value))}
+                />
+                <div className="h-0.5 w-full bg-slate-100 dark:bg-slate-800 rounded-full mt-2 group-focus-within:bg-blue-600 transition-colors" />
+              </div>
             )}
           </div>
 
-          <div className="space-y-4">
-            <label className="text-sm font-semibold text-slate-500 uppercase tracking-wider block">
+          <div className="space-y-6">
+            <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] block">
               Rozdelenie (%)
             </label>
             {loading ? (
@@ -213,19 +229,28 @@ export default function CalculatorPage() {
                 <Skeleton className="h-8 w-full" />
               </div>
             ) : (
-              <>
-                {Object.entries(split).map(([key, value]) => (
-                  <div key={key} className="space-y-1">
-                    <div className="flex justify-between text-sm capitalize">
-                      <span>{key.replace('_', ' ')}</span>
-                      <span className="font-bold">{value}%</span>
+              <div className="space-y-5">
+                {(
+                  ['fixed_costs', 'investments', 'savings', 'fun'] as const
+                ).map((key) => (
+                  <div key={key} className="space-y-2 group">
+                    <div className="flex justify-between text-xs">
+                      <span className="font-bold text-slate-600 dark:text-slate-400 group-hover:text-slate-900 dark:group-hover:text-slate-100 transition-colors">
+                        {SPLIT_LABELS[key]}
+                      </span>
+                      <span
+                        className={`font-black text-${SPLIT_COLORS[key]}-600`}
+                      >
+                        {split[key]}%
+                      </span>
                     </div>
                     <input
                       type="range"
                       min="0"
                       max="100"
-                      className="w-full h-2 bg-slate-100 dark:bg-slate-800 rounded-lg appearance-none cursor-pointer accent-blue-600"
-                      value={value}
+                      step="5"
+                      className={`w-full h-1.5 bg-slate-100 dark:bg-slate-800 rounded-full appearance-none cursor-pointer accent-${SPLIT_COLORS[key]}-600`}
+                      value={split[key]}
                       onChange={(e) =>
                         setSplit({ ...split, [key]: Number(e.target.value) })
                       }
@@ -234,63 +259,69 @@ export default function CalculatorPage() {
                 ))}
 
                 <div
-                  className={`text-xs font-bold text-right ${totalPercent === 100 ? 'text-emerald-500' : 'text-rose-500'}`}
+                  className={`text-[10px] font-black text-right pt-2 tracking-widest uppercase ${totalPercent === 100 ? 'text-emerald-500' : 'text-rose-500'}`}
                 >
                   Spolu: {totalPercent}%{' '}
                   {totalPercent !== 100 && '(musí byť 100%)'}
                 </div>
-              </>
+              </div>
             )}
           </div>
 
           <button
             onClick={handleSave}
             disabled={loading || saving || totalPercent !== 100}
-            className="w-full bg-blue-600 text-white rounded-xl py-3 font-bold hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 transition-all"
+            className="w-full bg-blue-600 text-white rounded-2xl py-4 font-black text-sm uppercase tracking-widest hover:bg-blue-700 hover:shadow-lg hover:shadow-blue-200 dark:hover:shadow-none disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-3 transition-all active:scale-[0.98]"
           >
             {saving ? (
-              <Loader2 className="animate-spin" size={20} />
+              <Loader2 className="animate-spin" size={18} />
             ) : (
-              <Save size={20} />
+              <Save size={18} />
             )}
             Uložiť nastavenia
           </button>
         </div>
 
         {/* Right Columns: Results & Projections */}
-        <div className="lg:col-span-2 space-y-8">
+        <div className="lg:col-span-8 space-y-8">
           {/* Current Split Results */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {loading ? (
               <>
-                <Skeleton className="h-24 w-full rounded-2xl" />
-                <Skeleton className="h-24 w-full rounded-2xl" />
-                <Skeleton className="h-24 w-full rounded-2xl" />
-                <Skeleton className="h-24 w-full rounded-2xl" />
+                <Skeleton className="h-28 w-full rounded-3xl" />
+                <Skeleton className="h-28 w-full rounded-3xl" />
+                <Skeleton className="h-28 w-full rounded-3xl" />
+                <Skeleton className="h-28 w-full rounded-3xl" />
               </>
             ) : (
               <>
                 {results.map((item, index) => {
-                  const amount = (salary * item.percent) / 100;
+                  const amount = (salary * split[item.key]) / 100;
+                  const color = SPLIT_COLORS[item.key];
                   return (
                     <motion.div
-                      key={item.name}
+                      key={item.key}
                       initial={{ opacity: 0, y: 10 }}
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ delay: index * 0.1 }}
-                      className="bg-white dark:bg-slate-900 p-5 rounded-2xl shadow-sm border flex justify-between items-center group hover:border-blue-200 dark:hover:border-blue-800 transition-all"
+                      className="bg-white dark:bg-slate-900 p-6 rounded-3xl shadow-sm border border-slate-100 dark:border-slate-800 flex justify-between items-center group hover:border-blue-200 dark:hover:border-blue-800 transition-all"
                     >
-                      <div className="flex items-center gap-4">
+                      <div className="flex items-center gap-5">
                         <div
-                          className={`w-10 h-10 rounded-xl bg-${item.color}-50 dark:bg-${item.color}-950/50 flex items-center justify-center text-${item.color}-600 dark:text-${item.color}-400 font-bold text-sm`}
+                          className={`w-14 h-14 rounded-2xl bg-${color}-50 dark:bg-${color}-950/30 flex items-center justify-center text-${color}-600 dark:text-${color}-400 font-black text-lg shadow-inner`}
                         >
-                          {item.percent}%
+                          {split[item.key]}%
                         </div>
                         <div>
-                          <p className="text-xs text-slate-500">{item.name}</p>
-                          <h4 className="text-lg font-bold">
+                          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">
+                            {item.name}
+                          </p>
+                          <h4 className="text-2xl font-black text-slate-900 dark:text-slate-100">
                             {formatCurrency(amount)}
                           </h4>
+                          <p className="text-[10px] text-slate-400 mt-1">
+                            {item.desc}
+                          </p>
                         </div>
                       </div>
                     </motion.div>
