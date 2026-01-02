@@ -116,6 +116,7 @@ export interface Investment {
   avg_price: number;
   current_price: number;
   currency: 'EUR' | 'USD';
+  portfolio: string;
   created_at?: string;
   updated_at?: string;
 }
