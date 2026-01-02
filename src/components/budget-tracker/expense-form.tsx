@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useMemo } from 'react';
 import {
   MoneyEmoji,
   PlusEmoji,
@@ -7,6 +7,8 @@ import {
   ChartIcon,
 } from './icons';
 import { toast } from 'sonner';
+import { motion, AnimatePresence } from 'framer-motion';
+import { formatCurrency } from '@/lib/utils';
 
 const CATEGORIES = [
   'Bývanie',
@@ -34,7 +36,15 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ onAddExpense }) => {
   const [file, setFile] = useState<File | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isScanning, setIsScanning] = useState(false);
+  const [showSimulation, setShowSimulation] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const futureValue = useMemo(() => {
+    const p = parseFloat(amount);
+    if (isNaN(p) || p <= 0) return 0;
+    // Using 8.15% to match user's example: 5€ * (1.0815)^20 ≈ 24€
+    return p * Math.pow(1.0815, 20);
+  }, [amount]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -62,6 +72,7 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ onAddExpense }) => {
       setCategory('Ostatné');
       setFile(null);
       setError('');
+      setShowSimulation(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
     } catch (e) {
       setError('Chyba pri ukladaní výdavku.');
@@ -168,6 +179,42 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ onAddExpense }) => {
                 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 dark:text-slate-200"
             />
           </div>
+          {parseFloat(amount) > 0 && (
+            <div className="mt-2">
+              <button
+                type="button"
+                onClick={() => setShowSimulation(!showSimulation)}
+                className="text-xs font-bold text-indigo-600 dark:text-indigo-400 flex items-center gap-1.5 hover:underline"
+              >
+                <ChartIcon className="w-3.5 h-3.5" />
+                Čo ak by som to investoval?
+              </button>
+              <AnimatePresence>
+                {showSimulation && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    exit={{ opacity: 0, height: 0 }}
+                    className="overflow-hidden"
+                  >
+                    <div className="mt-2 p-3 bg-indigo-50 dark:bg-indigo-900/20 rounded-lg border border-indigo-100 dark:border-indigo-800/50">
+                      <p className="text-xs text-indigo-800 dark:text-indigo-300 leading-relaxed">
+                        Týchto{' '}
+                        <span className="font-bold">
+                          {formatCurrency(parseFloat(amount))}
+                        </span>{' '}
+                        by malo v S&P 500 o 20 rokov hodnotu{' '}
+                        <span className="font-bold text-emerald-600 dark:text-emerald-400 text-sm">
+                          {formatCurrency(futureValue)}
+                        </span>
+                        .
+                      </p>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+          )}
         </div>
 
         <div>
