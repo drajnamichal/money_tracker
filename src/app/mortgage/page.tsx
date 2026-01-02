@@ -9,10 +9,7 @@ import {
   Calendar,
   Percent,
   TrendingDown,
-  ArrowUpRight,
   ArrowDownRight,
-  ShieldCheck,
-  FileText,
   Clock,
   CheckCircle2,
   AlertCircle,
@@ -334,118 +331,77 @@ export default function MortgagePage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {/* Info Cards */}
-        <div className="space-y-6">
-          <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border shadow-sm">
-            <h4 className="font-bold mb-4 flex items-center gap-2">
-              <ShieldCheck size={18} className="text-blue-500" />
-              Detaily poistenia
-            </h4>
-            <div className="space-y-4 text-sm">
-              <div className="flex justify-between items-center">
-                <span className="text-slate-500">Typ poistenia:</span>
-                <span className="font-medium">Schopnosť splácať</span>
-              </div>
-              <div className="flex justify-between items-center text-xs text-slate-400 pl-4 border-l-2 ml-1">
-                <span>Zahrnuté v splátke</span>
-                <CheckCircle2 size={14} className="text-emerald-500" />
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-slate-500">Krytá suma:</span>
-                <span className="font-medium">100% istiny</span>
-              </div>
+      {/* History / Chart */}
+      <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border shadow-sm">
+        <div className="flex items-center justify-between mb-8">
+          <h4 className="font-bold flex items-center gap-2">
+            <TrendingDown size={18} className="text-blue-500" />
+            História splácania
+          </h4>
+          <div className="flex items-center gap-4 text-[10px] font-bold uppercase tracking-wider">
+            <div className="flex items-center gap-1.5">
+              <div className="w-2 h-2 bg-emerald-500 rounded-full" />
+              <span>Istina</span>
             </div>
-          </div>
-
-          <div className="bg-slate-50 dark:bg-slate-800/50 p-6 rounded-2xl border border-dashed flex items-center gap-4">
-            <div className="w-12 h-12 bg-white dark:bg-slate-900 rounded-xl flex items-center justify-center border shadow-sm">
-              <FileText className="text-slate-400" />
+            <div className="flex items-center gap-1.5">
+              <div className="w-2 h-2 bg-blue-500 rounded-full" />
+              <span>Úrok</span>
             </div>
-            <div>
-              <p className="text-sm font-bold">Zmluvná dokumentácia</p>
-              <p className="text-xs text-slate-500">
-                Všetky dokumenty k úveru v jednom PDF.
-              </p>
-            </div>
-            <button className="ml-auto p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors">
-              <ArrowUpRight size={20} className="text-blue-600" />
-            </button>
           </div>
         </div>
 
-        {/* History / Chart */}
-        <div className="col-span-1 md:col-span-2 bg-white dark:bg-slate-900 p-6 rounded-2xl border shadow-sm">
-          <div className="flex items-center justify-between mb-8">
-            <h4 className="font-bold flex items-center gap-2">
-              <TrendingDown size={18} className="text-blue-500" />
-              História splácania
-            </h4>
-            <div className="flex items-center gap-4 text-[10px] font-bold uppercase tracking-wider">
-              <div className="flex items-center gap-1.5">
-                <div className="w-2 h-2 bg-emerald-500 rounded-full" />
-                <span>Istina</span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <div className="w-2 h-2 bg-blue-500 rounded-full" />
-                <span>Úrok</span>
-              </div>
-            </div>
-          </div>
+        <div className="h-[250px] w-full">
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={payments.slice(0, 6).reverse()}>
+              <CartesianGrid
+                strokeDasharray="3 3"
+                vertical={false}
+                stroke="#e2e8f0"
+              />
+              <XAxis
+                dataKey="payment_date"
+                axisLine={false}
+                tickLine={false}
+                tick={{ fontSize: 10, fill: '#64748b' }}
+                tickFormatter={(val) =>
+                  new Date(val).toLocaleDateString('sk-SK', {
+                    month: 'short',
+                  })
+                }
+              />
+              <YAxis hide />
+              <RechartsTooltip
+                cursor={{ fill: '#f1f5f9' }}
+                contentStyle={{
+                  backgroundColor: '#fff',
+                  borderRadius: '12px',
+                  border: 'none',
+                  boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)',
+                }}
+                formatter={(value: number) => formatCurrency(value)}
+              />
+              <Bar
+                dataKey="principal_paid"
+                stackId="a"
+                fill="#10b981"
+                radius={[0, 0, 0, 0]}
+              />
+              <Bar
+                dataKey="interest_paid"
+                stackId="a"
+                fill="#3b82f6"
+                radius={[4, 4, 0, 0]}
+              />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
 
-          <div className="h-[250px] w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={payments.slice(0, 6).reverse()}>
-                <CartesianGrid
-                  strokeDasharray="3 3"
-                  vertical={false}
-                  stroke="#e2e8f0"
-                />
-                <XAxis
-                  dataKey="payment_date"
-                  axisLine={false}
-                  tickLine={false}
-                  tick={{ fontSize: 10, fill: '#64748b' }}
-                  tickFormatter={(val) =>
-                    new Date(val).toLocaleDateString('sk-SK', {
-                      month: 'short',
-                    })
-                  }
-                />
-                <YAxis hide />
-                <RechartsTooltip
-                  cursor={{ fill: '#f1f5f9' }}
-                  contentStyle={{
-                    backgroundColor: '#fff',
-                    borderRadius: '12px',
-                    border: 'none',
-                    boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)',
-                  }}
-                  formatter={(value: number) => formatCurrency(value)}
-                />
-                <Bar
-                  dataKey="principal_paid"
-                  stackId="a"
-                  fill="#10b981"
-                  radius={[0, 0, 0, 0]}
-                />
-                <Bar
-                  dataKey="interest_paid"
-                  stackId="a"
-                  fill="#3b82f6"
-                  radius={[4, 4, 0, 0]}
-                />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-
-          <div className="mt-6 flex items-center gap-2 text-[10px] text-slate-400 bg-slate-50 dark:bg-slate-800/50 p-3 rounded-xl border">
-            <Info size={14} className="shrink-0" />
-            <p>
-              Údaje o úrokoch a istine sú odhadované na základe anuitného
-              splácania a môžu sa mierne líšiť od skutočnosti v banke.
-            </p>
-          </div>
+        <div className="mt-6 flex items-center gap-2 text-[10px] text-slate-400 bg-slate-50 dark:bg-slate-800/50 p-3 rounded-xl border">
+          <Info size={14} className="shrink-0" />
+          <p>
+            Údaje o úrokoch a istine sú odhadované na základe anuitného
+            splácania a môžu sa mierne líšiť od skutočnosti v banke.
+          </p>
         </div>
       </div>
 
