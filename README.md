@@ -13,6 +13,7 @@ npm run dev
 Otvorte [http://localhost:3000](http://localhost:3000) vo vašom prehliadači.
 
 ## Technológie
+
 - **Next.js**
 - **Supabase**
 - **Tailwind CSS**
