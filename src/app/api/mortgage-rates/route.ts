@@ -26,9 +26,9 @@ export async function GET() {
 
     const rates: { bank: string; rate: string }[] = [];
 
-    // Finančná Hitparáda uses <img> with logo and text for rates
+    // Finančná Hitparáda table parsing
     const rowRegex = /<tr[^>]*>([\s\S]*?)<\/tr>/g;
-    const bankRegex = /img\s+src="[^"]*\/loga_banky\/([^.-]+)[^"]*"/i;
+    const bankRegex = /<img[^>]+alt="([^"]+)"/i;
     const rateRegex = /(\d+[,.]\d+)\s*%/;
 
     let match;
@@ -38,9 +38,8 @@ export async function GET() {
       const rateMatch = rowHtml.match(rateRegex);
 
       if (bankMatch && rateMatch) {
-        let bankSlug = bankMatch[1].toLowerCase();
+        let bankSlug = bankMatch[1].toLowerCase().replace('-logo', '').trim();
 
-        // Map slug to proper name
         const bankMap: Record<string, string> = {
           slsp: 'SLSP',
           vub: 'VÚB',
@@ -85,6 +84,7 @@ export async function GET() {
         debug: {
           htmlLength: html.length,
           title: html.match(/<title>(.*?)<\/title>/i)?.[1],
+          first1000Chars: html.substring(0, 1000).replace(/\s+/g, ' '),
         },
       });
     }
