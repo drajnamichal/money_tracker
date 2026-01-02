@@ -2,7 +2,15 @@
 
 import { useEffect, useState, useMemo } from 'react';
 import { formatCurrency } from '@/lib/utils';
-import { TrendingUp, TrendingDown, Wallet } from 'lucide-react';
+import {
+  TrendingUp,
+  TrendingDown,
+  Wallet,
+  Sparkles,
+  ArrowRight,
+  BrainCircuit,
+  Lightbulb,
+} from 'lucide-react';
 import {
   AreaChart,
   Area,
@@ -15,7 +23,7 @@ import {
   Bar,
   Legend,
 } from 'recharts';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { Skeleton } from '@/components/skeleton';
 import {
   useWealthData,
@@ -35,6 +43,7 @@ export default function Dashboard() {
     let growth = 0;
     let monthlyIncome = 0;
     let monthlyExpenses = 0;
+    let savingsRate = 0;
 
     if (wealthData && wealthData.length > 0) {
       const totalsByDate = wealthData.reduce((acc: any, curr: any) => {
@@ -82,10 +91,53 @@ export default function Dashboard() {
     if (latestMonth) {
       monthlyIncome = latestMonth.income;
       monthlyExpenses = latestMonth.expenses;
+      savingsRate =
+        monthlyIncome > 0
+          ? ((monthlyIncome - monthlyExpenses) / monthlyIncome) * 100
+          : 0;
     }
 
-    return { totalAssets, growth, monthlyIncome, monthlyExpenses };
+    return { totalAssets, growth, monthlyIncome, monthlyExpenses, savingsRate };
   }, [wealthData, incomeData, expenseData]);
+
+  const aiInsights = useMemo(() => {
+    if (loading) return [];
+
+    const insights = [];
+
+    // Insight 1: Savings Rate
+    if (stats.savingsRate > 20) {
+      insights.push({
+        icon: <TrendingUp className="text-emerald-500" size={18} />,
+        text: `Tvoja miera úspor je skvelých ${Math.round(stats.savingsRate)}%! Pokračuj v investovaní do S&P 500.`,
+        color: 'emerald',
+      });
+    } else if (stats.savingsRate > 0) {
+      insights.push({
+        icon: <Lightbulb className="text-amber-500" size={18} />,
+        text: `Tvoja miera úspor je ${Math.round(stats.savingsRate)}%. Skús ju vytiahnuť nad 20% optimalizáciou výdavkov na zábavu.`,
+        color: 'amber',
+      });
+    }
+
+    // Insight 2: Emergency Fund (assuming 6 months of expenses is the goal)
+    const emergencyFundGoal = stats.monthlyExpenses * 6;
+    if (stats.totalAssets > emergencyFundGoal) {
+      insights.push({
+        icon: <Sparkles className="text-blue-500" size={18} />,
+        text: 'Máš vybudovanú dostatočnú rezervu. Každé ďalšie euro by malo smerovať do investícií.',
+        color: 'blue',
+      });
+    } else {
+      insights.push({
+        icon: <BrainCircuit className="text-indigo-500" size={18} />,
+        text: `Tvoj celkový majetok pokrýva ${Math.round((stats.totalAssets / stats.monthlyExpenses) * 10) / 10} mesiacov výdavkov. Cieľ je 6.`,
+        color: 'indigo',
+      });
+    }
+
+    return insights;
+  }, [stats, loading]);
 
   const assetsHistory = useMemo(() => {
     if (!wealthData || wealthData.length === 0) return [];
@@ -139,7 +191,7 @@ export default function Dashboard() {
   }, [incomeData, expenseData]);
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 pb-12">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold">Ahoj! 👋</h1>
@@ -163,6 +215,75 @@ export default function Dashboard() {
           </div>
         )}
       </div>
+
+      {/* AI Financial Coach Section */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="bg-gradient-to-br from-indigo-600 to-blue-700 rounded-3xl p-1 shadow-xl shadow-blue-200 dark:shadow-none overflow-hidden"
+      >
+        <div className="bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl rounded-[22px] p-6">
+          <div className="flex items-center gap-3 mb-6">
+            <div className="w-10 h-10 rounded-full bg-indigo-100 dark:bg-indigo-900/30 flex items-center justify-center text-indigo-600">
+              <Sparkles size={22} />
+            </div>
+            <div>
+              <h2 className="text-lg font-bold">AI Finančný kouč</h2>
+              <p className="text-[10px] text-slate-500 uppercase font-black tracking-widest">
+                Analýza tvojich dát
+              </p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {loading ? (
+              <>
+                <Skeleton className="h-20 w-full rounded-2xl" />
+                <Skeleton className="h-20 w-full rounded-2xl" />
+              </>
+            ) : (
+              <>
+                {aiInsights.map((insight, idx) => (
+                  <motion.div
+                    key={idx}
+                    initial={{ opacity: 0, x: -10 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: idx * 0.1 }}
+                    className={`flex items-start gap-4 p-4 rounded-2xl bg-${insight.color}-50/50 dark:bg-${insight.color}-900/10 border border-${insight.color}-100/50 dark:border-${insight.color}-900/20`}
+                  >
+                    <div
+                      className={`mt-1 p-2 rounded-lg bg-${insight.color}-100 dark:bg-${insight.color}-900/30`}
+                    >
+                      {insight.icon}
+                    </div>
+                    <p className="text-sm font-medium text-slate-700 dark:text-slate-300 leading-relaxed">
+                      {insight.text}
+                    </p>
+                  </motion.div>
+                ))}
+                {aiInsights.length === 0 && (
+                  <p className="text-sm text-slate-500 italic p-4">
+                    Zatiaľ nemám dostatok dát na analýzu. Pridaj viac záznamov o
+                    majetku a výdavkoch.
+                  </p>
+                )}
+              </>
+            )}
+          </div>
+
+          {!loading && (
+            <div className="mt-6 pt-6 border-t border-slate-100 dark:border-slate-800 flex justify-end">
+              <button className="text-xs font-bold text-indigo-600 hover:text-indigo-700 flex items-center gap-1.5 transition-colors group">
+                Detailná analýza{' '}
+                <ArrowRight
+                  size={14}
+                  className="group-hover:translate-x-1 transition-transform"
+                />
+              </button>
+            </div>
+          )}
+        </div>
+      </motion.div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {loading ? (
