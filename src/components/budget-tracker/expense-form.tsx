@@ -16,6 +16,7 @@ const CATEGORIES = [
   'Doprava',
   'Voľný čas',
   'Zdravie',
+  'Darčeky',
   'Ostatné',
 ];
 
