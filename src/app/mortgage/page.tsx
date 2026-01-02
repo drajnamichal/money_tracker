@@ -648,12 +648,12 @@ export default function MortgagePage() {
             <h4 className="font-bold">Aktuálne trhové sadzby</h4>
           </div>
           <a
-            href="https://www.financnykompas.sk/hypoteka"
+            href="https://www.financnahitparada.sk/hypoteky"
             target="_blank"
             rel="noopener noreferrer"
             className="text-[10px] text-slate-400 hover:text-blue-500 flex items-center gap-1 transition-colors font-bold uppercase tracking-wider"
           >
-            Zdroj: FinancnyKompas.sk
+            Zdroj: FinancnaHitparada.sk
             <ExternalLink size={12} />
           </a>
         </div>
