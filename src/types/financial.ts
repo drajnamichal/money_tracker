@@ -56,6 +56,7 @@ export interface ExpenseRecord {
 export interface BudgetExpense {
   id: string;
   description: string;
+  category: string | null;
   amount: number;
   amount_eur: number;
   currency: 'EUR' | 'CZK';
@@ -105,4 +106,5 @@ export interface Investment {
   current_price: number;
   currency: 'EUR' | 'USD';
   created_at?: string;
+  updated_at?: string;
 }

@@ -1,18 +1,42 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { formatCurrency } from '@/lib/utils';
 import { ChartEmoji, MoneyEmoji, HouseEmoji } from './icons';
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 
 interface SummaryProps {
   totalBudget: number;
   totalSpent: number;
   remainingBudget: number;
+  expenses: any[];
 }
+
+const COLORS = [
+  '#6366f1',
+  '#10b981',
+  '#f59e0b',
+  '#f43f5e',
+  '#8b5cf6',
+  '#06b6d4',
+];
 
 const Summary: React.FC<SummaryProps> = ({
   totalBudget,
   totalSpent,
   remainingBudget,
+  expenses,
 }) => {
+  const categoryData = useMemo(() => {
+    const categories: Record<string, number> = {};
+    expenses.forEach((expense) => {
+      const cat = expense.category || 'Ostatné';
+      categories[cat] = (categories[cat] || 0) + Number(expense.amount);
+    });
+
+    return Object.entries(categories)
+      .map(([name, value]) => ({ name, value }))
+      .sort((a, b) => b.value - a.value);
+  }, [expenses]);
+
   const percentageSpent =
     totalBudget > 0 ? (totalSpent / totalBudget) * 100 : 0;
 
@@ -91,6 +115,72 @@ const Summary: React.FC<SummaryProps> = ({
           {statusMessage}
         </p>
       </div>
+
+      {categoryData.length > 0 && (
+        <div className="mt-8 pt-8 border-t border-slate-100 dark:border-slate-800">
+          <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 mb-4 text-center uppercase tracking-widest">
+            Rozdelenie podľa kategórií
+          </h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
+            <div className="h-[200px] w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={categoryData}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={60}
+                    outerRadius={80}
+                    paddingAngle={5}
+                    dataKey="value"
+                  >
+                    {categoryData.map((entry, index) => (
+                      <Cell
+                        key={`cell-${index}`}
+                        fill={COLORS[index % COLORS.length]}
+                      />
+                    ))}
+                  </Pie>
+                  <Tooltip
+                    formatter={(value: number) => formatCurrency(value)}
+                    contentStyle={{
+                      borderRadius: '12px',
+                      border: 'none',
+                      boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)',
+                    }}
+                  />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+            <div className="space-y-2">
+              {categoryData.map((item, idx) => (
+                <div
+                  key={item.name}
+                  className="flex items-center justify-between text-xs"
+                >
+                  <div className="flex items-center gap-2">
+                    <div
+                      className="w-2.5 h-2.5 rounded-full"
+                      style={{ backgroundColor: COLORS[idx % COLORS.length] }}
+                    />
+                    <span className="font-medium text-slate-600 dark:text-slate-400">
+                      {item.name}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <span className="font-bold text-slate-800 dark:text-slate-200">
+                      {formatCurrency(item.value)}
+                    </span>
+                    <span className="text-slate-400 w-8 text-right">
+                      {((item.value / totalSpent) * 100).toFixed(0)}%
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

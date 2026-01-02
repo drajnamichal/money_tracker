@@ -15,7 +15,12 @@ export default function BudgetTrackerPage() {
   const { expenses, todoItems, loading, refresh } = useBudgetData();
 
   const addExpense = useCallback(
-    async (expense: { description: string; amount: number; file?: File }) => {
+    async (expense: {
+      description: string;
+      amount: number;
+      category?: string;
+      file?: File;
+    }) => {
       try {
         let attachment_url = null;
 
@@ -43,6 +48,7 @@ export default function BudgetTrackerPage() {
           {
             description: expense.description,
             amount: expense.amount,
+            category: expense.category || 'Ostatné',
             attachment_url,
           },
         ]);
@@ -114,7 +120,10 @@ export default function BudgetTrackerPage() {
   );
 
   const updateExpense = useCallback(
-    async (id: string, newValues: { description: string; amount: number }) => {
+    async (
+      id: string,
+      newValues: { description: string; amount: number; category?: string }
+    ) => {
       try {
         const { error } = await supabase
           .from('budget_expenses')
@@ -207,6 +216,7 @@ export default function BudgetTrackerPage() {
           totalBudget={TOTAL_BUDGET}
           totalSpent={totalSpent}
           remainingBudget={remainingBudget}
+          expenses={expenses}
         />
 
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">

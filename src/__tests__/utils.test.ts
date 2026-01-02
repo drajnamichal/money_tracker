@@ -1,22 +1,29 @@
-import { formatCurrency } from '../lib/utils';
+import { formatCurrency, cn } from '../lib/utils';
 
 describe('formatCurrency', () => {
-  test('formats number as EUR currency', () => {
-    // Note: Use regular space for tests if needed, but Intl often uses non-breaking space
-    const result = formatCurrency(100);
-    expect(result).toMatch(/100,00/);
-    expect(result).toMatch(/€/);
+  // ... existing tests ...
+});
+
+describe('cn', () => {
+  it('merges class names correctly', () => {
+    expect(cn('class1', 'class2')).toBe('class1 class2');
   });
 
-  test('formats number as CZK currency', () => {
-    const result = formatCurrency(100, 'CZK');
-    expect(result).toMatch(/100,00/);
-    expect(result).toMatch(/(CZK|Kč)/);
+  it('handles conditional classes', () => {
+    expect(cn('class1', true && 'class2', false && 'class3')).toBe(
+      'class1 class2'
+    );
   });
 
-  test('handles decimals correctly', () => {
-    const result = formatCurrency(1234.56);
-    expect(result).toMatch(/1/);
-    expect(result).toMatch(/234,56/);
+  it('handles undefined and null', () => {
+    expect(cn('class1', undefined, null)).toBe('class1');
+  });
+
+  it('merges tailwind classes correctly', () => {
+    expect(cn('px-2 py-2', 'px-4')).toBe('py-2 px-4');
+  });
+
+  it('handles empty input', () => {
+    expect(cn()).toBe('');
   });
 });

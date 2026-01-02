@@ -17,12 +17,21 @@ interface ExpenseListProps {
   onDeleteExpense: (id: string) => void;
   onUpdateExpense: (
     id: string,
-    newValues: { description: string; amount: number }
+    newValues: { description: string; amount: number; category: string }
   ) => void;
   totalBudget: number;
   totalSpent: number;
   remainingBudget: number;
 }
+
+const CATEGORIES = [
+  'Bývanie',
+  'Strava',
+  'Doprava',
+  'Voľný čas',
+  'Zdravie',
+  'Ostatné',
+];
 
 const ExpenseList: React.FC<ExpenseListProps> = ({
   expenses,
@@ -35,17 +44,20 @@ const ExpenseList: React.FC<ExpenseListProps> = ({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editedDescription, setEditedDescription] = useState('');
   const [editedAmount, setEditedAmount] = useState('');
+  const [editedCategory, setEditedCategory] = useState('');
 
   const handleEditStart = (expense: any) => {
     setEditingId(expense.id);
     setEditedDescription(expense.description);
     setEditedAmount(expense.amount.toString());
+    setEditedCategory(expense.category || 'Ostatné');
   };
 
   const handleCancelEdit = () => {
     setEditingId(null);
     setEditedDescription('');
     setEditedAmount('');
+    setEditedCategory('');
   };
 
   const handleSaveEdit = (id: string) => {
@@ -58,6 +70,7 @@ const ExpenseList: React.FC<ExpenseListProps> = ({
       onUpdateExpense(id, {
         description: editedDescription.trim(),
         amount: numericAmount,
+        category: editedCategory,
       });
       handleCancelEdit();
     }
@@ -101,6 +114,18 @@ const ExpenseList: React.FC<ExpenseListProps> = ({
                       className="block w-full px-2 py-1 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-md text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:text-slate-200"
                       aria-label="Upraviť sumu"
                     />
+                    <select
+                      value={editedCategory}
+                      onChange={(e) => setEditedCategory(e.target.value)}
+                      className="block w-full px-2 py-1 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-md text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:text-slate-200"
+                      aria-label="Upraviť kategóriu"
+                    >
+                      {CATEGORIES.map((cat) => (
+                        <option key={cat} value={cat}>
+                          {cat}
+                        </option>
+                      ))}
+                    </select>
                   </div>
                   <div className="flex items-center ml-2">
                     <button
@@ -126,6 +151,9 @@ const ExpenseList: React.FC<ExpenseListProps> = ({
                       <p className="font-medium text-slate-800 dark:text-slate-200 truncate">
                         {expense.description}
                       </p>
+                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400 font-bold uppercase tracking-tighter">
+                        {expense.category || 'Ostatné'}
+                      </span>
                       {expense.attachment_url && (
                         <a
                           href={expense.attachment_url}

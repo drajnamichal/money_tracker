@@ -8,6 +8,9 @@ import {
   SalarySplit,
   mergeAssetItems,
   AssetItem,
+  mergeIncomeItems,
+  calculateFireTarget,
+  calculateMonthsToFire,
 } from '../lib/calculations';
 
 describe('calculations', () => {
@@ -58,6 +61,39 @@ describe('calculations', () => {
         expenses: 1000,
         categories: { Ostatné: 1000 },
       });
+    });
+
+    it('handles empty input arrays', () => {
+      const result = aggregateMonthlyData([], []);
+      expect(result).toEqual([]);
+    });
+
+    it('handles only income data', () => {
+      const income = [{ record_month: '2023-01-01', amount_eur: 1000 }];
+      const result = aggregateMonthlyData(income, []);
+      expect(result).toHaveLength(1);
+      expect(result[0].income).toBe(1000);
+      expect(result[0].expenses).toBe(0);
+    });
+
+    it('handles only expense data', () => {
+      const expenses = [
+        { record_date: '2023-01-01', amount_eur: 500, category: 'Strava' },
+      ];
+      const result = aggregateMonthlyData([], expenses);
+      expect(result).toHaveLength(1);
+      expect(result[0].income).toBe(0);
+      expect(result[0].expenses).toBe(500);
+    });
+
+    it('sorts months correctly across different years', () => {
+      const income = [
+        { record_month: '2024-01-01', amount_eur: 1000 },
+        { record_month: '2023-12-01', amount_eur: 1000 },
+      ];
+      const result = aggregateMonthlyData(income, []);
+      expect(result[0].month).toBe('2023-12');
+      expect(result[1].month).toBe('2024-01');
     });
   });
 
@@ -185,10 +221,7 @@ describe('calculations', () => {
       expect(merged.find((m) => m.accountName === 'Crypto')?.amount).toBe(500);
     });
 
-    it('trims account names and handles case insensitivity', () => {
-      // Note: Current mergeAssetItems implementation is case sensitive.
-      // Let's check if we want it to be case insensitive.
-      // For now, let's test trimming.
+    it('trims account names', () => {
       const items: AssetItem[] = [
         { accountName: ' Tatra Banka ', amount: '100', currency: 'EUR' },
         { accountName: 'Tatra Banka', amount: '200', currency: 'EUR' },
@@ -197,6 +230,69 @@ describe('calculations', () => {
       const merged = mergeAssetItems(items);
       expect(merged).toHaveLength(1);
       expect(merged[0].amount).toBe(300);
+    });
+  });
+
+  describe('mergeIncomeItems', () => {
+    it('merges multiple items with the same category name', () => {
+      const items = [
+        { categoryName: 'Práca', amount: '1500', currency: 'EUR' },
+        { categoryName: 'Práca', amount: '200', currency: 'EUR' },
+        { categoryName: 'Bonus', amount: '300', currency: 'EUR' },
+      ];
+
+      const merged = mergeIncomeItems(items);
+
+      expect(merged).toHaveLength(2);
+      expect(merged.find((m) => m.categoryName === 'Práca')?.amount).toBe(1700);
+      expect(merged.find((m) => m.categoryName === 'Bonus')?.amount).toBe(300);
+    });
+
+    it('trims category names', () => {
+      const items = [
+        { categoryName: ' Dividendy ', amount: '100', currency: 'EUR' },
+        { categoryName: 'Dividendy', amount: '50', currency: 'EUR' },
+      ];
+
+      const merged = mergeIncomeItems(items);
+      expect(merged).toHaveLength(1);
+      expect(merged[0].amount).toBe(150);
+    });
+
+    it('handles empty category names', () => {
+      const items = [
+        { categoryName: '', amount: '100', currency: 'EUR' },
+        { categoryName: '  ', amount: '200', currency: 'EUR' },
+      ];
+
+      const merged = mergeIncomeItems(items);
+      expect(merged).toHaveLength(0);
+    });
+  });
+
+  describe('calculateFireTarget', () => {
+    it('calculates target correctly for 4% SWR', () => {
+      expect(calculateFireTarget(1000, 4)).toBe(300000);
+    });
+
+    it('handles zero expenses', () => {
+      expect(calculateFireTarget(0, 4)).toBe(0);
+    });
+  });
+
+  describe('calculateMonthsToFire', () => {
+    it('returns 0 if already at target', () => {
+      expect(calculateMonthsToFire(100, 10, 0.01, 50)).toBe(0);
+    });
+
+    it('calculates months correctly without growth', () => {
+      expect(calculateMonthsToFire(0, 100, 0, 1000)).toBe(10);
+    });
+
+    it('handles growth correctly', () => {
+      // 0 + 100 * 1.1 = 110 (1 month)
+      // 110 + 100 * 1.1 = 231 (2 months)
+      expect(calculateMonthsToFire(0, 100, 0.1, 200)).toBe(2);
     });
   });
 });

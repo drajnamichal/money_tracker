@@ -10,6 +10,8 @@ import {
   ArrowRight,
   BrainCircuit,
   Lightbulb,
+  Flame,
+  Target,
 } from 'lucide-react';
 import {
   AreaChart,
@@ -30,16 +32,24 @@ import {
   useIncomeData,
   useExpenseData,
   useInvestmentData,
+  useMortgageData,
 } from '@/hooks/use-financial-data';
+import { calculateFireTarget } from '@/lib/calculations';
+import Link from 'next/link';
 
 export default function Dashboard() {
   const { records: wealthData, loading: wealthLoading } = useWealthData();
   const { records: incomeData, loading: incomeLoading } = useIncomeData();
   const { records: expenseData, loading: expenseLoading } = useExpenseData();
   const { investments, loading: investmentLoading } = useInvestmentData();
+  const { mortgage, loading: mortgageLoading } = useMortgageData();
 
   const loading =
-    wealthLoading || incomeLoading || expenseLoading || investmentLoading;
+    wealthLoading ||
+    incomeLoading ||
+    expenseLoading ||
+    investmentLoading ||
+    mortgageLoading;
 
   const stats = useMemo(() => {
     let totalAssets = 0;
@@ -54,6 +64,21 @@ export default function Dashboard() {
     );
 
     if (wealthData && wealthData.length > 0) {
+      // Latest wealth per account
+      const latestDates: Record<string, string> = {};
+      wealthData.forEach((r) => {
+        if (
+          !latestDates[r.account_id] ||
+          r.record_date > latestDates[r.account_id]
+        ) {
+          latestDates[r.account_id] = r.record_date;
+        }
+      });
+
+      const cashValue = wealthData
+        .filter((r) => r.record_date === latestDates[r.account_id])
+        .reduce((sum, r) => sum + Number(r.amount_eur), 0);
+
       const totalsByDate = wealthData.reduce((acc: any, curr: any) => {
         acc[curr.record_date] =
           (acc[curr.record_date] || 0) + Number(curr.amount_eur);
@@ -64,7 +89,7 @@ export default function Dashboard() {
       const latestDate = sortedDates[sortedDates.length - 1];
       const previousDate = sortedDates[sortedDates.length - 2];
 
-      totalAssets = totalsByDate[latestDate] + investmentValue;
+      totalAssets = cashValue + investmentValue;
       const previousTotal = totalsByDate[previousDate] || totalAssets;
       growth =
         previousTotal !== 0
@@ -107,8 +132,21 @@ export default function Dashboard() {
           : 0;
     }
 
-    return { totalAssets, growth, monthlyIncome, monthlyExpenses, savingsRate };
-  }, [wealthData, incomeData, expenseData]);
+    const netWorth = totalAssets - (mortgage?.current_principal || 0);
+    const fireTarget = calculateFireTarget(monthlyExpenses);
+    const fireProgress = fireTarget > 0 ? (netWorth / fireTarget) * 100 : 0;
+
+    return {
+      totalAssets,
+      growth,
+      monthlyIncome,
+      monthlyExpenses,
+      savingsRate,
+      netWorth,
+      fireTarget,
+      fireProgress,
+    };
+  }, [wealthData, incomeData, expenseData, investments, mortgage]);
 
   const aiInsights = useMemo(() => {
     if (loading) return [];
@@ -230,17 +268,92 @@ export default function Dashboard() {
         {loading ? (
           <Skeleton className="h-16 w-48 rounded-2xl" />
         ) : (
-          <div className="bg-blue-600 text-white px-6 py-3 rounded-2xl shadow-lg shadow-blue-200 dark:shadow-blue-900/20 flex items-center gap-4">
-            <Wallet size={24} />
-            <div>
-              <p className="text-xs opacity-80 uppercase font-bold tracking-wider">
-                Celkový Majetok
-              </p>
-              <p className="text-xl font-bold">
-                {formatCurrency(stats.totalAssets)}
-              </p>
+          <div className="flex gap-4">
+            <div className="bg-slate-900 text-white px-6 py-3 rounded-2xl shadow-lg flex items-center gap-4 border border-slate-800">
+              <Wallet size={24} className="text-slate-400" />
+              <div>
+                <p className="text-xs opacity-60 uppercase font-bold tracking-wider">
+                  Čistý Majetok
+                </p>
+                <p className="text-xl font-bold">
+                  {formatCurrency(stats.netWorth)}
+                </p>
+              </div>
+            </div>
+            <div className="bg-blue-600 text-white px-6 py-3 rounded-2xl shadow-lg shadow-blue-200 dark:shadow-blue-900/20 flex items-center gap-4">
+              <TrendingUp size={24} />
+              <div>
+                <p className="text-xs opacity-80 uppercase font-bold tracking-wider">
+                  Celkové Aktíva
+                </p>
+                <p className="text-xl font-bold">
+                  {formatCurrency(stats.totalAssets)}
+                </p>
+              </div>
             </div>
           </div>
+        )}
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+        {loading ? (
+          <>
+            <Skeleton className="h-32 rounded-2xl" />
+            <Skeleton className="h-32 rounded-2xl" />
+            <Skeleton className="h-32 rounded-2xl" />
+            <Skeleton className="h-32 rounded-2xl" />
+          </>
+        ) : (
+          <>
+            <StatCard
+              title="Mesačný Príjem"
+              value={formatCurrency(stats.monthlyIncome)}
+              change={0}
+              icon={<TrendingUp className="text-emerald-500" />}
+              color="emerald"
+            />
+            <StatCard
+              title="Mesačné Výdavky"
+              value={formatCurrency(stats.monthlyExpenses)}
+              change={0}
+              icon={<TrendingDown className="text-rose-500" />}
+              color="rose"
+            />
+            <StatCard
+              title="Mesačná Úspora"
+              value={formatCurrency(
+                stats.monthlyIncome - stats.monthlyExpenses
+              )}
+              change={0}
+              icon={<TrendingUp className="text-blue-500" />}
+              color="blue"
+            />
+            <Link href="/fire" className="block">
+              <motion.div
+                whileHover={{ y: -4 }}
+                className="bg-gradient-to-br from-orange-500 to-rose-600 p-6 rounded-2xl shadow-sm border border-orange-400/20 flex flex-col justify-between h-full text-white relative overflow-hidden group"
+              >
+                <Flame className="absolute -right-2 -bottom-2 w-24 h-24 opacity-20 group-hover:scale-110 transition-transform duration-500" />
+                <div className="flex justify-between items-start relative z-10">
+                  <p className="text-sm font-medium opacity-80">
+                    FIRE Progress
+                  </p>
+                  <Target size={18} className="opacity-80" />
+                </div>
+                <div className="relative z-10 mt-2">
+                  <h3 className="text-2xl font-black">
+                    {stats.fireProgress.toFixed(1)}%
+                  </h3>
+                  <div className="w-full bg-white/20 h-1.5 rounded-full mt-2 overflow-hidden">
+                    <div
+                      className="bg-white h-full transition-all duration-1000"
+                      style={{ width: `${Math.min(stats.fireProgress, 100)}%` }}
+                    />
+                  </div>
+                </div>
+              </motion.div>
+            </Link>
+          </>
         )}
       </div>
 
@@ -312,42 +425,6 @@ export default function Dashboard() {
           )}
         </div>
       </motion.div>
-
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {loading ? (
-          <>
-            <Skeleton className="h-32 rounded-2xl" />
-            <Skeleton className="h-32 rounded-2xl" />
-            <Skeleton className="h-32 rounded-2xl" />
-          </>
-        ) : (
-          <>
-            <StatCard
-              title="Mesačný Príjem"
-              value={formatCurrency(stats.monthlyIncome)}
-              change={0}
-              icon={<TrendingUp className="text-emerald-500" />}
-              color="emerald"
-            />
-            <StatCard
-              title="Mesačné Výdavky"
-              value={formatCurrency(stats.monthlyExpenses)}
-              change={0}
-              icon={<TrendingDown className="text-rose-500" />}
-              color="rose"
-            />
-            <StatCard
-              title="Mesačná Úspora"
-              value={formatCurrency(
-                stats.monthlyIncome - stats.monthlyExpenses
-              )}
-              change={0}
-              icon={<TrendingUp className="text-blue-500" />}
-              color="blue"
-            />
-          </>
-        )}
-      </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl shadow-sm border">

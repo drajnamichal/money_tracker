@@ -8,10 +8,20 @@ import {
 } from './icons';
 import { toast } from 'sonner';
 
+const CATEGORIES = [
+  'Bývanie',
+  'Strava',
+  'Doprava',
+  'Voľný čas',
+  'Zdravie',
+  'Ostatné',
+];
+
 interface ExpenseFormProps {
   onAddExpense: (expense: {
     description: string;
     amount: number;
+    category: string;
     file?: File;
   }) => Promise<void>;
 }
@@ -19,6 +29,7 @@ interface ExpenseFormProps {
 const ExpenseForm: React.FC<ExpenseFormProps> = ({ onAddExpense }) => {
   const [description, setDescription] = useState('');
   const [amount, setAmount] = useState('');
+  const [category, setCategory] = useState('Ostatné');
   const [error, setError] = useState('');
   const [file, setFile] = useState<File | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -43,10 +54,12 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ onAddExpense }) => {
       await onAddExpense({
         description,
         amount: numericAmount,
+        category,
         file: file || undefined,
       });
       setDescription('');
       setAmount('');
+      setCategory('Ostatné');
       setFile(null);
       setError('');
       if (fileInputRef.current) fileInputRef.current.value = '';
@@ -94,6 +107,9 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ onAddExpense }) => {
 
       if (data.description) setDescription(data.description);
       if (data.amount) setAmount(data.amount.toString());
+      if (data.category && CATEGORIES.includes(data.category)) {
+        setCategory(data.category);
+      }
 
       toast.success('Bloček úspešne naskenovaný!');
     } catch (error: any) {
@@ -152,6 +168,28 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ onAddExpense }) => {
                 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 dark:text-slate-200"
             />
           </div>
+        </div>
+
+        <div>
+          <label
+            htmlFor="category"
+            className="block text-sm font-medium text-slate-700 dark:text-slate-300"
+          >
+            Kategória
+          </label>
+          <select
+            id="category"
+            value={category}
+            onChange={(e) => setCategory(e.target.value)}
+            className="mt-1 block w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-md text-sm shadow-sm
+              focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 dark:text-slate-200"
+          >
+            {CATEGORIES.map((cat) => (
+              <option key={cat} value={cat}>
+                {cat}
+              </option>
+            ))}
+          </select>
         </div>
 
         <div>

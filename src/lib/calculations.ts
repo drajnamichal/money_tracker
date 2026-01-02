@@ -217,3 +217,32 @@ export function mergeIncomeItems(items: IncomeItem[]): {
     ...data,
   }));
 }
+
+export function calculateFireTarget(
+  monthlyExpenses: number,
+  swr: number = 4
+): number {
+  if (monthlyExpenses <= 0 || swr <= 0) return 0;
+  return (monthlyExpenses * 12) / (swr / 100);
+}
+
+export function calculateMonthsToFire(
+  currentNetWorth: number,
+  monthlySavings: number,
+  monthlyReturnRate: number,
+  targetAmount: number
+): number {
+  if (currentNetWorth >= targetAmount) return 0;
+  if (monthlySavings <= 0 && monthlyReturnRate <= 0) return Infinity;
+
+  let months = 0;
+  let netWorth = currentNetWorth;
+  const maxMonths = 1200; // 100 years
+
+  while (netWorth < targetAmount && months < maxMonths) {
+    netWorth = (netWorth + monthlySavings) * (1 + monthlyReturnRate);
+    months++;
+  }
+
+  return months;
+}
