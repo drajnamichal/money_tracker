@@ -15,10 +15,10 @@ export default function CalculatorPage() {
   const [saving, setSaving] = useState(false);
   const [salary, setSalary] = useState(0);
   const [split, setSplit] = useState({
-    fixed_costs: 55,
+    fixed_costs: 50,
     investments: 25,
-    savings: 15,
-    fun: 5,
+    savings: 5,
+    fun: 20,
   });
 
   // Calculate latest month total income
@@ -86,16 +86,20 @@ export default function CalculatorPage() {
       color: 'blue',
     },
     {
+      name: 'Zábava a radosť',
+      percent: split.fun,
+      color: 'rose',
+    },
+    {
       name: 'Investície (ETF, Akcie)',
       percent: split.investments,
       color: 'emerald',
     },
     {
-      name: 'Krátkodobé sporenie (Rezerva)',
+      name: 'Rezerva (udržiavacia)',
       percent: split.savings,
       color: 'amber',
     },
-    { name: 'Zábava a radosť', percent: split.fun, color: 'rose' },
   ];
 
   const totalPercent = Object.values(split).reduce((a, b) => a + b, 0);
@@ -241,13 +245,14 @@ export default function CalculatorPage() {
 
               <div className="bg-blue-600 p-6 rounded-2xl text-white shadow-lg shadow-blue-200 dark:shadow-none">
                 <div className="flex items-center gap-3 mb-4">
-                  <Calculator size={24} className="opacity-70" />
-                  <h3 className="font-bold">Rýchly tip</h3>
+                  <TrendingUp size={24} className="opacity-70" />
+                  <h3 className="font-bold">Konzervatívna optimalizácia</h3>
                 </div>
                 <p className="text-blue-100 text-sm leading-relaxed">
-                  Pravidlo 50/30/20 je dobrý štart, ale tvoje nastavenie (
-                  {split.fixed_costs}/{split.investments + split.savings}/
-                  {split.fun}) je ešte ambicióznejšie pre budovanie bohatstva!
+                  Keďže už máš vybudovanú základnú rezervu, sústredíme sa na
+                  maximálnu kvalitu života (20% zábava) pri zachovaní silného
+                  investičného tempa (25%). Rezerva sa už len udržiava na úrovni
+                  5%.
                 </p>
               </div>
             </>
