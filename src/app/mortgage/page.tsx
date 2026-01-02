@@ -235,6 +235,38 @@ export default function MortgagePage() {
 
   return (
     <div className="space-y-8 pb-12">
+      {/* Live Interest Rate Ticker */}
+      {!loadingRates && marketRates.length > 0 && (
+        <div className="relative overflow-hidden bg-blue-600/5 dark:bg-blue-400/5 border-y border-blue-100/50 dark:border-blue-900/30 py-2 -mx-4 md:-mx-8 mb-4">
+          <motion.div
+            animate={{
+              x: [0, -1035], // Adjust based on content width
+            }}
+            transition={{
+              x: {
+                repeat: Infinity,
+                repeatType: 'loop',
+                duration: 30,
+                ease: 'linear',
+              },
+            }}
+            className="flex gap-12 whitespace-nowrap w-max px-4"
+          >
+            {[...marketRates, ...marketRates].map((rate, i) => (
+              <div key={i} className="flex items-center gap-2">
+                <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                  {rate.bank}
+                </span>
+                <span className="text-sm font-bold text-blue-600 dark:text-blue-400">
+                  {rate.rate}
+                </span>
+                <TrendingUp size={12} className="text-emerald-500" />
+              </div>
+            ))}
+          </motion.div>
+        </div>
+      )}
+
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold flex items-center gap-3">
