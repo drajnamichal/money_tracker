@@ -27,7 +27,7 @@ const navigation = [
   { name: 'Príjmy', href: '/income', icon: TrendingUp },
   { name: 'Výdaje', href: '/expenses', icon: Receipt },
   { name: 'Rozpočet bytu', href: '/budget-tracker', icon: Building2 },
-  { name: 'Platby', href: '/recurring-payments', icon: CreditCard },
+  { name: 'Pravidelné platby', href: '/recurring-payments', icon: CreditCard },
   { name: 'Kalkulačka', href: '/calculator', icon: Calculator },
 ];
 
