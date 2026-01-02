@@ -22,6 +22,7 @@ interface RecurringPayment {
   id: string;
   name: string;
   amount: number;
+  last_amount?: number;
   frequency: 'monthly' | 'yearly';
 }
 
@@ -100,9 +101,18 @@ export default function RecurringPaymentsPage() {
     amount: number,
     frequency: 'monthly' | 'yearly'
   ) {
+    // Find the current payment to get its current amount
+    const currentPayment = payments.find((p) => p.id === id);
+    const updateData: any = { name, amount, frequency };
+
+    // If amount is changing, store the current amount as last_amount
+    if (currentPayment && currentPayment.amount !== amount) {
+      updateData.last_amount = currentPayment.amount;
+    }
+
     const { error } = await supabase
       .from('recurring_payments')
-      .update({ name, amount, frequency })
+      .update(updateData)
       .eq('id', id);
 
     if (!error) {
@@ -430,12 +440,21 @@ function PaymentRow({
   }
 
   return (
-    <div className="p-4 flex items-center justify-between hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+    <div className="p-4 flex items-center justify-between hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors group">
       <div className="space-y-0.5">
         <p className="font-medium">{payment.name}</p>
-        <p className="text-2xl font-bold text-slate-900 dark:text-white">
-          {formatCurrency(payment.amount)}
-        </p>
+        <div className="flex flex-col">
+          <p className="text-2xl font-bold text-slate-900 dark:text-white leading-tight">
+            {formatCurrency(payment.amount)}
+          </p>
+          {payment.last_amount !== undefined &&
+            payment.last_amount !== null &&
+            payment.last_amount !== payment.amount && (
+              <p className="text-[10px] font-medium text-slate-400 italic">
+                predtým {formatCurrency(payment.last_amount)}
+              </p>
+            )}
+        </div>
       </div>
       <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 md:opacity-100">
         <button
