@@ -64,7 +64,8 @@ export default function Dashboard() {
       const allDates = wealthData.map((r) => r.record_date);
       const latestDate = allDates.reduce((a, b) => (a > b ? a : b));
 
-      const cashValue = wealthData
+      // This is the number from the Assets page "CELKOM" for the latest period
+      const latestAssetsTotal = wealthData
         .filter((r) => r.record_date === latestDate)
         .reduce((sum, r) => sum + Number(r.amount_eur), 0);
 
@@ -76,17 +77,21 @@ export default function Dashboard() {
 
       const sortedDates = Object.keys(totalsByDate).sort();
       const previousDate = sortedDates[sortedDates.length - 2];
+      const previousAssetsTotal =
+        totalsByDate[previousDate] || latestAssetsTotal;
 
-      totalAssets = cashValue + investmentValue;
-      const previousTotal =
-        (totalsByDate[previousDate] || cashValue) + investmentValue;
+      totalAssets = latestAssetsTotal;
       growth =
-        previousTotal !== 0
-          ? ((totalAssets - previousTotal) / previousTotal) * 100
+        previousAssetsTotal !== 0
+          ? ((latestAssetsTotal - previousAssetsTotal) / previousAssetsTotal) *
+            100
           : 0;
     } else {
       totalAssets = investmentValue;
     }
+
+    // The user specifically wants "Čistý majetok" to match the Assets page total (snapshot)
+    const netWorth = totalAssets;
 
     const monthlyData: any = {};
     if (incomeData) {
@@ -120,8 +125,6 @@ export default function Dashboard() {
           ? ((monthlyIncome - monthlyExpenses) / monthlyIncome) * 100
           : 0;
     }
-
-    const netWorth = totalAssets - (mortgage?.current_principal || 0);
 
     return {
       totalAssets,
