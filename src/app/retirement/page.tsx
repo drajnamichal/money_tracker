@@ -5,7 +5,6 @@ import { formatCurrency } from '@/lib/utils';
 import {
   Palmtree,
   TrendingUp,
-  TrendingDown,
   Calendar,
   Wallet,
   Plus,
@@ -14,48 +13,84 @@ import {
   Edit2,
   Check,
   X,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useRetirementData } from '@/hooks/use-financial-data';
 import { Skeleton } from '@/components/skeleton';
 import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
+import { RetirementRecord } from '@/types/financial';
 
 export default function RetirementPage() {
   const { records, loading, refresh } = useRetirementData();
   const [isAdding, setIsAdding] = useState(false);
+  const [selectedAccount, setSelectedAccount] = useState<string>('');
   const [editValues, setEditValues] = useState({
     total_value: '',
     total_contributions: '',
     record_date: new Date().toISOString().split('T')[0],
   });
 
-  const latestRecord = records[0];
+  const latestRecordsByAccount = useMemo(() => {
+    const latest: Record<string, RetirementRecord> = {};
+    records.forEach((record) => {
+      if (!latest[record.account_name]) {
+        latest[record.account_name] = record;
+      } else {
+        const currentLatest = new Date(latest[record.account_name].record_date);
+        const recordDate = new Date(record.record_date);
+        if (recordDate > currentLatest) {
+          latest[record.account_name] = record;
+        }
+      }
+    });
+    return Object.values(latest);
+  }, [records]);
 
-  const stats = useMemo(() => {
-    if (!latestRecord) return null;
-    const profit = latestRecord.total_value - latestRecord.total_contributions;
-    const profitPct = (profit / latestRecord.total_contributions) * 100;
-    return {
-      value: latestRecord.total_value,
-      contributions: latestRecord.total_contributions,
-      profit,
-      profitPct,
-      date: latestRecord.record_date,
-    };
-  }, [latestRecord]);
+  const totalStats = useMemo(() => {
+    if (latestRecordsByAccount.length === 0) return null;
+    const totalValue = latestRecordsByAccount.reduce(
+      (sum, r) => sum + Number(r.total_value),
+      0
+    );
+    const totalContributions = latestRecordsByAccount.reduce(
+      (sum, r) => sum + Number(r.total_contributions),
+      0
+    );
+    const profit = totalValue - totalContributions;
+    const profitPct =
+      totalContributions > 0 ? (profit / totalContributions) * 100 : 0;
+
+    const latestDate = latestRecordsByAccount.reduce(
+      (max, r) => (r.record_date > max ? r.record_date : max),
+      latestRecordsByAccount[0].record_date
+    );
+
+    return { totalValue, totalContributions, profit, profitPct, latestDate };
+  }, [latestRecordsByAccount]);
 
   const handleAddRecord = async () => {
+    if (!selectedAccount) {
+      toast.error('Vyber si účet pre aktualizáciu');
+      return;
+    }
+
     try {
       const val = parseFloat(editValues.total_value);
-      const contrib = parseFloat(editValues.total_contributions);
+      const contrib = parseFloat(editValues.total_contributions) || 0;
       const profit = val - contrib;
-      const profitPct = (profit / contrib) * 100;
+      const profitPct = contrib > 0 ? (profit / contrib) * 100 : 0;
+
+      const account = latestRecordsByAccount.find(
+        (a) => a.account_name === selectedAccount
+      );
 
       const { error } = await supabase.from('retirement_records').insert([
         {
-          account_name: 'Európsky dôchodok',
-          account_number: '2321351501',
+          account_name: selectedAccount,
+          account_number: account?.account_number || null,
           total_value: val,
           total_contributions: contrib,
           profit: profit,
@@ -66,12 +101,28 @@ export default function RetirementPage() {
 
       if (error) throw error;
 
-      toast.success('Dáta o dôchodku boli aktualizované');
+      toast.success(`Dáta pre ${selectedAccount} boli aktualizované`);
       await refresh();
       setIsAdding(false);
+      setEditValues({
+        total_value: '',
+        total_contributions: '',
+        record_date: new Date().toISOString().split('T')[0],
+      });
     } catch (error: any) {
       toast.error('Chyba pri ukladaní: ' + error.message);
     }
+  };
+
+  const handleEditClick = (record: RetirementRecord) => {
+    setSelectedAccount(record.account_name);
+    setEditValues({
+      total_value: record.total_value.toString(),
+      total_contributions: record.total_contributions.toString(),
+      record_date: new Date().toISOString().split('T')[0],
+    });
+    setIsAdding(true);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   return (
@@ -81,26 +132,27 @@ export default function RetirementPage() {
           <div className="flex items-center gap-3">
             <Palmtree size={32} className="text-orange-500" />
             <h1 className="text-3xl font-bold">Dôchodok</h1>
-            {stats && (
+            {totalStats && (
               <div className="flex items-center gap-1.5 px-2.5 py-1 bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400 rounded-full border border-orange-100 dark:border-orange-800/50 shadow-sm">
                 <Calendar size={12} />
                 <span className="text-[10px] font-bold uppercase tracking-tight">
-                  Aktualizované:{' '}
-                  {new Date(stats.date).toLocaleDateString('sk-SK')}
+                  Posledná aktualizácia:{' '}
+                  {new Date(totalStats.latestDate).toLocaleDateString('sk-SK')}
                 </span>
               </div>
             )}
           </div>
           <p className="text-slate-500 mt-1">
-            Prehľad tvojho dôchodkového sporenia (Finax PEPP).
+            Prehľad tvojich dôchodkových pilierov (Finax PEPP, II. a III.
+            pilier).
           </p>
         </div>
         <button
           onClick={() => setIsAdding(!isAdding)}
           className="bg-orange-600 hover:bg-orange-700 text-white px-6 py-3 rounded-2xl flex items-center gap-2 transition-all shadow-lg shadow-orange-200 dark:shadow-none font-bold"
         >
-          {isAdding ? <X size={20} /> : <Edit2 size={20} />}
-          <span>{isAdding ? 'Zrušiť' : 'Aktualizovať údaje'}</span>
+          {isAdding ? <X size={20} /> : <Plus size={20} />}
+          <span>{isAdding ? 'Zrušiť' : 'Pridať/Upraviť záznam'}</span>
         </button>
       </div>
 
@@ -112,10 +164,25 @@ export default function RetirementPage() {
             exit={{ opacity: 0, y: -20 }}
             className="bg-white dark:bg-slate-900 p-6 rounded-[32px] border border-orange-100 dark:border-orange-900/30 shadow-sm"
           >
-            <h3 className="text-lg font-bold mb-4">
-              Aktualizovať hodnotu účtu
-            </h3>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <h3 className="text-lg font-bold mb-4">Aktualizovať údaje</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div>
+                <label className="block text-xs font-black uppercase tracking-widest text-slate-400 mb-2">
+                  Účet
+                </label>
+                <select
+                  className="w-full bg-slate-50 dark:bg-slate-800 border-none rounded-2xl px-4 py-3 outline-none focus:ring-2 focus:ring-orange-500 transition-all text-slate-900 dark:text-white"
+                  value={selectedAccount}
+                  onChange={(e) => setSelectedAccount(e.target.value)}
+                >
+                  <option value="">Vyber účet...</option>
+                  {latestRecordsByAccount.map((acc) => (
+                    <option key={acc.id} value={acc.account_name}>
+                      {acc.account_name}
+                    </option>
+                  ))}
+                </select>
+              </div>
               <div>
                 <label className="block text-xs font-black uppercase tracking-widest text-slate-400 mb-2">
                   Aktuálna hodnota (€)
@@ -123,7 +190,7 @@ export default function RetirementPage() {
                 <input
                   type="number"
                   step="0.01"
-                  className="w-full bg-slate-50 dark:bg-slate-800 border-none rounded-2xl px-4 py-3 outline-none focus:ring-2 focus:ring-orange-500 transition-all"
+                  className="w-full bg-slate-50 dark:bg-slate-800 border-none rounded-2xl px-4 py-3 outline-none focus:ring-2 focus:ring-orange-500 transition-all text-slate-900 dark:text-white"
                   value={editValues.total_value}
                   onChange={(e) =>
                     setEditValues({
@@ -141,7 +208,7 @@ export default function RetirementPage() {
                 <input
                   type="number"
                   step="0.01"
-                  className="w-full bg-slate-50 dark:bg-slate-800 border-none rounded-2xl px-4 py-3 outline-none focus:ring-2 focus:ring-orange-500 transition-all"
+                  className="w-full bg-slate-50 dark:bg-slate-800 border-none rounded-2xl px-4 py-3 outline-none focus:ring-2 focus:ring-orange-500 transition-all text-slate-900 dark:text-white"
                   value={editValues.total_contributions}
                   onChange={(e) =>
                     setEditValues({
@@ -154,11 +221,11 @@ export default function RetirementPage() {
               </div>
               <div>
                 <label className="block text-xs font-black uppercase tracking-widest text-slate-400 mb-2">
-                  Dátum aktualizácie
+                  Dátum
                 </label>
                 <input
                   type="date"
-                  className="w-full bg-slate-50 dark:bg-slate-800 border-none rounded-2xl px-4 py-3 outline-none focus:ring-2 focus:ring-orange-500 transition-all"
+                  className="w-full bg-slate-50 dark:bg-slate-800 border-none rounded-2xl px-4 py-3 outline-none focus:ring-2 focus:ring-orange-500 transition-all text-slate-900 dark:text-white"
                   value={editValues.record_date}
                   onChange={(e) =>
                     setEditValues({
@@ -172,7 +239,7 @@ export default function RetirementPage() {
             <div className="mt-6 flex justify-end">
               <button
                 onClick={handleAddRecord}
-                className="bg-orange-600 hover:bg-orange-700 text-white px-8 py-3 rounded-2xl flex items-center gap-2 transition-all font-bold"
+                className="bg-orange-600 hover:bg-orange-700 text-white px-8 py-3 rounded-2xl flex items-center gap-2 transition-all font-bold shadow-lg shadow-orange-200 dark:shadow-none"
               >
                 <Check size={20} />
                 Uložiť zmeny
@@ -188,85 +255,128 @@ export default function RetirementPage() {
             <Skeleton key={i} className="h-32 rounded-[32px]" />
           ))}
         </div>
-      ) : stats ? (
-        <div className="space-y-8">
+      ) : totalStats ? (
+        <div className="space-y-12">
+          {/* Súhrnné štatistiky */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <RetirementStatCard
-              title="Aktuálna hodnota"
-              value={formatCurrency(stats.value)}
+              title="Celková hodnota pilierov"
+              value={formatCurrency(totalStats.totalValue)}
               icon={<Wallet className="text-orange-500" />}
               color="orange"
             />
             <RetirementStatCard
               title="Celkové vklady"
-              value={formatCurrency(stats.contributions)}
+              value={formatCurrency(totalStats.totalContributions)}
               icon={<TrendingUp className="text-emerald-500" />}
               color="emerald"
             />
             <RetirementStatCard
               title="Celkový zisk"
-              value={formatCurrency(stats.profit)}
-              percentage={stats.profitPct}
+              value={formatCurrency(totalStats.profit)}
+              percentage={totalStats.profitPct}
               icon={<TrendingUp className="text-blue-500" />}
               color="blue"
             />
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            <div className="bg-white dark:bg-slate-900 p-8 rounded-[32px] border border-slate-100 dark:border-slate-800 shadow-sm">
-              <h3 className="text-xl font-bold mb-6">Detaily účtu</h3>
-              <div className="space-y-4">
-                <div className="flex justify-between items-center py-3 border-b border-slate-50 dark:border-slate-800/50">
-                  <span className="text-slate-500 font-medium">Názov účtu</span>
-                  <span className="font-bold text-slate-900 dark:text-white">
-                    Európsky dôchodok (PEPP)
-                  </span>
-                </div>
-                <div className="flex justify-between items-center py-3 border-b border-slate-50 dark:border-slate-800/50">
-                  <span className="text-slate-500 font-medium">Číslo účtu</span>
-                  <span className="font-bold text-slate-900 dark:text-white uppercase tracking-wider">
-                    2321351501
-                  </span>
-                </div>
-                <div className="flex justify-between items-center py-3 border-b border-slate-50 dark:border-slate-800/50">
-                  <span className="text-slate-500 font-medium">Stratégia</span>
-                  <div className="flex items-center gap-2">
-                    <span className="px-2 py-0.5 bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400 text-[10px] font-black uppercase rounded-md tracking-widest">
-                      Akcie 100%
-                    </span>
-                  </div>
-                </div>
-                <div className="flex justify-between items-center py-3">
-                  <span className="text-slate-500 font-medium">
-                    Investičný horizont
-                  </span>
-                  <span className="font-bold text-slate-900 dark:text-white">
-                    29 rokov
-                  </span>
-                </div>
-              </div>
-            </div>
+          {/* Zoznam účtov */}
+          <div className="space-y-6">
+            <h2 className="text-2xl font-bold px-2">Jednotlivé účty</h2>
+            <div className="grid grid-cols-1 gap-4">
+              {latestRecordsByAccount.map((record) => (
+                <motion.div
+                  key={record.id}
+                  layout
+                  className="bg-white dark:bg-slate-900 p-6 rounded-[28px] border border-slate-100 dark:border-slate-800 shadow-sm hover:shadow-md transition-all group"
+                >
+                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+                    <div className="flex items-center gap-4">
+                      <div
+                        className={`p-3 rounded-2xl ${
+                          record.account_name.includes('Finax')
+                            ? 'bg-orange-100 dark:bg-orange-900/30 text-orange-600'
+                            : 'bg-blue-100 dark:bg-blue-900/30 text-blue-600'
+                        }`}
+                      >
+                        <Wallet size={24} />
+                      </div>
+                      <div>
+                        <h3 className="font-bold text-lg text-slate-900 dark:text-white">
+                          {record.account_name}
+                        </h3>
+                        <p className="text-xs text-slate-400 font-bold uppercase tracking-widest mt-0.5">
+                          {record.account_number || 'Bez čísla zmluvy'}
+                        </p>
+                      </div>
+                    </div>
 
-            <div className="bg-gradient-to-br from-orange-500 to-orange-600 p-8 rounded-[32px] text-white shadow-xl shadow-orange-200 dark:shadow-none relative overflow-hidden group">
-              <div className="absolute top-0 right-0 p-8 opacity-10 group-hover:scale-110 transition-transform duration-500">
-                <Palmtree size={160} />
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-8 md:gap-12 flex-1 md:justify-items-end">
+                      <div>
+                        <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">
+                          Hodnota
+                        </p>
+                        <p className="font-black text-xl text-slate-900 dark:text-white">
+                          {formatCurrency(record.total_value)}
+                        </p>
+                      </div>
+                      <div className="hidden md:block">
+                        <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">
+                          Vklady
+                        </p>
+                        <p className="font-bold text-slate-600 dark:text-slate-300">
+                          {formatCurrency(record.total_contributions)}
+                        </p>
+                      </div>
+                      <div className="text-right md:text-left">
+                        <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">
+                          Zisk
+                        </p>
+                        <div className="flex items-center gap-1.5 justify-end md:justify-start">
+                          <span
+                            className={`font-bold ${record.profit >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}
+                          >
+                            {record.profit >= 0 ? '+' : ''}
+                            {formatCurrency(record.profit)}
+                          </span>
+                          <span className="text-[10px] font-black px-1.5 py-0.5 bg-slate-100 dark:bg-slate-800 rounded-md">
+                            {record.profit_percentage.toFixed(1)}%
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <button
+                      onClick={() => handleEditClick(record)}
+                      className="p-3 text-slate-400 hover:text-orange-500 hover:bg-orange-50 dark:hover:bg-orange-950/30 rounded-xl transition-all"
+                    >
+                      <Edit2 size={18} />
+                    </button>
+                  </div>
+                </motion.div>
+              ))}
+            </div>
+          </div>
+
+          {/* Poznámka */}
+          <div className="bg-gradient-to-br from-slate-800 to-slate-900 p-8 rounded-[32px] text-white relative overflow-hidden">
+            <div className="absolute top-0 right-0 p-8 opacity-5">
+              <Palmtree size={120} />
+            </div>
+            <div className="relative z-10 flex items-start gap-4">
+              <div className="p-3 bg-white/10 rounded-2xl backdrop-blur-md">
+                <Info size={24} className="text-orange-400" />
               </div>
-              <div className="relative z-10 space-y-6">
-                <div className="w-12 h-12 rounded-2xl bg-white/20 flex items-center justify-center backdrop-blur-md">
-                  <Info size={24} />
-                </div>
-                <div>
-                  <h3 className="text-2xl font-bold">Poznámka k majetku</h3>
-                  <p className="text-orange-50 leading-relaxed mt-2 text-lg">
-                    Tento účet sa nezapočítava do celkového majetku na
-                    Dashboarde, pretože ide o dlhodobé sporenie na dôchodok,
-                    ktoré nie je možné predčasne vybrať bez sankcií.
-                  </p>
-                </div>
-                <div className="pt-4 flex items-center gap-2 text-sm font-bold text-orange-100 uppercase tracking-widest">
-                  <ArrowUpRight size={16} />
-                  Zabezpečenie na budúcnosť
-                </div>
+              <div>
+                <h3 className="text-xl font-bold mb-2">
+                  Prečo tu nie sú tieto peniaze v majetku?
+                </h3>
+                <p className="text-slate-300 leading-relaxed max-w-2xl">
+                  Dôchodkové piliere (PEPP, II. a III. pilier) sú viazané
+                  úspory, ku ktorým budeš mať prístup až v dôchodkovom veku.
+                  Zobrazujeme ich tu pre tvoj prehľad o budúcom zabezpečení, ale
+                  nepočítame ich do aktuálneho likvidného majetku.
+                </p>
               </div>
             </div>
           </div>
