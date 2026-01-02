@@ -1,12 +1,21 @@
 'use client';
 
-import { useEffect, useState, Fragment, useMemo } from 'react';
-import { useForm } from 'react-hook-form';
+import { useState, Fragment, useMemo } from 'react';
+import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { supabase } from '@/lib/supabase';
 import { formatCurrency } from '@/lib/utils';
-import { Loader2, Plus, TrendingUp, Calendar, Save, X } from 'lucide-react';
+import { mergeIncomeItems } from '@/lib/calculations';
+import {
+  Loader2,
+  Plus,
+  TrendingUp,
+  Calendar,
+  Save,
+  X,
+  Trash2,
+} from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
 import { Skeleton } from '@/components/skeleton';
@@ -23,20 +32,22 @@ import {
 
 const incomeSchema = z.object({
   recordMonth: z.string().min(1, 'Mesiac je povinný'),
-  records: z.record(
-    z.string(),
-    z.object({
-      amount: z
-        .string()
-        .refine(
-          (val) => val === '' || (!isNaN(Number(val)) && Number(val) >= 0),
-          {
-            message: 'Suma musí byť kladné číslo',
-          }
-        ),
-      currency: z.string().min(1),
-    })
-  ),
+  items: z
+    .array(
+      z.object({
+        categoryName: z.string().min(1, 'Názov je povinný'),
+        amount: z
+          .string()
+          .refine(
+            (val) => val !== '' && !isNaN(Number(val)) && Number(val) >= 0,
+            {
+              message: 'Suma musí byť kladné číslo',
+            }
+          ),
+        currency: z.string().min(1),
+      })
+    )
+    .min(1, 'Pridajte aspoň jeden príjem'),
 });
 
 type IncomeFormValues = z.infer<typeof incomeSchema>;
@@ -49,6 +60,7 @@ export default function IncomePage() {
 
   const {
     register,
+    control,
     handleSubmit,
     reset,
     formState: { errors },
@@ -56,8 +68,13 @@ export default function IncomePage() {
     resolver: zodResolver(incomeSchema),
     defaultValues: {
       recordMonth: new Date().toISOString().substring(0, 7),
-      records: {},
+      items: [{ categoryName: '', amount: '', currency: 'EUR' }],
     },
+  });
+
+  const { fields, append, remove } = useFieldArray({
+    control,
+    name: 'items',
   });
 
   const chartData = useMemo(() => {
@@ -79,54 +96,62 @@ export default function IncomePage() {
       }));
   }, [records]);
 
-  useEffect(() => {
-    if (categories.length > 0) {
-      const initialRecords: Record<
-        string,
-        { amount: string; currency: string }
-      > = {};
-      categories.forEach((cat) => {
-        initialRecords[cat.id] = { amount: '', currency: 'CZK' };
-      });
-      reset({
-        recordMonth: new Date().toISOString().substring(0, 7),
-        records: initialRecords,
-      });
-    }
-  }, [categories, reset]);
-
   const onSave = async (data: IncomeFormValues) => {
     setSaving(true);
     try {
-      const inserts = Object.entries(data.records)
-        .filter(
-          ([_, record]) => record.amount !== '' && Number(record.amount) !== 0
-        )
-        .map(([categoryId, record]) => {
-          const amount = Number(record.amount);
-          const amountEur =
-            record.currency === 'CZK' ? amount / exchangeRate : amount;
+      const inserts = [];
+      const mergedItems = mergeIncomeItems(data.items);
+      const localCategoriesMap = new Map<string, string>();
 
-          return {
-            category_id: categoryId,
-            record_month: data.recordMonth + '-01',
-            amount: amount,
-            currency: record.currency,
-            amount_eur: amountEur,
-          };
+      // Pre-fill local map with existing categories
+      categories.forEach((cat) => {
+        localCategoriesMap.set(cat.name.toLowerCase(), cat.id);
+      });
+
+      for (const item of mergedItems) {
+        let categoryId;
+        const normalizedName = item.categoryName.trim().toLowerCase();
+
+        if (localCategoriesMap.has(normalizedName)) {
+          categoryId = localCategoriesMap.get(normalizedName);
+        } else {
+          // Create new category if it doesn't exist
+          const { data: newCat, error: catError } = await supabase
+            .from('income_categories')
+            .insert({ name: item.categoryName.trim() })
+            .select()
+            .single();
+
+          if (catError) throw catError;
+          categoryId = newCat.id;
+          localCategoriesMap.set(normalizedName, categoryId);
+        }
+
+        const amount = Number(item.amount);
+        const amountEur =
+          item.currency === 'CZK' ? amount / exchangeRate : amount;
+
+        inserts.push({
+          category_id: categoryId,
+          record_month: data.recordMonth + '-01',
+          amount: amount,
+          currency: item.currency,
+          amount_eur: amountEur,
         });
-
-      if (inserts.length === 0) {
-        toast.error('Prosím zadajte aspoň jednu sumu');
-        setSaving(false);
-        return;
       }
 
-      const { error } = await supabase.from('income_records').insert(inserts);
+      // Use upsert to handle cases where user might be updating a month
+      const { error } = await supabase.from('income_records').upsert(inserts, {
+        onConflict: 'category_id,record_month',
+      });
 
       if (error) throw error;
 
       setIsAdding(false);
+      reset({
+        recordMonth: new Date().toISOString().substring(0, 7),
+        items: [{ categoryName: '', amount: '', currency: 'EUR' }],
+      });
       await refresh();
       toast.success('Príjmy boli úspešne uložené');
     } catch (error) {
@@ -209,35 +234,66 @@ export default function IncomePage() {
             </div>
 
             <form onSubmit={handleSubmit(onSave)} className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {categories.map((category) => (
-                  <div key={category.id} className="space-y-1.5">
-                    <label className="text-xs font-bold text-slate-500 uppercase">
-                      {category.name}
-                    </label>
-                    <div className="flex gap-2">
+              <div className="space-y-4">
+                {fields.map((field, index) => (
+                  <div key={field.id} className="flex gap-3 items-start">
+                    <div className="flex-[3] space-y-1">
                       <input
-                        type="number"
-                        step="0.01"
-                        className={`flex-1 bg-slate-50 dark:bg-slate-800 border rounded-xl px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-emerald-500 ${errors.records?.[category.id]?.amount ? 'border-rose-500 focus:ring-rose-500' : ''}`}
-                        {...register(`records.${category.id}.amount`)}
-                        placeholder="0.00"
+                        {...register(`items.${index}.categoryName`)}
+                        placeholder="Odkiaľ je príjem (napr. Výplata)"
+                        className={`w-full bg-slate-50 dark:bg-slate-800 border rounded-xl px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-emerald-500 ${errors.items?.[index]?.categoryName ? 'border-rose-500 focus:ring-rose-500' : ''}`}
                       />
-                      <select
-                        className="bg-slate-50 dark:bg-slate-800 border rounded-xl px-2 py-2 text-xs outline-none focus:ring-2 focus:ring-emerald-500"
-                        {...register(`records.${category.id}.currency`)}
-                      >
-                        <option value="CZK">CZK</option>
-                        <option value="EUR">EUR</option>
-                      </select>
+                      {errors.items?.[index]?.categoryName && (
+                        <p className="text-[10px] text-rose-500 font-medium">
+                          {errors.items[index]?.categoryName?.message}
+                        </p>
+                      )}
                     </div>
-                    {errors.records?.[category.id]?.amount && (
-                      <p className="text-[10px] text-rose-500 font-medium">
-                        {errors.records[category.id]?.amount?.message}
-                      </p>
+                    <div className="flex-[2] space-y-1">
+                      <div className="flex border rounded-xl bg-slate-50 dark:bg-slate-800 focus-within:ring-2 focus-within:ring-emerald-500 overflow-hidden">
+                        <input
+                          type="number"
+                          step="0.01"
+                          className={`flex-1 bg-transparent px-4 py-2 text-sm outline-none ${errors.items?.[index]?.amount ? 'border-rose-500' : ''}`}
+                          {...register(`items.${index}.amount`)}
+                          placeholder="0.00"
+                        />
+                        <select
+                          className="bg-slate-100 dark:bg-slate-700 px-3 py-2 text-xs outline-none border-l dark:border-slate-600 font-bold"
+                          {...register(`items.${index}.currency`)}
+                        >
+                          <option value="EUR">EUR</option>
+                          <option value="CZK">CZK</option>
+                        </select>
+                      </div>
+                      {errors.items?.[index]?.amount && (
+                        <p className="text-[10px] text-rose-500 font-medium">
+                          {errors.items[index]?.amount?.message}
+                        </p>
+                      )}
+                    </div>
+                    {fields.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => remove(index)}
+                        className="text-slate-400 hover:text-rose-500 p-2 mt-0.5 shrink-0"
+                      >
+                        <Trash2 size={18} />
+                      </button>
                     )}
                   </div>
                 ))}
+
+                <button
+                  type="button"
+                  onClick={() =>
+                    append({ categoryName: '', amount: '', currency: 'EUR' })
+                  }
+                  className="flex items-center gap-2 text-emerald-600 font-bold py-2 hover:opacity-80 transition-opacity"
+                >
+                  <Plus size={20} />
+                  <span>Pridať ďalší príjem</span>
+                </button>
               </div>
 
               <div className="flex justify-end gap-3 pt-6 border-t">
