@@ -1,23 +1,39 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { supabase } from '@/lib/supabase';
 import { formatCurrency } from '@/lib/utils';
-import { Loader2, Calculator, Save, RefreshCw } from 'lucide-react';
+import { useIncomeData } from '@/hooks/use-financial-data';
+import { Loader2, Calculator, Save, RefreshCw, TrendingUp } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { toast } from 'sonner';
 import { Skeleton } from '@/components/skeleton';
 
 export default function CalculatorPage() {
+  const { records: incomeRecords, loading: incomeLoading } = useIncomeData();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [salary, setSalary] = useState(7000);
+  const [salary, setSalary] = useState(0);
   const [split, setSplit] = useState({
     fixed_costs: 55,
     investments: 25,
     savings: 15,
     fun: 5,
   });
+
+  // Calculate latest month total income
+  const latestMonthIncome = useMemo(() => {
+    if (!incomeRecords || incomeRecords.length === 0) return 0;
+
+    // Find the latest month
+    const months = incomeRecords.map((r) => r.record_month);
+    const latestMonth = months.reduce((a, b) => (a > b ? a : b));
+
+    // Sum all records for that month
+    return incomeRecords
+      .filter((r) => r.record_month === latestMonth)
+      .reduce((sum, r) => sum + (r.amount_eur || 0), 0);
+  }, [incomeRecords]);
 
   useEffect(() => {
     async function fetchSettings() {
@@ -28,7 +44,13 @@ export default function CalculatorPage() {
           const salarySetting = data.find((s) => s.key === 'base_salary');
 
           if (splitSetting) setSplit(splitSetting.value);
-          if (salarySetting) setSalary(salarySetting.value.amount);
+
+          // If we have latest month income, prioritize it, otherwise use saved setting
+          if (latestMonthIncome > 0) {
+            setSalary(Math.round(latestMonthIncome));
+          } else if (salarySetting) {
+            setSalary(salarySetting.value.amount);
+          }
         }
       } catch (error) {
         console.error('Error fetching settings:', error);
@@ -36,8 +58,11 @@ export default function CalculatorPage() {
         setLoading(false);
       }
     }
-    fetchSettings();
-  }, []);
+
+    if (!incomeLoading) {
+      fetchSettings();
+    }
+  }, [incomeLoading, latestMonthIncome]);
 
   async function handleSave() {
     setSaving(true);
@@ -87,9 +112,25 @@ export default function CalculatorPage() {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
         <div className="bg-white dark:bg-slate-900 p-8 rounded-2xl shadow-sm border space-y-6">
           <div className="space-y-2">
-            <label className="text-sm font-semibold text-slate-500 uppercase tracking-wider">
-              Mesačný príjem (€)
-            </label>
+            <div className="flex justify-between items-center">
+              <label className="text-sm font-semibold text-slate-500 uppercase tracking-wider">
+                Mesačný príjem (€)
+              </label>
+              {latestMonthIncome > 0 && (
+                <div className="flex items-center gap-1.5 px-2 py-0.5 bg-emerald-50 dark:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400 rounded-md border border-emerald-100 dark:border-emerald-900/50">
+                  <TrendingUp size={10} />
+                  <span className="text-[10px] font-bold uppercase tracking-tight">
+                    Automaticky z{' '}
+                    {new Date(
+                      incomeRecords[0]?.record_month
+                    ).toLocaleDateString('sk-SK', {
+                      month: 'long',
+                      year: 'numeric',
+                    })}
+                  </span>
+                </div>
+              )}
+            </div>
             {loading ? (
               <Skeleton className="h-12 w-full" />
             ) : (
