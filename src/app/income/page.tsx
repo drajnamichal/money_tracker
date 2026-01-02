@@ -6,17 +6,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { supabase } from '@/lib/supabase';
 import { formatCurrency } from '@/lib/utils';
-import {
-  Loader2,
-  Plus,
-  TrendingUp,
-  Calendar,
-  Save,
-  X,
-  Edit2,
-  Trash2,
-  Check,
-} from 'lucide-react';
+import { Loader2, Plus, TrendingUp, Calendar, Save, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
 import { Skeleton } from '@/components/skeleton';
@@ -56,11 +46,6 @@ export default function IncomePage() {
     useIncomeData();
   const [saving, setSaving] = useState(false);
   const [isAdding, setIsAdding] = useState(false);
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [editValues, setEditValues] = useState<{
-    amount: string;
-    currency: string;
-  }>({ amount: '', currency: 'CZK' });
 
   const {
     register,
@@ -147,67 +132,6 @@ export default function IncomePage() {
     } catch (error) {
       console.error('Error saving income:', error);
       toast.error('Chyba pri ukladaní príjmov');
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const handleDelete = async (id: string) => {
-    if (!confirm('Naozaj chcete zmazať tento príjem?')) return;
-
-    try {
-      const { error } = await supabase
-        .from('income_records')
-        .delete()
-        .eq('id', id);
-
-      if (error) throw error;
-
-      await refresh();
-      toast.success('Príjem bol zmazaný');
-    } catch (error) {
-      console.error('Error deleting income:', error);
-      toast.error('Chyba pri mazaní príjmu');
-    }
-  };
-
-  const startEditing = (record: any) => {
-    setEditingId(record.id);
-    setEditValues({
-      amount: record.amount.toString(),
-      currency: record.currency,
-    });
-  };
-
-  const handleUpdate = async (id: string) => {
-    const amount = Number(editValues.amount);
-    if (isNaN(amount) || amount <= 0) {
-      toast.error('Suma musí byť kladné číslo');
-      return;
-    }
-
-    setSaving(true);
-    try {
-      const amountEur =
-        editValues.currency === 'CZK' ? amount / exchangeRate : amount;
-
-      const { error } = await supabase
-        .from('income_records')
-        .update({
-          amount: amount,
-          currency: editValues.currency,
-          amount_eur: amountEur,
-        })
-        .eq('id', id);
-
-      if (error) throw error;
-
-      setEditingId(null);
-      await refresh();
-      toast.success('Príjem bol upravený');
-    } catch (error) {
-      console.error('Error updating income:', error);
-      toast.error('Chyba pri úprave príjmu');
     } finally {
       setSaving(false);
     }
@@ -432,7 +356,6 @@ export default function IncomePage() {
                   <th className="px-6 py-4 font-semibold text-right">
                     Čiastka (EUR)
                   </th>
-                  <th className="px-6 py-4 font-semibold text-right">Akcie</th>
                 </tr>
               </thead>
               <tbody className="divide-y">
@@ -441,7 +364,7 @@ export default function IncomePage() {
                     <Fragment key={month}>
                       <tr className="bg-slate-50/80 dark:bg-slate-800/40">
                         <td
-                          colSpan={4}
+                          colSpan={3}
                           className="px-6 py-3 text-left font-bold text-blue-600 uppercase text-xs tracking-wider border-y border-slate-100 dark:border-slate-800"
                         >
                           <div className="flex justify-between items-center">
@@ -469,88 +392,16 @@ export default function IncomePage() {
                           key={record.id}
                           initial={{ opacity: 0 }}
                           animate={{ opacity: 1 }}
-                          className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors group"
+                          className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"
                         >
                           <td className="px-6 py-4 text-slate-500 font-medium">
                             {record.income_categories?.name}
                           </td>
                           <td className="px-6 py-4 text-slate-400">
-                            {editingId === record.id ? (
-                              <div className="flex gap-2 max-w-[200px]">
-                                <input
-                                  type="number"
-                                  step="0.01"
-                                  className="flex-1 bg-white dark:bg-slate-800 border rounded-lg px-2 py-1 text-sm outline-none focus:ring-2 focus:ring-emerald-500"
-                                  value={editValues.amount}
-                                  onChange={(e) =>
-                                    setEditValues({
-                                      ...editValues,
-                                      amount: e.target.value,
-                                    })
-                                  }
-                                />
-                                <select
-                                  className="bg-white dark:bg-slate-800 border rounded-lg px-1 py-1 text-xs outline-none focus:ring-2 focus:ring-emerald-500"
-                                  value={editValues.currency}
-                                  onChange={(e) =>
-                                    setEditValues({
-                                      ...editValues,
-                                      currency: e.target.value,
-                                    })
-                                  }
-                                >
-                                  <option value="CZK">CZK</option>
-                                  <option value="EUR">EUR</option>
-                                </select>
-                              </div>
-                            ) : (
-                              <>
-                                {record.amount} {record.currency}
-                              </>
-                            )}
+                            {record.amount} {record.currency}
                           </td>
                           <td className="px-6 py-4 text-right font-semibold text-emerald-600">
                             {formatCurrency(record.amount_eur)}
-                          </td>
-                          <td className="px-6 py-4 text-right">
-                            <div className="flex justify-end gap-2">
-                              {editingId === record.id ? (
-                                <>
-                                  <button
-                                    onClick={() => handleUpdate(record.id)}
-                                    disabled={saving}
-                                    className="p-1.5 text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
-                                    title="Uložiť"
-                                  >
-                                    <Check size={18} />
-                                  </button>
-                                  <button
-                                    onClick={() => setEditingId(null)}
-                                    className="p-1.5 text-slate-400 hover:bg-slate-50 rounded-lg transition-colors"
-                                    title="Zrušiť"
-                                  >
-                                    <X size={18} />
-                                  </button>
-                                </>
-                              ) : (
-                                <>
-                                  <button
-                                    onClick={() => startEditing(record)}
-                                    className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
-                                    title="Upraviť"
-                                  >
-                                    <Edit2 size={18} />
-                                  </button>
-                                  <button
-                                    onClick={() => handleDelete(record.id)}
-                                    className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
-                                    title="Zmazať"
-                                  >
-                                    <Trash2 size={18} />
-                                  </button>
-                                </>
-                              )}
-                            </div>
                           </td>
                         </motion.tr>
                       ))}
