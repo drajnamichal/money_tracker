@@ -26,9 +26,9 @@ export async function GET() {
 
     const rates: { bank: string; rate: string }[] = [];
 
-    // Finančná Hitparáda table parsing
+    // Finančná Hitparáda table parsing - supports both single and double quotes
     const rowRegex = /<tr[^>]*>([\s\S]*?)<\/tr>/g;
-    const bankRegex = /<img[^>]+alt="([^"]+)"/i;
+    const bankRegex = /<img[^>]+alt=['"]([^'"]+)['"]/i;
     const rateRegex = /(\d+[,.]\d+)\s*%/;
 
     let match;
@@ -84,7 +84,9 @@ export async function GET() {
         debug: {
           htmlLength: html.length,
           title: html.match(/<title>(.*?)<\/title>/i)?.[1],
-          first1000Chars: html.substring(0, 1000).replace(/\s+/g, ' '),
+          snippet: html
+            .substring(html.indexOf('<tbody'), html.indexOf('<tbody') + 1000)
+            .replace(/\s+/g, ' '),
         },
       });
     }
