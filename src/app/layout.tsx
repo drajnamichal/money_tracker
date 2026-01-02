@@ -11,7 +11,6 @@ const inter = Inter({ subsets: ['latin'] });
 export const metadata: Metadata = {
   title: 'Family Money Tracker',
   description: 'Track your family assets, income, and expenses',
-  manifest: '/manifest.json',
 };
 
 export default function RootLayout({

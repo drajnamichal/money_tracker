@@ -14,56 +14,53 @@ export async function GET() {
 
     const html = await response.text();
 
-    // Debugging: Log if HTML is received but empty
     if (!html || html.length < 100) {
-      console.error('Empty or too short HTML received from FinancnyKompas');
       return NextResponse.json(
-        { error: 'Source site returned no content' },
+        { error: 'Source site returned no content', debug: html?.length },
         { status: 500 }
       );
     }
 
     const rates: { bank: string; rate: string }[] = [];
 
-    // Improved scraping: find the table body and then rows
-    const tbodyMatch = html.match(/<tbody[^>]*>([\s\S]*?)<\/tbody>/);
-    const tbodyHtml = tbodyMatch ? tbodyMatch[1] : html;
-
+    // 1. Try specific table parsing
     const rowRegex = /<tr[^>]*>([\s\S]*?)<\/tr>/g;
     const bankRegex = /alt="([^"]+)"|data-bank="([^"]+)"/;
     const rateRegex = /(\d+[,.]\d+)\s*%/;
 
     let match;
-    while ((match = rowRegex.exec(tbodyHtml)) !== null) {
+    while ((match = rowRegex.exec(html)) !== null) {
       const rowHtml = match[1];
       const bankMatch = rowHtml.match(bankRegex);
       const rateMatch = rowHtml.match(rateRegex);
 
       if (bankMatch && rateMatch) {
-        const bankName = bankMatch[1] || bankMatch[2];
-        // Skip generic "AKCIA" or other tags that might get caught
-        if (bankName.toLowerCase() === 'akcia') continue;
-
-        rates.push({
-          bank: bankName,
-          rate: rateMatch[1].replace(',', '.') + ' %',
-        });
+        const bankName = (bankMatch[1] || bankMatch[2]).trim();
+        if (bankName.toLowerCase() !== 'akcia' && bankName.length > 1) {
+          rates.push({
+            bank: bankName,
+            rate: rateMatch[1].replace(',', '.') + ' %',
+          });
+        }
       }
     }
 
-    // If still empty, try an even broader search
+    // 2. If nothing found, try a very broad search for bank logos and nearby rates
     if (rates.length === 0) {
-      const broadRateRegex = /alt="([^"]+)"[\s\S]{1,200}?>(\d+[,.]\d+)\s*%/g;
+      const broadRegex = /alt="([^"]+)"[\s\S]{1,500}?>\s*(\d+[,.]\d+)\s*%/g;
       let broadMatch;
-      while ((broadMatch = broadRateRegex.exec(tbodyHtml)) !== null) {
-        rates.push({
-          bank: broadMatch[1],
-          rate: broadMatch[2].replace(',', '.') + ' %',
-        });
+      while ((broadMatch = broadRegex.exec(html)) !== null) {
+        const bankName = broadMatch[1].trim();
+        if (bankName.toLowerCase() !== 'akcia' && bankName.length > 1) {
+          rates.push({
+            bank: bankName,
+            rate: broadMatch[2].replace(',', '.') + ' %',
+          });
+        }
       }
     }
 
-    // Return unique rates, keeping the first (usually best) offer for each bank
+    // Deduplicate and limit
     const uniqueMap = new Map();
     rates.forEach((item) => {
       if (!uniqueMap.has(item.bank)) {
@@ -73,8 +70,19 @@ export async function GET() {
 
     const uniqueRates = Array.from(uniqueMap.values()).slice(0, 10);
 
+    // If still empty, return some debug info about the HTML structure
     if (uniqueRates.length === 0) {
-      console.warn('Scraper found no rates. HTML length:', html.length);
+      const hasTable = html.includes('<table');
+      const hasTbody = html.includes('<tbody');
+      return NextResponse.json({
+        error: 'No rates found',
+        debug: {
+          htmlLength: html.length,
+          hasTable,
+          hasTbody,
+          snippet: html.substring(0, 500).replace(/<[^>]*>/g, ' '),
+        },
+      });
     }
 
     return NextResponse.json(uniqueRates);

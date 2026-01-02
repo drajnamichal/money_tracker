@@ -43,17 +43,26 @@ export default function MortgagePage() {
     { bank: string; rate: string }[]
   >([]);
   const [loadingRates, setLoadingRates] = useState(true);
+  const [ratesError, setRatesError] = useState<string | null>(null);
+  const [isMounted, setIsMounted] = useState(false);
 
   useEffect(() => {
+    setIsMounted(true);
     async function fetchMarketRates() {
       try {
         const res = await fetch('/api/mortgage-rates');
         const data = await res.json();
-        if (Array.isArray(data)) {
+        if (Array.isArray(data) && data.length > 0) {
           setMarketRates(data);
+          setRatesError(null);
+        } else if (data.error) {
+          setRatesError(data.error);
+        } else {
+          setRatesError('Žiadne dáta');
         }
       } catch (error) {
         console.error('Error fetching market rates:', error);
+        setRatesError('Chyba spojenia');
       } finally {
         setLoadingRates(false);
       }
@@ -373,49 +382,51 @@ export default function MortgagePage() {
         </div>
 
         <div className="h-[250px] w-full">
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={payments.slice(0, 6).reverse()}>
-              <CartesianGrid
-                strokeDasharray="3 3"
-                vertical={false}
-                stroke="#e2e8f0"
-              />
-              <XAxis
-                dataKey="payment_date"
-                axisLine={false}
-                tickLine={false}
-                tick={{ fontSize: 10, fill: '#64748b' }}
-                tickFormatter={(val) =>
-                  new Date(val).toLocaleDateString('sk-SK', {
-                    month: 'short',
-                  })
-                }
-              />
-              <YAxis hide />
-              <RechartsTooltip
-                cursor={{ fill: '#f1f5f9' }}
-                contentStyle={{
-                  backgroundColor: '#fff',
-                  borderRadius: '12px',
-                  border: 'none',
-                  boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)',
-                }}
-                formatter={(value: number) => formatCurrency(value)}
-              />
-              <Bar
-                dataKey="principal_paid"
-                stackId="a"
-                fill="#10b981"
-                radius={[0, 0, 0, 0]}
-              />
-              <Bar
-                dataKey="interest_paid"
-                stackId="a"
-                fill="#3b82f6"
-                radius={[4, 4, 0, 0]}
-              />
-            </BarChart>
-          </ResponsiveContainer>
+          {isMounted && (
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={payments.slice(0, 6).reverse()}>
+                <CartesianGrid
+                  strokeDasharray="3 3"
+                  vertical={false}
+                  stroke="#e2e8f0"
+                />
+                <XAxis
+                  dataKey="payment_date"
+                  axisLine={false}
+                  tickLine={false}
+                  tick={{ fontSize: 10, fill: '#64748b' }}
+                  tickFormatter={(val) =>
+                    new Date(val).toLocaleDateString('sk-SK', {
+                      month: 'short',
+                    })
+                  }
+                />
+                <YAxis hide />
+                <RechartsTooltip
+                  cursor={{ fill: '#f1f5f9' }}
+                  contentStyle={{
+                    backgroundColor: '#fff',
+                    borderRadius: '12px',
+                    border: 'none',
+                    boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)',
+                  }}
+                  formatter={(value: number) => formatCurrency(value)}
+                />
+                <Bar
+                  dataKey="principal_paid"
+                  stackId="a"
+                  fill="#10b981"
+                  radius={[0, 0, 0, 0]}
+                />
+                <Bar
+                  dataKey="interest_paid"
+                  stackId="a"
+                  fill="#3b82f6"
+                  radius={[4, 4, 0, 0]}
+                />
+              </BarChart>
+            </ResponsiveContainer>
+          )}
         </div>
 
         <div className="mt-6 flex items-center gap-2 text-[10px] text-slate-400 bg-slate-50 dark:bg-slate-800/50 p-3 rounded-xl border">
@@ -483,31 +494,33 @@ export default function MortgagePage() {
 
           <div className="flex flex-col md:flex-row items-center gap-8">
             <div className="h-[180px] w-[180px] shrink-0">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={[
-                      { name: 'Istina', value: mortgage.original_amount },
-                      {
-                        name: 'Úrok',
-                        value: analysis?.totalInterest || 0,
-                      },
-                    ]}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={45}
-                    outerRadius={70}
-                    paddingAngle={5}
-                    dataKey="value"
-                  >
-                    <Cell fill="#3b82f6" />
-                    <Cell fill="#f43f5e" />
-                  </Pie>
-                  <RechartsTooltip
-                    formatter={(value: number) => formatCurrency(value)}
-                  />
-                </PieChart>
-              </ResponsiveContainer>
+              {isMounted && (
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={[
+                        { name: 'Istina', value: mortgage.original_amount },
+                        {
+                          name: 'Úrok',
+                          value: analysis?.totalInterest || 0,
+                        },
+                      ]}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={45}
+                      outerRadius={70}
+                      paddingAngle={5}
+                      dataKey="value"
+                    >
+                      <Cell fill="#3b82f6" />
+                      <Cell fill="#f43f5e" />
+                    </Pie>
+                    <RechartsTooltip
+                      formatter={(value: number) => formatCurrency(value)}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+              )}
             </div>
 
             <div className="flex-1 space-y-4 w-full">
@@ -650,6 +663,14 @@ export default function MortgagePage() {
               {[...Array(10)].map((_, i) => (
                 <Skeleton key={i} className="h-16 w-full rounded-xl" />
               ))}
+            </div>
+          ) : ratesError ? (
+            <div className="flex flex-col items-center justify-center py-8 text-slate-400">
+              <AlertCircle size={32} className="mb-2 opacity-20" />
+              <p className="text-sm font-medium">Momentálne nedostupné</p>
+              <p className="text-[10px] uppercase tracking-widest mt-1 opacity-50">
+                {ratesError}
+              </p>
             </div>
           ) : (
             <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
