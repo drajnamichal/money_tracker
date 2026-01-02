@@ -18,6 +18,8 @@ import {
   AlertCircle,
   RefreshCw,
   Info,
+  Zap,
+  TrendingUp,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
@@ -38,6 +40,44 @@ import {
 export default function MortgagePage() {
   const { mortgage, payments, loading, refresh } = useMortgageData();
   const [updating, setUpdating] = useState(false);
+  const [overpayment, setOverpayment] = useState<string>('5000');
+
+  const analysis = useMemo(() => {
+    if (!mortgage) return null;
+
+    const r = mortgage.interest_rate / 100 / 12;
+    const P = mortgage.original_amount;
+    const M = mortgage.monthly_payment;
+
+    // Total original months
+    const nTotal = Math.round(Math.log(M / (M - P * r)) / Math.log(1 + r));
+    const totalPaid = M * nTotal;
+    const totalInterest = totalPaid - P;
+
+    // Remaining months without overpayment
+    const Pcurr = mortgage.current_principal;
+    const nRemOld = Math.log(M / (M - Pcurr * r)) / Math.log(1 + r);
+
+    // With overpayment
+    const X = Number(overpayment) || 0;
+    let nRemNew = nRemOld;
+    let interestSaved = 0;
+    let monthsSaved = 0;
+
+    if (X > 0 && X < Pcurr) {
+      const Pnew = Pcurr - X;
+      nRemNew = Math.log(M / (M - Pnew * r)) / Math.log(1 + r);
+      monthsSaved = Math.max(0, nRemOld - nRemNew);
+      interestSaved = Math.max(0, M * monthsSaved);
+    }
+
+    return {
+      totalInterest,
+      totalPaid,
+      monthsSaved: Math.floor(monthsSaved),
+      interestSaved,
+    };
+  }, [mortgage, overpayment]);
 
   // Auto-update logic: if current date is past next payment date and no payment recorded for this month
   useEffect(() => {
@@ -451,6 +491,161 @@ export default function MortgagePage() {
               ))}
             </tbody>
           </table>
+        </div>
+      </div>
+
+      {/* Analysis & Simulation */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {/* Total Cost Analysis */}
+        <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border shadow-sm">
+          <h4 className="font-bold mb-6 flex items-center gap-2">
+            <PieChart size={18} className="text-blue-500" />
+            Celková bilancia úveru
+          </h4>
+
+          <div className="flex flex-col md:flex-row items-center gap-8">
+            <div className="h-[180px] w-[180px] shrink-0">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={[
+                      { name: 'Istina', value: mortgage.original_amount },
+                      {
+                        name: 'Úrok',
+                        value: analysis?.totalInterest || 0,
+                      },
+                    ]}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={45}
+                    outerRadius={70}
+                    paddingAngle={5}
+                    dataKey="value"
+                  >
+                    <Cell fill="#3b82f6" />
+                    <Cell fill="#f43f5e" />
+                  </Pie>
+                  <RechartsTooltip
+                    formatter={(value: number) => formatCurrency(value)}
+                  />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+
+            <div className="flex-1 space-y-4 w-full">
+              <div className="p-4 bg-slate-50 dark:bg-slate-800/50 rounded-xl border">
+                <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider mb-1">
+                  Celkovo zaplatíte
+                </p>
+                <p className="text-xl font-black text-slate-900 dark:text-white">
+                  {formatCurrency(analysis?.totalPaid || 0)}
+                </p>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="p-3">
+                  <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider mb-1">
+                    Istina
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <div className="w-2 h-2 bg-blue-500 rounded-full" />
+                    <p className="text-sm font-bold">
+                      {formatCurrency(mortgage.original_amount)}
+                    </p>
+                  </div>
+                </div>
+                <div className="p-3">
+                  <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider mb-1">
+                    Úrok
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <div className="w-2 h-2 bg-rose-500 rounded-full" />
+                    <p className="text-sm font-bold text-rose-500">
+                      {formatCurrency(analysis?.totalInterest || 0)}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Overpayment Simulator */}
+        <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border shadow-sm flex flex-col">
+          <div className="flex items-center justify-between mb-6">
+            <h4 className="font-bold flex items-center gap-2">
+              <Zap size={18} className="text-amber-500 fill-amber-500" />
+              Simulátor mimoriadnej splátky
+            </h4>
+          </div>
+
+          <div className="space-y-6 flex-1 flex flex-col justify-center">
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                Suma mimoriadnej splátky
+              </label>
+              <div className="relative">
+                <input
+                  type="number"
+                  value={overpayment}
+                  onChange={(e) => setOverpayment(e.target.value)}
+                  className="w-full bg-slate-50 dark:bg-slate-800 border rounded-xl px-4 py-3 text-lg font-bold outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+                  placeholder="0.00"
+                />
+                <span className="absolute right-4 top-1/2 -translate-y-1/2 font-bold text-slate-400">
+                  €
+                </span>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <motion.div
+                key={analysis?.monthsSaved}
+                initial={{ scale: 0.95, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                className="bg-blue-50 dark:bg-blue-950/30 p-4 rounded-2xl border border-blue-100 dark:border-blue-900/50"
+              >
+                <div className="flex items-center gap-2 text-blue-600 dark:text-blue-400 mb-1">
+                  <Clock size={14} />
+                  <span className="text-[10px] font-bold uppercase tracking-wider">
+                    Ušetrený čas
+                  </span>
+                </div>
+                <p className="text-xl font-black">
+                  {analysis?.monthsSaved}{' '}
+                  <span className="text-xs font-bold">mesiacov</span>
+                </p>
+                <p className="text-[10px] text-blue-600/60 font-medium mt-1">
+                  ≈ {(Number(analysis?.monthsSaved || 0) / 12).toFixed(1)} rokov
+                </p>
+              </motion.div>
+
+              <motion.div
+                key={analysis?.interestSaved}
+                initial={{ scale: 0.95, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                className="bg-emerald-50 dark:bg-emerald-950/30 p-4 rounded-2xl border border-emerald-100 dark:border-emerald-900/50"
+              >
+                <div className="flex items-center gap-2 text-emerald-600 dark:text-emerald-400 mb-1">
+                  <TrendingUp size={14} />
+                  <span className="text-[10px] font-bold uppercase tracking-wider">
+                    Ušetrený úrok
+                  </span>
+                </div>
+                <p className="text-xl font-black text-emerald-600">
+                  {formatCurrency(analysis?.interestSaved || 0)}
+                </p>
+                <p className="text-[10px] text-emerald-600/60 font-medium mt-1">
+                  čistá úspora na úrokoch
+                </p>
+              </motion.div>
+            </div>
+
+            <p className="text-[10px] text-slate-400 text-center italic">
+              * Simulácia predpokladá zachovanie výšky mesačnej splátky a
+              skrátenie doby splácania.
+            </p>
+          </div>
         </div>
       </div>
     </div>
