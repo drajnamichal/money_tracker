@@ -258,25 +258,12 @@ export default function RetirementPage() {
       ) : totalStats ? (
         <div className="space-y-12">
           {/* Súhrnné štatistiky */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="max-w-md">
             <RetirementStatCard
               title="Celková hodnota pilierov"
               value={formatCurrency(totalStats.totalValue)}
               icon={<Wallet className="text-orange-500" />}
               color="orange"
-            />
-            <RetirementStatCard
-              title="Celkové vklady"
-              value={formatCurrency(totalStats.totalContributions)}
-              icon={<TrendingUp className="text-emerald-500" />}
-              color="emerald"
-            />
-            <RetirementStatCard
-              title="Celkový zisk"
-              value={formatCurrency(totalStats.profit)}
-              percentage={totalStats.profitPct}
-              icon={<TrendingUp className="text-blue-500" />}
-              color="blue"
             />
           </div>
 
@@ -311,38 +298,14 @@ export default function RetirementPage() {
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-2 md:grid-cols-3 gap-8 md:gap-12 flex-1 md:justify-items-end">
-                      <div>
+                    <div className="flex-1 flex justify-end md:pr-8">
+                      <div className="text-right">
                         <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">
                           Hodnota
                         </p>
-                        <p className="font-black text-xl text-slate-900 dark:text-white">
+                        <p className="font-black text-2xl text-slate-900 dark:text-white">
                           {formatCurrency(record.total_value)}
                         </p>
-                      </div>
-                      <div className="hidden md:block">
-                        <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">
-                          Vklady
-                        </p>
-                        <p className="font-bold text-slate-600 dark:text-slate-300">
-                          {formatCurrency(record.total_contributions)}
-                        </p>
-                      </div>
-                      <div className="text-right md:text-left">
-                        <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">
-                          Zisk
-                        </p>
-                        <div className="flex items-center gap-1.5 justify-end md:justify-start">
-                          <span
-                            className={`font-bold ${record.profit >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}
-                          >
-                            {record.profit >= 0 ? '+' : ''}
-                            {formatCurrency(record.profit)}
-                          </span>
-                          <span className="text-[10px] font-black px-1.5 py-0.5 bg-slate-100 dark:bg-slate-800 rounded-md">
-                            {record.profit_percentage.toFixed(1)}%
-                          </span>
-                        </div>
                       </div>
                     </div>
 
