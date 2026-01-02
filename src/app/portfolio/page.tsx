@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef } from 'react';
+import { supabase } from '@/lib/supabase';
 import { formatCurrency } from '@/lib/utils';
 import {
   TrendingUp,
@@ -11,15 +12,21 @@ import {
   Briefcase,
   PieChart as PieIcon,
   Search,
+  Camera,
+  Loader2,
+  Calendar,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useInvestmentData } from '@/hooks/use-financial-data';
 import { Skeleton } from '@/components/skeleton';
+import { toast } from 'sonner';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 
 export default function PortfolioPage() {
-  const { investments, loading } = useInvestmentData();
+  const { investments, loading, refresh } = useInvestmentData();
   const [search, setSearch] = useState('');
+  const [isUpdating, setIsUpdating] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const stats = useMemo(() => {
     const totalValue = investments.reduce(
@@ -34,8 +41,74 @@ export default function PortfolioPage() {
     const profitPercentage =
       totalCost > 0 ? (totalProfit / totalCost) * 100 : 0;
 
-    return { totalValue, totalProfit, profitPercentage };
+    const lastUpdated =
+      investments.length > 0
+        ? new Date(
+            Math.max(
+              ...investments.map((i) =>
+                new Date(i.updated_at || i.created_at || 0).getTime()
+              )
+            )
+          )
+        : null;
+
+    return { totalValue, totalProfit, profitPercentage, lastUpdated };
   }, [investments]);
+
+  const handleScreenshotUpload = async (
+    e: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsUpdating(true);
+    const reader = new FileReader();
+    reader.onloadend = async () => {
+      const base64Image = reader.result as string;
+      try {
+        const response = await fetch('/api/portfolio-ocr', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ image: base64Image }),
+        });
+
+        const data = await response.json();
+        if (data.error) throw new Error(data.error);
+
+        if (data.investments) {
+          // Update each investment in Supabase
+          const updates = data.investments.map(async (newInv: any) => {
+            // Find existing investment by ticker or name
+            const existing = investments.find(
+              (i) => i.ticker === newInv.ticker || i.name === newInv.name
+            );
+
+            if (existing) {
+              return supabase
+                .from('investments')
+                .update({
+                  current_price: newInv.current_price,
+                  shares: newInv.shares || existing.shares,
+                  avg_price: newInv.avg_price || existing.avg_price,
+                })
+                .eq('id', existing.id);
+            }
+          });
+
+          await Promise.all(updates);
+          await refresh();
+          toast.success('Portfólio bolo úspešne aktualizované');
+        }
+      } catch (error: any) {
+        console.error('Update error:', error);
+        toast.error(error.message || 'Chyba pri aktualizácii portfólia');
+      } finally {
+        setIsUpdating(false);
+        if (fileInputRef.current) fileInputRef.current.value = '';
+      }
+    };
+    reader.readAsDataURL(file);
+  };
 
   const filteredInvestments = investments.filter(
     (inv) =>
@@ -65,15 +138,52 @@ export default function PortfolioPage() {
     <div className="space-y-8 pb-12">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold">Moje obchody</h1>
+          <div className="flex items-center gap-3">
+            <h1 className="text-3xl font-bold">Moje obchody</h1>
+            <div className="flex items-center gap-1.5 px-2.5 py-1 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 rounded-full border border-emerald-100 dark:border-emerald-800/50 shadow-sm">
+              <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+              <Calendar size={12} />
+              <span className="text-[10px] font-bold uppercase tracking-tight">
+                Aktualizované:{' '}
+                {new Date().toLocaleDateString('sk-SK', {
+                  day: 'numeric',
+                  month: 'long',
+                  year: 'numeric',
+                })}
+              </span>
+            </div>
+          </div>
           <p className="text-slate-500">
             Prehľad tvojho investičného portfólia v akciách a ETF.
           </p>
         </div>
-        <button className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-2xl flex items-center gap-2 transition-all shadow-lg shadow-blue-200 dark:shadow-none font-bold">
-          <Plus size={20} />
-          <span>Pridať nový inštrument</span>
-        </button>
+        <div className="flex items-center gap-3">
+          <input
+            type="file"
+            accept="image/*"
+            className="hidden"
+            ref={fileInputRef}
+            onChange={handleScreenshotUpload}
+          />
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            disabled={isUpdating}
+            className="bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-3 rounded-2xl flex items-center gap-2 transition-all shadow-lg shadow-emerald-200 dark:shadow-none font-bold disabled:opacity-50"
+          >
+            {isUpdating ? (
+              <Loader2 className="animate-spin" size={20} />
+            ) : (
+              <Camera size={20} />
+            )}
+            <span>
+              {isUpdating ? 'Spracovávam...' : 'Aktualizovať cez screenshot'}
+            </span>
+          </button>
+          <button className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-2xl flex items-center gap-2 transition-all shadow-lg shadow-blue-200 dark:shadow-none font-bold">
+            <Plus size={20} />
+            <span>Pridať nový inštrument</span>
+          </button>
+        </div>
       </div>
 
       {/* Main Stats Card */}
