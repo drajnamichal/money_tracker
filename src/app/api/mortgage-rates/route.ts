@@ -26,19 +26,31 @@ export async function GET() {
 
     const rates: { bank: string; rate: string }[] = [];
 
-    // Finančná Hitparáda table parsing - supports both single and double quotes
+    // Extract table rows
     const rowRegex = /<tr[^>]*>([\s\S]*?)<\/tr>/g;
     const bankRegex = /<img[^>]+alt=['"]([^'"]+)['"]/i;
-    const rateRegex = /(\d+[,.]\d+)\s*%/;
+    const rateRegex = /(\d+[,.]\d+)\s*%/g; // Use global to find all and pick the right one
 
     let match;
     while ((match = rowRegex.exec(html)) !== null) {
-      const rowHtml = match[1];
-      const bankMatch = rowHtml.match(bankRegex);
-      const rateMatch = rowHtml.match(rateRegex);
+      let rowHtml = match[1];
 
-      if (bankMatch && rateMatch) {
+      // CRITICAL: Remove title attributes and icons that contain "action/discount" percentages
+      // which are lower than the actual interest rate and appear earlier in the HTML
+      rowHtml = rowHtml.replace(/title=['"][\s\S]*?['"]/gi, '');
+      rowHtml = rowHtml.replace(/<i[\s\S]*?<\/i>/gi, '');
+
+      const bankMatch = rowHtml.match(bankRegex);
+
+      // Find all percentages in the cleaned row
+      const rateMatches = Array.from(rowHtml.matchAll(rateRegex));
+
+      if (bankMatch && rateMatches.length > 0) {
         let bankSlug = bankMatch[1].toLowerCase().replace('-logo', '').trim();
+
+        // The actual interest rate is typically the LAST percentage in the row or after the 5th column
+        // In the cleaned rowHtml, the first remaining percentage should be the actual rate
+        const actualRate = rateMatches[0][1];
 
         const bankMap: Record<string, string> = {
           slsp: 'SLSP',
@@ -61,7 +73,7 @@ export async function GET() {
 
         rates.push({
           bank: bankName,
-          rate: rateMatch[1].replace(',', '.') + ' %',
+          rate: actualRate.replace(',', '.') + ' %',
         });
       }
     }
@@ -84,9 +96,6 @@ export async function GET() {
         debug: {
           htmlLength: html.length,
           title: html.match(/<title>(.*?)<\/title>/i)?.[1],
-          snippet: html
-            .substring(html.indexOf('<tbody'), html.indexOf('<tbody') + 1000)
-            .replace(/\s+/g, ' '),
         },
       });
     }
