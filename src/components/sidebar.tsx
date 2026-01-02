@@ -16,6 +16,7 @@ import {
   Home,
   PieChart,
   Flame,
+  ArrowRightLeft,
 } from 'lucide-react';
 import { useState } from 'react';
 import { cn } from '@/lib/utils';
@@ -34,6 +35,7 @@ const navigation = [
   { name: 'Pravidelné platby', href: '/recurring-payments', icon: CreditCard },
   { name: 'Hypotéka', href: '/mortgage', icon: Home },
   { name: 'Kalkulačka', href: '/calculator', icon: Calculator },
+  { name: 'Prevod mien', href: '/currency-converter', icon: ArrowRightLeft },
   { name: 'FIRE', href: '/fire', icon: Flame },
 ];
 
