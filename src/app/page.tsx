@@ -6,10 +6,9 @@ import {
   TrendingUp,
   TrendingDown,
   Wallet,
-  Sparkles,
   ArrowRight,
   BrainCircuit,
-  Lightbulb,
+  Zap,
 } from 'lucide-react';
 import {
   AreaChart,
@@ -31,6 +30,7 @@ import {
   useExpenseData,
   useInvestmentData,
   useMortgageData,
+  useRecurringPaymentsData,
 } from '@/hooks/use-financial-data';
 
 export default function Dashboard() {
@@ -39,13 +39,16 @@ export default function Dashboard() {
   const { records: expenseData, loading: expenseLoading } = useExpenseData();
   const { investments, loading: investmentLoading } = useInvestmentData();
   const { mortgage, loading: mortgageLoading } = useMortgageData();
+  const { records: recurringPayments, loading: recurringLoading } =
+    useRecurringPaymentsData();
 
   const loading =
     wealthLoading ||
     incomeLoading ||
     expenseLoading ||
     investmentLoading ||
-    mortgageLoading;
+    mortgageLoading ||
+    recurringLoading;
 
   const stats = useMemo(() => {
     let totalAssets = 0;
@@ -141,57 +144,79 @@ export default function Dashboard() {
 
     const insights = [];
 
-    // Insight 1: Savings Rate
-    if (stats.savingsRate > 20) {
+    // Action 1: Investable Amount (Prioritized)
+    const monthlySaving = stats.monthlyIncome - stats.monthlyExpenses;
+    if (monthlySaving > 0) {
       insights.push({
         icon: <TrendingUp className="text-emerald-500" size={18} />,
-        text: `Tvoja miera úspor je skvelých ${Math.round(stats.savingsRate)}%! Pokračuj v investovaní do S&P 500.`,
+        text: (
+          <span>
+            Tento mesiac môžeš investovať{' '}
+            <span className="font-bold text-emerald-600 dark:text-emerald-400">
+              +{formatCurrency(monthlySaving)}
+            </span>{' '}
+            bez rizika pre tvoj cashflow.
+          </span>
+        ),
         color: 'emerald',
-      });
-    } else if (stats.savingsRate > 0) {
-      insights.push({
-        icon: <Lightbulb className="text-amber-500" size={18} />,
-        text: `Tvoja miera úspor je ${Math.round(stats.savingsRate)}%. Skús ju vytiahnuť nad 20% optimalizáciou výdavkov na zábavu.`,
-        color: 'amber',
+        priority: 1,
       });
     }
 
-    // Insight 2: Emergency Fund (assuming 6 months of expenses is the goal)
-    const emergencyFundGoal = stats.monthlyExpenses * 6;
-    if (stats.totalAssets > emergencyFundGoal) {
+    // Action 2: Subscriptions Analysis
+    const subs = recurringPayments.filter(
+      (p) =>
+        p.frequency === 'monthly' &&
+        (p.name.toLowerCase().includes('netflix') ||
+          p.name.toLowerCase().includes('spotify') ||
+          p.name.toLowerCase().includes('hbo') ||
+          p.name.toLowerCase().includes('disney') ||
+          p.name.toLowerCase().includes('youtube') ||
+          p.amount < 20)
+    );
+
+    if (subs.length >= 2) {
+      const totalSubsAmount = subs.reduce(
+        (sum, p) => sum + Number(p.amount),
+        0
+      );
       insights.push({
-        icon: <Sparkles className="text-blue-500" size={18} />,
-        text: 'Máš vybudovanú dostatočnú rezervu. Každé ďalšie euro by malo smerovať do investícií.',
-        color: 'blue',
+        icon: <TrendingDown className="text-rose-500" size={18} />,
+        text: (
+          <span>
+            Zváž zrušenie týchto {subs.length} predplatných – ušetríš{' '}
+            <span className="font-bold text-rose-600 dark:text-rose-400">
+              {formatCurrency(totalSubsAmount)}
+            </span>{' '}
+            mesačne.
+          </span>
+        ),
+        color: 'rose',
+        priority: 2,
       });
-    } else {
+    }
+
+    // Action 3: Emergency Fund check (if not enough)
+    const emergencyFundGoal = stats.monthlyExpenses * 6;
+    if (stats.totalAssets < emergencyFundGoal) {
+      const missing = emergencyFundGoal - stats.totalAssets;
       insights.push({
         icon: <BrainCircuit className="text-indigo-500" size={18} />,
-        text: `Tvoj celkový majetok pokrýva ${Math.round((stats.totalAssets / stats.monthlyExpenses) * 10) / 10} mesiacov výdavkov. Cieľ je 6.`,
+        text: (
+          <span>
+            Doplnenie rezervy: Potrebuješ ešte{' '}
+            <span className="font-bold">{formatCurrency(missing)}</span> na
+            dosiahnutie bezpečného vankúša (6 mesiacov).
+          </span>
+        ),
         color: 'indigo',
+        priority: 3,
       });
     }
 
-    // Insight 3: Portfolio Profitability
-    const investmentValue = investments.reduce(
-      (sum, inv) => sum + inv.shares * inv.current_price,
-      0
-    );
-    const investmentCost = investments.reduce(
-      (sum, inv) => sum + inv.shares * inv.avg_price,
-      0
-    );
-    const profit = investmentValue - investmentCost;
-    if (profit > 0) {
-      insights.push({
-        icon: <TrendingUp className="text-emerald-500" size={18} />,
-        text: `Tvoje portfólio je v zisku ${formatCurrency(profit)}. Najviac ti momentálne zarába ${investments.sort((a, b) => b.shares * b.current_price - b.shares * b.avg_price - (a.shares * a.current_price - a.shares * a.avg_price))[0]?.name}.`,
-        color: 'emerald',
-      });
-    }
-
-    return insights;
-  }, [stats, loading, investments]);
+    // Sort by priority and take only top 2
+    return insights.sort((a, b) => a.priority - b.priority).slice(0, 2);
+  }, [stats, loading, recurringPayments]);
 
   const assetsHistory = useMemo(() => {
     if (!wealthData || wealthData.length === 0) return [];
@@ -314,13 +339,13 @@ export default function Dashboard() {
       >
         <div className="bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl rounded-[22px] p-6">
           <div className="flex items-center gap-3 mb-6">
-            <div className="w-10 h-10 rounded-full bg-indigo-100 dark:bg-indigo-900/30 flex items-center justify-center text-indigo-600">
-              <Sparkles size={22} />
+            <div className="w-10 h-10 rounded-full bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center text-amber-600">
+              <Zap size={22} />
             </div>
             <div>
               <h2 className="text-lg font-bold">AI Finančný kouč</h2>
               <p className="text-[10px] text-slate-500 uppercase font-black tracking-widest">
-                Analýza tvojich dát
+                Akcie na tento mesiac
               </p>
             </div>
           </div>
@@ -346,9 +371,9 @@ export default function Dashboard() {
                     >
                       {insight.icon}
                     </div>
-                    <p className="text-sm font-medium text-slate-700 dark:text-slate-300 leading-relaxed">
+                    <div className="text-sm font-medium text-slate-700 dark:text-slate-300 leading-relaxed">
                       {insight.text}
-                    </p>
+                    </div>
                   </motion.div>
                 ))}
                 {aiInsights.length === 0 && (

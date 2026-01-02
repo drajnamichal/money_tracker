@@ -19,6 +19,8 @@ import {
   BudgetTodoItem,
   Mortgage,
   MortgagePayment,
+  RecurringPayment,
+  Investment,
 } from '@/types/financial';
 
 interface FinancialContextType {
@@ -32,6 +34,7 @@ interface FinancialContextType {
   expenseCategories: ExpenseCategory[];
   mortgages: Mortgage[];
   mortgagePayments: MortgagePayment[];
+  recurringPayments: RecurringPayment[];
   investments: Investment[];
   exchangeRate: number;
   loading: boolean;
@@ -41,6 +44,7 @@ interface FinancialContextType {
   refreshExpenseCategories: () => Promise<void>;
   refreshBudget: () => Promise<void>;
   refreshMortgage: () => Promise<void>;
+  refreshRecurringPayments: () => Promise<void>;
   refreshInvestments: () => Promise<void>;
   refreshAll: () => Promise<void>;
 }
@@ -66,6 +70,9 @@ export function FinancialProvider({ children }: { children: React.ReactNode }) {
   const [mortgagePayments, setMortgagePayments] = useState<MortgagePayment[]>(
     []
   );
+  const [recurringPayments, setRecurringPayments] = useState<
+    RecurringPayment[]
+  >([]);
   const [investments, setInvestments] = useState<Investment[]>([]);
   const [exchangeRate, setExchangeRate] = useState<number>(25.0); // Default fallback
   const [loading, setLoading] = useState(true);
@@ -152,6 +159,14 @@ export function FinancialProvider({ children }: { children: React.ReactNode }) {
     if (paymentsData) setMortgagePayments(paymentsData as MortgagePayment[]);
   }, []);
 
+  const fetchRecurringPayments = useCallback(async () => {
+    const { data } = await supabase
+      .from('recurring_payments')
+      .select('*')
+      .order('name');
+    if (data) setRecurringPayments(data as RecurringPayment[]);
+  }, []);
+
   const fetchInvestments = useCallback(async () => {
     const { data } = await supabase
       .from('investments')
@@ -169,6 +184,7 @@ export function FinancialProvider({ children }: { children: React.ReactNode }) {
       fetchExpenseCategories(),
       fetchBudget(),
       fetchMortgage(),
+      fetchRecurringPayments(),
       fetchInvestments(),
       fetchExchangeRate(),
     ]);
@@ -180,6 +196,7 @@ export function FinancialProvider({ children }: { children: React.ReactNode }) {
     fetchExpenseCategories,
     fetchBudget,
     fetchMortgage,
+    fetchRecurringPayments,
     fetchInvestments,
     fetchExchangeRate,
   ]);
@@ -201,6 +218,7 @@ export function FinancialProvider({ children }: { children: React.ReactNode }) {
         expenseCategories,
         mortgages,
         mortgagePayments,
+        recurringPayments,
         investments,
         exchangeRate,
         loading,
@@ -210,6 +228,7 @@ export function FinancialProvider({ children }: { children: React.ReactNode }) {
         refreshExpenseCategories: fetchExpenseCategories,
         refreshBudget: fetchBudget,
         refreshMortgage: fetchMortgage,
+        refreshRecurringPayments: fetchRecurringPayments,
         refreshInvestments: fetchInvestments,
         refreshAll,
       }}

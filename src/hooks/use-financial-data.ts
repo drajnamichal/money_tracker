@@ -12,6 +12,7 @@ import {
   BudgetTodoItem,
   Mortgage,
   MortgagePayment,
+  RecurringPayment,
   Investment,
 } from '@/types/financial';
 
@@ -88,6 +89,16 @@ export function useMortgageData() {
     payments: mortgagePayments as MortgagePayment[],
     loading,
     refresh: refreshMortgage,
+  };
+}
+
+export function useRecurringPaymentsData() {
+  const { recurringPayments, loading, refreshRecurringPayments } =
+    useFinancialData();
+  return {
+    records: recurringPayments as RecurringPayment[],
+    loading,
+    refresh: refreshRecurringPayments,
   };
 }
 

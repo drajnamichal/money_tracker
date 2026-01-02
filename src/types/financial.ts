@@ -95,6 +95,17 @@ export interface MortgagePayment {
   created_at?: string;
 }
 
+export interface RecurringPayment {
+  id: string;
+  user_id: string | null;
+  name: string;
+  amount: number;
+  frequency: 'monthly' | 'yearly';
+  currency: string;
+  created_at: string;
+  last_amount: number | null;
+}
+
 export interface Investment {
   id: string;
   user_id: string;
