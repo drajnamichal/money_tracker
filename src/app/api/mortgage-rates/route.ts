@@ -4,16 +4,13 @@ export const dynamic = 'force-dynamic';
 
 export async function GET() {
   try {
-    const response = await fetch('https://www.financnykompas.sk/hypoteka', {
+    const response = await fetch('https://www.financnahitparada.sk/hypoteky', {
       headers: {
         'User-Agent':
           'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
         Accept:
           'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
         'Accept-Language': 'sk-SK,sk;q=0.9,en-US;q=0.8,en;q=0.7',
-        'Cache-Control': 'no-cache',
-        Pragma: 'no-cache',
-        Referer: 'https://www.google.com/',
       },
       next: { revalidate: 3600 },
     });
@@ -22,16 +19,16 @@ export async function GET() {
 
     if (!html || html.length < 100) {
       return NextResponse.json(
-        { error: 'Source site returned no content', debug: html?.length },
+        { error: 'Source site returned no content' },
         { status: 500 }
       );
     }
 
     const rates: { bank: string; rate: string }[] = [];
 
-    // 1. Try a more generic regex that looks for bank names or logos near rates
+    // Finančná Hitparáda uses <img> with logo and text for rates
     const rowRegex = /<tr[^>]*>([\s\S]*?)<\/tr>/g;
-    const bankRegex = /(?:alt|data-bank)="([^"]+)"/i;
+    const bankRegex = /img\s+src="[^"]*\/loga_banky\/([^.-]+)[^"]*"/i;
     const rateRegex = /(\d+[,.]\d+)\s*%/;
 
     let match;
@@ -41,51 +38,36 @@ export async function GET() {
       const rateMatch = rowHtml.match(rateRegex);
 
       if (bankMatch && rateMatch) {
-        const bankName = bankMatch[1].trim();
-        if (
-          bankName &&
-          !['akcia', 'logo', 'banka'].includes(bankName.toLowerCase())
-        ) {
-          rates.push({
-            bank: bankName,
-            rate: rateMatch[1].replace(',', '.') + ' %',
-          });
-        }
+        let bankSlug = bankMatch[1].toLowerCase();
+
+        // Map slug to proper name
+        const bankMap: Record<string, string> = {
+          slsp: 'SLSP',
+          vub: 'VÚB',
+          csob: 'ČSOB',
+          'tatra-banka': 'Tatra banka',
+          mbank: 'mBank',
+          unicredit: 'UniCredit',
+          fio: 'Fio banka',
+          'prima-banka': 'Prima banka',
+          prima: 'Prima banka',
+          bks: 'BKS Bank',
+          '365-bank': '365.bank',
+        };
+
+        const bankName =
+          bankMap[bankSlug] ||
+          bankSlug.charAt(0).toUpperCase() +
+            bankSlug.slice(1).replace(/-/g, ' ');
+
+        rates.push({
+          bank: bankName,
+          rate: rateMatch[1].replace(',', '.') + ' %',
+        });
       }
     }
 
-    // 2. Fallback: search for known banks if the above fails
-    if (rates.length === 0) {
-      const commonBanks = [
-        'VÚB',
-        'Tatra banka',
-        'Slovenská sporiteľňa',
-        'ČSOB',
-        'Prima banka',
-        'mBank',
-        '365.bank',
-        'Fio banka',
-        'UniCredit',
-        'BKS Bank',
-      ];
-
-      commonBanks.forEach((bank) => {
-        const escapedBank = bank.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-        const bankWithRateRegex = new RegExp(
-          `${escapedBank}[\\s\\S]{1,500}?>(\\d+[,.]\\d+)\\s*%`,
-          'i'
-        );
-        const bankMatch = html.match(bankWithRateRegex);
-        if (bankMatch) {
-          rates.push({
-            bank: bank,
-            rate: bankMatch[1].replace(',', '.') + ' %',
-          });
-        }
-      });
-    }
-
-    // Deduplicate
+    // Deduplicate and sort
     const uniqueMap = new Map();
     rates.forEach((item) => {
       if (!uniqueMap.has(item.bank)) {
@@ -98,13 +80,11 @@ export async function GET() {
       .slice(0, 10);
 
     if (uniqueRates.length === 0) {
-      const isBlocked = html.includes('cloudflare') || html.includes('captcha');
       return NextResponse.json({
-        error: isBlocked ? 'Blocked by protection' : 'No rates found',
+        error: 'No rates found',
         debug: {
           htmlLength: html.length,
           title: html.match(/<title>(.*?)<\/title>/i)?.[1],
-          snippet: html.substring(0, 300).replace(/\s+/g, ' '),
         },
       });
     }
