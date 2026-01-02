@@ -17,6 +17,7 @@ import {
   Info,
   Zap,
   TrendingUp,
+  ExternalLink,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
@@ -38,6 +39,27 @@ export default function MortgagePage() {
   const { mortgage, payments, loading, refresh } = useMortgageData();
   const [updating, setUpdating] = useState(false);
   const [overpayment, setOverpayment] = useState<string>('5000');
+  const [marketRates, setMarketRates] = useState<
+    { bank: string; rate: string }[]
+  >([]);
+  const [loadingRates, setLoadingRates] = useState(true);
+
+  useEffect(() => {
+    async function fetchMarketRates() {
+      try {
+        const res = await fetch('/api/mortgage-rates');
+        const data = await res.json();
+        if (Array.isArray(data)) {
+          setMarketRates(data);
+        }
+      } catch (error) {
+        console.error('Error fetching market rates:', error);
+      } finally {
+        setLoadingRates(false);
+      }
+    }
+    fetchMarketRates();
+  }, []);
 
   const analysis = useMemo(() => {
     if (!mortgage) return null;
@@ -602,6 +624,53 @@ export default function MortgagePage() {
               skrátenie doby splácania.
             </p>
           </div>
+        </div>
+      </div>
+
+      {/* Market Rates Section */}
+      <div className="bg-white dark:bg-slate-900 rounded-2xl border shadow-sm overflow-hidden">
+        <div className="p-6 border-b flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Percent size={18} className="text-blue-500" />
+            <h4 className="font-bold">Aktuálne trhové sadzby</h4>
+          </div>
+          <a
+            href="https://www.financnykompas.sk/hypoteka"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-[10px] text-slate-400 hover:text-blue-500 flex items-center gap-1 transition-colors font-bold uppercase tracking-wider"
+          >
+            Zdroj: FinancnyKompas.sk
+            <ExternalLink size={12} />
+          </a>
+        </div>
+        <div className="p-6">
+          {loadingRates ? (
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+              {[...Array(10)].map((_, i) => (
+                <Skeleton key={i} className="h-16 w-full rounded-xl" />
+              ))}
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+              {marketRates.map((rate, index) => (
+                <motion.div
+                  key={rate.bank}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: index * 0.05 }}
+                  className="p-4 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-100 dark:border-slate-800 flex flex-col justify-center items-center text-center group hover:border-blue-200 dark:hover:border-blue-900/50 transition-colors"
+                >
+                  <p className="text-[10px] text-slate-500 font-bold uppercase tracking-tight mb-1 truncate w-full">
+                    {rate.bank}
+                  </p>
+                  <p className="text-xl font-black text-blue-600 dark:text-blue-400">
+                    {rate.rate}
+                  </p>
+                </motion.div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </div>
