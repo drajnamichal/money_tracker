@@ -692,6 +692,34 @@ export default function MortgagePage() {
               ))}
             </div>
           )}
+
+          {!loadingRates && !ratesError && (
+            <div className="mt-8 pt-4 border-t border-slate-100 dark:border-slate-800 flex flex-wrap items-center justify-center gap-x-8 gap-y-2">
+              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">
+                Pre ďalšie porovnanie:
+              </p>
+              <div className="flex items-center gap-6">
+                <a
+                  href="https://www.financnykompas.sk/hypoteka"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-[10px] text-blue-600 dark:text-blue-400 hover:text-blue-700 font-bold uppercase tracking-wider flex items-center gap-1 transition-colors"
+                >
+                  FinancnyKompas.sk
+                  <ExternalLink size={10} />
+                </a>
+                <a
+                  href="https://www.financnahitparada.sk/hypoteky"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-[10px] text-blue-600 dark:text-blue-400 hover:text-blue-700 font-bold uppercase tracking-wider flex items-center gap-1 transition-colors"
+                >
+                  FinancnaHitparada.sk
+                  <ExternalLink size={10} />
+                </a>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>
