@@ -1,13 +1,12 @@
 'use client';
 
-import { useState, Fragment, useMemo } from 'react';
-import { useForm, useFieldArray } from 'react-hook-form';
+import { useEffect, useState, useMemo } from 'react';
+import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { supabase } from '@/lib/supabase';
 import { formatCurrency } from '@/lib/utils';
-import { mergeAssetItems } from '@/lib/calculations';
-import { Loader2, Plus, ArrowRight, Save, X, Trash2 } from 'lucide-react';
+import { Loader2, Plus, ArrowRight, Save, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
 import { Skeleton } from '@/components/skeleton';
@@ -15,22 +14,17 @@ import { useWealthData } from '@/hooks/use-financial-data';
 
 const assetSchema = z.object({
   recordDate: z.string().min(1, 'Dátum je povinný'),
-  items: z
-    .array(
-      z.object({
-        accountName: z.string().min(1, 'Názov je povinný'),
-        amount: z
-          .string()
-          .refine(
-            (val) => val !== '' && !isNaN(Number(val)) && Number(val) >= 0,
-            {
-              message: 'Suma musí byť kladné číslo',
-            }
-          ),
-        currency: z.string().min(1),
-      })
-    )
-    .min(1, 'Pridajte aspoň jeden záznam'),
+  amounts: z.record(
+    z.string(),
+    z
+      .string()
+      .refine(
+        (val) => val === '' || (!isNaN(Number(val)) && Number(val) >= 0),
+        {
+          message: 'Suma musí byť kladné číslo',
+        }
+      )
+  ),
 });
 
 type AssetFormValues = z.infer<typeof assetSchema>;
@@ -48,7 +42,6 @@ export default function AssetsPage() {
 
   const {
     register,
-    control,
     handleSubmit,
     reset,
     formState: { errors },
@@ -56,13 +49,8 @@ export default function AssetsPage() {
     resolver: zodResolver(assetSchema),
     defaultValues: {
       recordDate: new Date().toISOString().split('T')[0],
-      items: [{ accountName: '', amount: '', currency: 'EUR' }],
+      amounts: {},
     },
-  });
-
-  const { fields, append, remove } = useFieldArray({
-    control,
-    name: 'items',
   });
 
   const { dates, recordMap } = useMemo(() => {
@@ -81,65 +69,49 @@ export default function AssetsPage() {
     return { dates: uniqueDates, recordMap: map };
   }, [wealthData]);
 
+  useEffect(() => {
+    if (dates.length > 0 && accounts.length > 0) {
+      const latest = recordMap[dates[0]];
+      const initialAmounts: Record<string, string> = {};
+      accounts.forEach((acc) => {
+        initialAmounts[acc.id] = latest[acc.id]?.toString() || '0';
+      });
+      reset({
+        recordDate: new Date().toISOString().split('T')[0],
+        amounts: initialAmounts,
+      });
+    }
+  }, [dates, accounts, recordMap, reset]);
+
   const onSave = async (data: AssetFormValues) => {
     setSaving(true);
     try {
-      const inserts = [];
-      const mergedItems = mergeAssetItems(data.items);
-      const localAccountsMap = new Map<string, string>();
+      const inserts = Object.entries(data.amounts)
+        .filter(([_, amount]) => amount !== '')
+        .map(([accountId, amount]) => {
+          const account = accounts.find((a) => a.id === accountId);
+          const numAmount = Number(amount);
+          const amountEur =
+            account?.currency === 'CZK' ? numAmount / exchangeRate : numAmount;
 
-      // Pre-fill local map with existing accounts
-      accounts.forEach((acc) => {
-        localAccountsMap.set(acc.name.toLowerCase(), acc.id);
-      });
-
-      for (const item of mergedItems) {
-        let accountId;
-        const normalizedName = item.accountName.trim().toLowerCase();
-
-        if (localAccountsMap.has(normalizedName)) {
-          accountId = localAccountsMap.get(normalizedName);
-        } else {
-          // Create new account if it doesn't exist
-          const { data: newAccount, error: accError } = await supabase
-            .from('asset_accounts')
-            .insert({
-              name: item.accountName.trim(),
-              type: 'other',
-              currency: item.currency as 'EUR' | 'CZK',
-            })
-            .select()
-            .single();
-
-          if (accError) throw accError;
-          accountId = newAccount.id;
-          localAccountsMap.set(normalizedName, accountId);
-        }
-
-        const amount = Number(item.amount);
-        const amountEur =
-          item.currency === 'CZK' ? amount / exchangeRate : amount;
-
-        inserts.push({
-          account_id: accountId,
-          record_date: data.recordDate,
-          amount: amount,
-          amount_eur: amountEur,
+          return {
+            account_id: accountId,
+            record_date: data.recordDate,
+            amount: numAmount,
+            amount_eur: amountEur,
+          };
         });
+
+      if (inserts.length === 0) {
+        toast.error('Prosím zadajte aspoň jednu sumu');
+        return;
       }
 
-      // Use upsert to prevent unique constraint errors if record already exists for this date
-      const { error } = await supabase.from('wealth_records').upsert(inserts, {
-        onConflict: 'account_id,record_date',
-      });
+      const { error } = await supabase.from('wealth_records').insert(inserts);
 
       if (error) throw error;
 
       setIsAdding(false);
-      reset({
-        recordDate: new Date().toISOString().split('T')[0],
-        items: [{ accountName: '', amount: '', currency: 'EUR' }],
-      });
       await refresh();
       toast.success('Záznamy boli úspešne uložené');
     } catch (error) {
@@ -208,66 +180,31 @@ export default function AssetsPage() {
             </div>
 
             <form onSubmit={handleSubmit(onSave)} className="space-y-4">
-              <div className="space-y-4">
-                {fields.map((field, index) => (
-                  <div key={field.id} className="flex gap-3 items-start">
-                    <div className="flex-[3] space-y-1">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {accounts.map((account) => (
+                  <div key={account.id} className="space-y-1.5">
+                    <label className="text-xs font-bold text-slate-500 uppercase">
+                      {account.name}
+                    </label>
+                    <div className="relative">
                       <input
-                        {...register(`items.${index}.accountName`)}
-                        placeholder="Názov účtu / investície (napr. Tatra Banka)"
-                        className={`w-full bg-slate-50 dark:bg-slate-800 border rounded-xl px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500 ${errors.items?.[index]?.accountName ? 'border-rose-500 focus:ring-rose-500' : ''}`}
+                        type="number"
+                        step="0.01"
+                        className={`w-full bg-slate-50 dark:bg-slate-800 border rounded-xl px-4 py-2.5 outline-none focus:ring-2 focus:ring-blue-500 pr-12 ${errors.amounts?.[account.id] ? 'border-rose-500 focus:ring-rose-500' : ''}`}
+                        {...register(`amounts.${account.id}`)}
+                        placeholder="0.00"
                       />
-                      {errors.items?.[index]?.accountName && (
-                        <p className="text-[10px] text-rose-500 font-medium">
-                          {errors.items[index]?.accountName?.message}
-                        </p>
-                      )}
+                      <span className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 text-sm">
+                        €
+                      </span>
                     </div>
-                    <div className="flex-[2] space-y-1">
-                      <div className="flex border rounded-xl bg-slate-50 dark:bg-slate-800 focus-within:ring-2 focus-within:ring-blue-500 overflow-hidden">
-                        <input
-                          type="number"
-                          step="0.01"
-                          className={`flex-1 bg-transparent px-4 py-2 text-sm outline-none ${errors.items?.[index]?.amount ? 'border-rose-500' : ''}`}
-                          {...register(`items.${index}.amount`)}
-                          placeholder="0.00"
-                        />
-                        <select
-                          className="bg-slate-100 dark:bg-slate-700 px-3 py-2 text-xs outline-none border-l dark:border-slate-600 font-bold"
-                          {...register(`items.${index}.currency`)}
-                        >
-                          <option value="EUR">EUR</option>
-                          <option value="CZK">CZK</option>
-                        </select>
-                      </div>
-                      {errors.items?.[index]?.amount && (
-                        <p className="text-[10px] text-rose-500 font-medium">
-                          {errors.items[index]?.amount?.message}
-                        </p>
-                      )}
-                    </div>
-                    {fields.length > 1 && (
-                      <button
-                        type="button"
-                        onClick={() => remove(index)}
-                        className="text-slate-400 hover:text-rose-500 p-2 mt-0.5 shrink-0"
-                      >
-                        <Trash2 size={18} />
-                      </button>
+                    {errors.amounts?.[account.id] && (
+                      <p className="text-[10px] text-rose-500 font-medium">
+                        {errors.amounts[account.id]?.message}
+                      </p>
                     )}
                   </div>
                 ))}
-
-                <button
-                  type="button"
-                  onClick={() =>
-                    append({ accountName: '', amount: '', currency: 'EUR' })
-                  }
-                  className="flex items-center gap-2 text-blue-600 font-bold py-2 hover:opacity-80 transition-opacity"
-                >
-                  <Plus size={20} />
-                  <span>Pridať ďalší účet</span>
-                </button>
               </div>
 
               <div className="flex justify-end gap-3 pt-6 border-t">
@@ -288,7 +225,7 @@ export default function AssetsPage() {
                   ) : (
                     <Save size={20} />
                   )}
-                  Uložiť záznamy
+                  Uložiť všetko
                 </button>
               </div>
             </form>

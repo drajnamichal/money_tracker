@@ -2,14 +2,7 @@
 
 import { useEffect, useState, useMemo } from 'react';
 import { formatCurrency } from '@/lib/utils';
-import {
-  TrendingUp,
-  TrendingDown,
-  Wallet,
-  ArrowUpRight,
-  ArrowDownRight,
-  Lightbulb,
-} from 'lucide-react';
+import { TrendingUp, TrendingDown, Wallet } from 'lucide-react';
 import {
   AreaChart,
   Area,
@@ -22,19 +15,13 @@ import {
   Bar,
   Legend,
 } from 'recharts';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { Skeleton } from '@/components/skeleton';
 import {
   useWealthData,
   useIncomeData,
   useExpenseData,
 } from '@/hooks/use-financial-data';
-import {
-  calculatePercentageChange,
-  aggregateMonthlyData,
-  calculateWealthGrowth,
-  generateSpendingInsight,
-} from '@/lib/calculations';
 
 export default function Dashboard() {
   const { records: wealthData, loading: wealthLoading } = useWealthData();
@@ -44,51 +31,60 @@ export default function Dashboard() {
   const loading = wealthLoading || incomeLoading || expenseLoading;
 
   const stats = useMemo(() => {
-    const { totalAssets, growth } = calculateWealthGrowth(wealthData);
-    const combinedMonthlyData = aggregateMonthlyData(incomeData, expenseData);
-
+    let totalAssets = 0;
+    let growth = 0;
     let monthlyIncome = 0;
     let monthlyExpenses = 0;
-    let incomeChange = 0;
-    let expenseChange = 0;
-    let savingsChange = 0;
-    let insight = null;
 
-    const latestMonth = combinedMonthlyData[combinedMonthlyData.length - 1];
-    const prevMonth = combinedMonthlyData[combinedMonthlyData.length - 2];
+    if (wealthData && wealthData.length > 0) {
+      const totalsByDate = wealthData.reduce((acc: any, curr: any) => {
+        acc[curr.record_date] =
+          (acc[curr.record_date] || 0) + Number(curr.amount_eur);
+        return acc;
+      }, {});
 
+      const sortedDates = Object.keys(totalsByDate).sort();
+      const latestDate = sortedDates[sortedDates.length - 1];
+      const previousDate = sortedDates[sortedDates.length - 2];
+
+      totalAssets = totalsByDate[latestDate];
+      const previousTotal = totalsByDate[previousDate] || totalAssets;
+      growth =
+        previousTotal !== 0
+          ? ((totalAssets - previousTotal) / previousTotal) * 100
+          : 0;
+    }
+
+    const monthlyData: any = {};
+    if (incomeData) {
+      incomeData.forEach((item: any) => {
+        const month = item.record_month.substring(0, 7);
+        if (!monthlyData[month])
+          monthlyData[month] = { month, income: 0, expenses: 0 };
+        monthlyData[month].income += Number(item.amount_eur);
+      });
+    }
+
+    if (expenseData) {
+      expenseData.forEach((item: any) => {
+        const month = item.record_date.substring(0, 7);
+        if (!monthlyData[month])
+          monthlyData[month] = { month, income: 0, expenses: 0 };
+        monthlyData[month].expenses += Number(item.amount_eur);
+      });
+    }
+
+    const combinedSorted = Object.values(monthlyData).sort((a: any, b: any) =>
+      a.month.localeCompare(b.month)
+    );
+
+    const latestMonth: any = combinedSorted[combinedSorted.length - 1];
     if (latestMonth) {
       monthlyIncome = latestMonth.income;
       monthlyExpenses = latestMonth.expenses;
-
-      if (prevMonth) {
-        incomeChange = calculatePercentageChange(
-          latestMonth.income,
-          prevMonth.income
-        );
-        expenseChange = calculatePercentageChange(
-          latestMonth.expenses,
-          prevMonth.expenses
-        );
-
-        const latestSavings = latestMonth.income - latestMonth.expenses;
-        const prevSavings = prevMonth.income - prevMonth.expenses;
-        savingsChange = calculatePercentageChange(latestSavings, prevSavings);
-
-        insight = generateSpendingInsight(latestMonth, prevMonth);
-      }
     }
 
-    return {
-      totalAssets,
-      growth,
-      monthlyIncome,
-      monthlyExpenses,
-      incomeChange,
-      expenseChange,
-      savingsChange,
-      insight,
-    };
+    return { totalAssets, growth, monthlyIncome, monthlyExpenses };
   }, [wealthData, incomeData, expenseData]);
 
   const assetsHistory = useMemo(() => {
@@ -110,15 +106,36 @@ export default function Dashboard() {
       }));
   }, [wealthData]);
 
-  const incomeVsExpensesChartData = useMemo(() => {
-    return aggregateMonthlyData(incomeData, expenseData).map((item) => ({
-      name: new Date(item.month).toLocaleDateString('sk-SK', {
-        month: 'short',
-        year: '2-digit',
-      }),
-      income: item.income,
-      expenses: item.expenses,
-    }));
+  const incomeVsExpenses = useMemo(() => {
+    const monthlyData: any = {};
+    if (incomeData) {
+      incomeData.forEach((item: any) => {
+        const month = item.record_month.substring(0, 7);
+        if (!monthlyData[month])
+          monthlyData[month] = { month, income: 0, expenses: 0 };
+        monthlyData[month].income += Number(item.amount_eur);
+      });
+    }
+
+    if (expenseData) {
+      expenseData.forEach((item: any) => {
+        const month = item.record_date.substring(0, 7);
+        if (!monthlyData[month])
+          monthlyData[month] = { month, income: 0, expenses: 0 };
+        monthlyData[month].expenses += Number(item.amount_eur);
+      });
+    }
+
+    return Object.values(monthlyData)
+      .sort((a: any, b: any) => a.month.localeCompare(b.month))
+      .map((item: any) => ({
+        name: new Date(item.month).toLocaleDateString('sk-SK', {
+          month: 'short',
+          year: '2-digit',
+        }),
+        income: item.income,
+        expenses: item.expenses,
+      }));
   }, [incomeData, expenseData]);
 
   return (
@@ -159,62 +176,29 @@ export default function Dashboard() {
             <StatCard
               title="Mesačný Príjem"
               value={formatCurrency(stats.monthlyIncome)}
-              change={stats.incomeChange}
+              change={0}
               icon={<TrendingUp className="text-emerald-500" />}
               color="emerald"
             />
             <StatCard
               title="Mesačné Výdavky"
               value={formatCurrency(stats.monthlyExpenses)}
-              change={stats.expenseChange}
+              change={0}
               icon={<TrendingDown className="text-rose-500" />}
               color="rose"
-              reverse
             />
             <StatCard
               title="Mesačná Úspora"
               value={formatCurrency(
                 stats.monthlyIncome - stats.monthlyExpenses
               )}
-              change={stats.savingsChange}
+              change={0}
               icon={<TrendingUp className="text-blue-500" />}
               color="blue"
             />
           </>
         )}
       </div>
-
-      <AnimatePresence>
-        {!loading && stats.insight && (
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            className={`p-4 rounded-2xl border flex items-start gap-4 ${
-              stats.insight.type === 'warning'
-                ? 'bg-amber-50 border-amber-100 text-amber-900 dark:bg-amber-950/20 dark:border-amber-900/30 dark:text-amber-200'
-                : stats.insight.type === 'success'
-                  ? 'bg-emerald-50 border-emerald-100 text-emerald-900 dark:bg-emerald-950/20 dark:border-emerald-900/30 dark:text-emerald-200'
-                  : 'bg-blue-50 border-blue-100 text-blue-900 dark:bg-blue-950/20 dark:border-blue-900/30 dark:text-blue-200'
-            }`}
-          >
-            <div
-              className={`p-2 rounded-lg ${
-                stats.insight.type === 'warning'
-                  ? 'bg-amber-100 dark:bg-amber-900/40'
-                  : stats.insight.type === 'success'
-                    ? 'bg-emerald-100 dark:bg-emerald-900/40'
-                    : 'bg-blue-100 dark:bg-blue-900/40'
-              }`}
-            >
-              <Lightbulb size={20} />
-            </div>
-            <div className="flex-1">
-              <p className="font-semibold text-sm">Inteligentný postreh</p>
-              <p className="text-sm opacity-90">{stats.insight.text}</p>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl shadow-sm border">
@@ -276,7 +260,7 @@ export default function Dashboard() {
               <Skeleton className="w-full h-full" />
             ) : (
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={incomeVsExpensesChartData}>
+                <BarChart data={incomeVsExpenses}>
                   <CartesianGrid
                     strokeDasharray="3 3"
                     vertical={false}
@@ -321,38 +305,26 @@ export default function Dashboard() {
   );
 }
 
-function StatCard({ title, value, change, icon, color, reverse }: any) {
-  const isPositive = change > 0;
-  const isGood = reverse ? !isPositive : isPositive;
-
+function StatCard({ title, value, change, icon, color }: any) {
   return (
     <motion.div
       whileHover={{ y: -4 }}
-      className="bg-white dark:bg-slate-900 p-6 rounded-2xl shadow-sm border flex items-center gap-6 relative overflow-hidden"
+      className="bg-white dark:bg-slate-900 p-6 rounded-2xl shadow-sm border flex items-center gap-6"
     >
-      <div className={`p-4 rounded-xl bg-${color}-50 dark:bg-${color}-950/30`}>
+      <div className={`p-4 rounded-xl bg-${color}-50 dark:bg-${color}-950`}>
         {icon}
       </div>
-      <div className="flex-1">
+      <div>
         <p className="text-sm text-slate-500 font-medium">{title}</p>
         <div className="flex items-baseline gap-2">
           <h3 className="text-2xl font-bold">{value}</h3>
           {change !== 0 && (
-            <div
-              className={`flex items-center text-xs font-bold ${isGood ? 'text-emerald-500' : 'text-rose-500'}`}
+            <span
+              className={`text-xs font-bold ${change > 0 ? 'text-emerald-500' : 'text-rose-500'}`}
             >
-              {isPositive ? (
-                <ArrowUpRight size={14} />
-              ) : (
-                <ArrowDownRight size={14} />
-              )}
-              <span>
-                {Math.abs(change).toFixed(1)}%
-                <span className="text-[10px] opacity-60 ml-1 font-normal">
-                  vs min. m.
-                </span>
-              </span>
-            </div>
+              {change > 0 ? '+' : ''}
+              {change.toFixed(1)}%
+            </span>
           )}
         </div>
       </div>

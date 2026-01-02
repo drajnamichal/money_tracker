@@ -1,225 +1,237 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useMemo, useCallback } from 'react';
 import { useBudgetData } from '@/hooks/use-financial-data';
 import { supabase } from '@/lib/supabase';
-import { toast } from 'sonner';
 import Summary from '@/components/budget-tracker/summary';
 import ExpenseForm from '@/components/budget-tracker/expense-form';
 import ExpenseList from '@/components/budget-tracker/expense-list';
-import TodoList from '@/components/budget-tracker/todo-list';
-import { Building2 } from 'lucide-react';
-import { motion } from 'framer-motion';
+import ToDoList from '@/components/budget-tracker/todo-list';
+import { toast } from 'sonner';
 
 const TOTAL_BUDGET = 250000;
 
-const BudgetTrackerPage = () => {
-  const { expenses, todoItems, exchangeRate, loading, refresh } =
-    useBudgetData();
-  const [isScanning, setIsScanning] = useState(false);
+export default function BudgetTrackerPage() {
+  const { expenses, todoItems, loading, refresh } = useBudgetData();
 
-  const handleAddExpense = async (expenseData: {
-    description: string;
-    amount: number;
-    currency: string;
-    file?: File;
-  }) => {
-    let attachment_url = null;
+  const addExpense = useCallback(
+    async (expense: { description: string; amount: number; file?: File }) => {
+      try {
+        let attachment_url = null;
 
-    if (expenseData.file) {
-      const fileExt = expenseData.file.name.split('.').pop();
-      const fileName = `${Math.random()}.${fileExt}`;
-      const filePath = `budget-attachments/${fileName}`;
+        if (expense.file) {
+          const fileExt = expense.file.name.split('.').pop();
+          const fileName = `${Math.random()}.${fileExt}`;
+          const filePath = `${fileName}`;
 
-      const { error: uploadError } = await supabase.storage
-        .from('financial-attachments')
-        .upload(filePath, expenseData.file);
+          const { error: uploadError } = await supabase.storage
+            .from('expense-attachments')
+            .upload(filePath, expense.file);
 
-      if (uploadError) {
-        toast.error('Chyba pri nahrávaní súboru');
-        console.error(uploadError);
-      } else {
-        const {
-          data: { publicUrl },
-        } = supabase.storage
-          .from('financial-attachments')
-          .getPublicUrl(filePath);
-        attachment_url = publicUrl;
+          if (uploadError) throw uploadError;
+
+          const {
+            data: { publicUrl },
+          } = supabase.storage
+            .from('expense-attachments')
+            .getPublicUrl(filePath);
+
+          attachment_url = publicUrl;
+        }
+
+        const { error } = await supabase.from('budget_expenses').insert([
+          {
+            description: expense.description,
+            amount: expense.amount,
+            attachment_url,
+          },
+        ]);
+
+        if (error) throw error;
+
+        toast.success('Výdavok pridaný!', {
+          description: `${expense.description} (${expense.amount}€) bol úspešne pridaný.`,
+        });
+
+        // Automatically remove from to-do list by description
+        const { data: matchedTodo } = await supabase
+          .from('budget_todo_items')
+          .select('id')
+          .eq('text', expense.description);
+
+        if (matchedTodo && matchedTodo.length > 0) {
+          await supabase
+            .from('budget_todo_items')
+            .delete()
+            .in(
+              'id',
+              matchedTodo.map((t) => t.id)
+            );
+
+          toast.success('Automaticky odstránené zo zoznamu!', {
+            description: `${expense.description} bol odstránený zo zoznamu nákupov.`,
+          });
+        }
+
+        refresh();
+      } catch (e) {
+        console.error('Error adding expense: ', e);
+        toast.error('Chyba pri pridávaní výdavku');
+        throw e;
       }
-    }
+    },
+    [refresh]
+  );
 
-    const amountEur =
-      expenseData.currency === 'CZK'
-        ? expenseData.amount / exchangeRate
-        : expenseData.amount;
+  const deleteExpense = useCallback(
+    async (id: string) => {
+      try {
+        // Find if there's an attachment to delete
+        const expenseToDelete = expenses.find((e) => e.id === id);
+        if (expenseToDelete?.attachment_url) {
+          const url = new URL(expenseToDelete.attachment_url);
+          const path = url.pathname.split('/').pop();
+          if (path) {
+            await supabase.storage.from('expense-attachments').remove([path]);
+          }
+        }
 
-    const { error } = await supabase.from('budget_expenses').insert([
-      {
-        description: expenseData.description,
-        amount: expenseData.amount,
-        amount_eur: amountEur,
-        currency: expenseData.currency,
-        is_fixed: false,
-        attachment_url,
-      },
-    ]);
+        const { error } = await supabase
+          .from('budget_expenses')
+          .delete()
+          .eq('id', id);
 
-    if (error) {
-      toast.error('Chyba pri pridávaní výdavku');
-      throw error;
-    }
+        if (error) throw error;
 
-    toast.success('Výdavok bol pridaný');
-    refresh();
-  };
+        toast.success('Výdavok odstránený!');
+        refresh();
+      } catch (e) {
+        console.error('Error deleting expense: ', e);
+        toast.error('Chyba pri odstraňovaní výdavku');
+      }
+    },
+    [expenses, refresh]
+  );
 
-  const handleDeleteExpense = async (id: string) => {
-    const { error } = await supabase
-      .from('budget_expenses')
-      .delete()
-      .eq('id', id);
+  const updateExpense = useCallback(
+    async (id: string, newValues: { description: string; amount: number }) => {
+      try {
+        const { error } = await supabase
+          .from('budget_expenses')
+          .update(newValues)
+          .eq('id', id);
 
-    if (error) {
-      toast.error('Chyba pri mazaní výdavku');
-      return;
-    }
+        if (error) throw error;
 
-    toast.success('Výdavok bol vymazaný');
-    refresh();
-  };
+        toast.success('Výdavok aktualizovaný!');
+        refresh();
+      } catch (e) {
+        console.error('Error updating expense: ', e);
+        toast.error('Chyba pri aktualizácii výdavku');
+      }
+    },
+    [refresh]
+  );
 
-  const handleUpdateExpense = async (
-    id: string,
-    updates: { description: string; amount: number; currency: string }
-  ) => {
-    const amountEur =
-      updates.currency === 'CZK'
-        ? updates.amount / exchangeRate
-        : updates.amount;
+  const addToDoItem = useCallback(
+    async (text: string) => {
+      try {
+        const { error } = await supabase
+          .from('budget_todo_items')
+          .insert([{ text }]);
 
-    const { error } = await supabase
-      .from('budget_expenses')
-      .update({
-        ...updates,
-        amount_eur: amountEur,
-      })
-      .eq('id', id);
+        if (error) throw error;
 
-    if (error) {
-      toast.error('Chyba pri úprave výdavku');
-      return;
-    }
+        toast.success('Položka pridaná do zoznamu!');
+        refresh();
+      } catch (e) {
+        console.error('Error adding To-Do item: ', e);
+        toast.error('Chyba pri pridávaní položky');
+      }
+    },
+    [refresh]
+  );
 
-    toast.success('Výdavok bol upravený');
-    refresh();
-  };
+  const deleteToDoItem = useCallback(
+    async (id: string) => {
+      try {
+        const { error } = await supabase
+          .from('budget_todo_items')
+          .delete()
+          .eq('id', id);
 
-  const handleAddTodoItem = async (text: string) => {
-    const { error } = await supabase.from('budget_todo_items').insert([
-      {
-        text,
-      },
-    ]);
+        if (error) throw error;
 
-    if (error) {
-      toast.error('Chyba pri pridávaní položky');
-      return;
-    }
+        toast.success('Položka odstránená!');
+        refresh();
+      } catch (e) {
+        console.error('Error deleting To-Do item: ', e);
+        toast.error('Chyba pri odstraňovaní položky');
+      }
+    },
+    [refresh]
+  );
 
-    toast.success('Položka pridaná');
-    refresh();
-  };
+  const { totalSpent, remainingBudget } = useMemo(() => {
+    const spent = expenses.reduce(
+      (sum, expense) => sum + Number(expense.amount),
+      0
+    );
+    return {
+      totalSpent: spent,
+      remainingBudget: TOTAL_BUDGET - spent,
+    };
+  }, [expenses]);
 
-  const handleDeleteTodoItem = async (id: string) => {
-    const { error } = await supabase
-      .from('budget_todo_items')
-      .delete()
-      .eq('id', id);
-
-    if (error) {
-      toast.error('Chyba pri mazaní položky');
-      return;
-    }
-
-    toast.success('Položka vymazaná');
-    refresh();
-  };
-
-  const totalSpent = expenses.reduce((sum, e) => sum + Number(e.amount_eur), 0);
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center text-slate-600 dark:text-slate-400">
+        <p>Pripájam sa k databáze...</p>
+      </div>
+    );
+  }
 
   return (
-    <div className="max-w-7xl mx-auto space-y-8">
-      <div className="flex items-center gap-3">
-        <div className="p-3 bg-blue-600 rounded-2xl shadow-lg shadow-blue-200 dark:shadow-none">
-          <Building2 className="text-white" size={24} />
-        </div>
-        <div>
-          <h1 className="text-3xl font-bold text-slate-900 dark:text-slate-100">
-            Rozpočet bytu
-          </h1>
-          <p className="text-slate-500 dark:text-slate-400">
-            Prehľad nákladov a nákupný zoznam pre naše nové bývanie
-          </p>
-          {!loading && exchangeRate && (
-            <p className="text-[10px] text-slate-400 mt-1 uppercase tracking-wider font-bold">
-              Aktuálny kurz: 1 EUR = {exchangeRate.toFixed(2)} CZK
-            </p>
-          )}
-        </div>
-      </div>
+    <div className="max-w-4xl mx-auto">
+      <header className="mb-8 text-center">
+        <h1 className="text-4xl sm:text-5xl font-bold text-slate-900 dark:text-white">
+          Sledovanie rozpočtu bytu
+        </h1>
+        <p className="text-slate-600 dark:text-slate-400 mt-2">
+          Majte prehľad o svojich investíciách do nového bývania.
+        </p>
+      </header>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <div className="lg:col-span-2 space-y-8">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-          >
-            <Summary
-              totalBudget={TOTAL_BUDGET}
-              totalSpent={totalSpent}
-              remainingBudget={TOTAL_BUDGET - totalSpent}
-            />
-          </motion.div>
+      <main className="space-y-8">
+        <Summary
+          totalBudget={TOTAL_BUDGET}
+          totalSpent={totalSpent}
+          remainingBudget={remainingBudget}
+        />
 
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.1 }}
-          >
+        <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
+          <div className="lg:col-span-2">
+            <ExpenseForm onAddExpense={addExpense} />
+          </div>
+          <div className="lg:col-span-3">
             <ExpenseList
               expenses={expenses}
-              onDeleteExpense={handleDeleteExpense}
-              onUpdateExpense={handleUpdateExpense}
-              loading={loading}
+              onDeleteExpense={deleteExpense}
+              onUpdateExpense={updateExpense}
+              totalBudget={TOTAL_BUDGET}
+              totalSpent={totalSpent}
+              remainingBudget={remainingBudget}
             />
-          </motion.div>
-        </div>
-
-        <div className="space-y-8">
-          <motion.div
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: 0.2 }}
-          >
-            <ExpenseForm onAddExpense={handleAddExpense} />
-          </motion.div>
-
-          <motion.div
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: 0.3 }}
-          >
-            <TodoList
+          </div>
+          <div className="lg:col-span-5">
+            <ToDoList
               items={todoItems}
-              onAddItem={handleAddTodoItem}
-              onDeleteItem={handleDeleteTodoItem}
-              loading={loading}
+              onAddItem={addToDoItem}
+              onDeleteItem={deleteToDoItem}
             />
-          </motion.div>
+          </div>
         </div>
-      </div>
+      </main>
     </div>
   );
-};
-
-export default BudgetTrackerPage;
+}

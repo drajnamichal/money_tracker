@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { formatCurrency } from '@/lib/utils';
-import { BudgetExpense } from '@/types/financial';
 import {
   TrashIcon,
   LockIcon,
@@ -9,42 +8,44 @@ import {
   XIcon,
   CategoryEmoji,
   MoneyEmoji,
+  AttachmentIcon,
   ImageIcon,
 } from './icons';
 
 interface ExpenseListProps {
-  expenses: BudgetExpense[];
+  expenses: any[];
   onDeleteExpense: (id: string) => void;
   onUpdateExpense: (
     id: string,
-    newValues: { description: string; amount: number; currency: string }
+    newValues: { description: string; amount: number }
   ) => void;
-  loading?: boolean;
+  totalBudget: number;
+  totalSpent: number;
+  remainingBudget: number;
 }
 
 const ExpenseList: React.FC<ExpenseListProps> = ({
   expenses,
   onDeleteExpense,
   onUpdateExpense,
-  loading,
+  totalBudget,
+  totalSpent,
+  remainingBudget,
 }) => {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editedDescription, setEditedDescription] = useState('');
   const [editedAmount, setEditedAmount] = useState('');
-  const [editedCurrency, setEditedCurrency] = useState('EUR');
 
-  const handleEditStart = (expense: BudgetExpense) => {
+  const handleEditStart = (expense: any) => {
     setEditingId(expense.id);
     setEditedDescription(expense.description);
     setEditedAmount(expense.amount.toString());
-    setEditedCurrency(expense.currency || 'EUR');
   };
 
   const handleCancelEdit = () => {
     setEditingId(null);
     setEditedDescription('');
     setEditedAmount('');
-    setEditedCurrency('EUR');
   };
 
   const handleSaveEdit = (id: string) => {
@@ -57,7 +58,6 @@ const ExpenseList: React.FC<ExpenseListProps> = ({
       onUpdateExpense(id, {
         description: editedDescription.trim(),
         amount: numericAmount,
-        currency: editedCurrency,
       });
       handleCancelEdit();
     }
@@ -70,11 +70,7 @@ const ExpenseList: React.FC<ExpenseListProps> = ({
         Zoznam výdavkov
       </h2>
       <div className="space-y-3 max-h-[400px] lg:max-h-[500px] overflow-y-auto pr-2">
-        {loading ? (
-          <p className="text-slate-500 dark:text-slate-400 text-center py-8 italic">
-            Načítavam...
-          </p>
-        ) : expenses.length === 0 ? (
+        {expenses.length === 0 ? (
           <p className="text-slate-500 dark:text-slate-400 text-center py-8">
             Zatiaľ žiadne výdavky. Pridajte prvú položku!
           </p>
@@ -98,23 +94,13 @@ const ExpenseList: React.FC<ExpenseListProps> = ({
                       className="block w-full px-2 py-1 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-md text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:text-slate-200"
                       aria-label="Upraviť popis"
                     />
-                    <div className="flex gap-2">
-                      <input
-                        type="number"
-                        value={editedAmount}
-                        onChange={(e) => setEditedAmount(e.target.value)}
-                        className="block flex-1 px-2 py-1 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-md text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:text-slate-200"
-                        aria-label="Upraviť sumu"
-                      />
-                      <select
-                        value={editedCurrency}
-                        onChange={(e) => setEditedCurrency(e.target.value)}
-                        className="block w-20 px-1 py-1 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:text-slate-200"
-                      >
-                        <option value="EUR">EUR</option>
-                        <option value="CZK">CZK</option>
-                      </select>
-                    </div>
+                    <input
+                      type="number"
+                      value={editedAmount}
+                      onChange={(e) => setEditedAmount(e.target.value)}
+                      className="block w-full px-2 py-1 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-md text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:text-slate-200"
+                      aria-label="Upraviť sumu"
+                    />
                   </div>
                   <div className="flex items-center ml-2">
                     <button
@@ -152,14 +138,10 @@ const ExpenseList: React.FC<ExpenseListProps> = ({
                         </a>
                       )}
                     </div>
-                    <div className="flex flex-col text-[10px] sm:text-xs">
-                      <p className="text-slate-600 dark:text-slate-400 flex items-center gap-1">
-                        <MoneyEmoji className="w-3 h-3" />
-                        {expense.currency === 'CZK'
-                          ? `${expense.amount} CZK (${formatCurrency(expense.amount_eur)})`
-                          : formatCurrency(expense.amount)}
-                      </p>
-                    </div>
+                    <p className="text-sm text-slate-600 dark:text-slate-400 flex items-center gap-1">
+                      <MoneyEmoji className="w-3 h-3" />
+                      {formatCurrency(expense.amount)}
+                    </p>
                   </div>
                   <div className="flex items-center ml-4 shrink-0">
                     {expense.is_fixed ? (

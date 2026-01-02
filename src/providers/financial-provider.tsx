@@ -17,8 +17,6 @@ import {
   ExpenseRecord,
   BudgetExpense,
   BudgetTodoItem,
-  Mortgage,
-  MortgagePayment,
 } from '@/types/financial';
 
 interface FinancialContextType {
@@ -30,8 +28,6 @@ interface FinancialContextType {
   assetAccounts: AssetAccount[];
   incomeCategories: IncomeCategory[];
   expenseCategories: ExpenseCategory[];
-  mortgages: Mortgage[];
-  mortgagePayments: MortgagePayment[];
   exchangeRate: number;
   loading: boolean;
   refreshWealth: () => Promise<void>;
@@ -39,7 +35,6 @@ interface FinancialContextType {
   refreshExpenses: () => Promise<void>;
   refreshExpenseCategories: () => Promise<void>;
   refreshBudget: () => Promise<void>;
-  refreshMortgage: () => Promise<void>;
   refreshAll: () => Promise<void>;
 }
 
@@ -58,10 +53,6 @@ export function FinancialProvider({ children }: { children: React.ReactNode }) {
     []
   );
   const [expenseCategories, setExpenseCategories] = useState<ExpenseCategory[]>(
-    []
-  );
-  const [mortgages, setMortgages] = useState<Mortgage[]>([]);
-  const [mortgagePayments, setMortgagePayments] = useState<MortgagePayment[]>(
     []
   );
   const [exchangeRate, setExchangeRate] = useState<number>(25.0); // Default fallback
@@ -136,19 +127,6 @@ export function FinancialProvider({ children }: { children: React.ReactNode }) {
     if (todoItems) setBudgetTodoItems(todoItems as BudgetTodoItem[]);
   }, []);
 
-  const fetchMortgage = useCallback(async () => {
-    const { data: mortgageData } = await supabase
-      .from('mortgages')
-      .select('*')
-      .order('created_at', { ascending: false });
-    const { data: paymentsData } = await supabase
-      .from('mortgage_payments')
-      .select('*')
-      .order('payment_date', { ascending: false });
-    if (mortgageData) setMortgages(mortgageData as Mortgage[]);
-    if (paymentsData) setMortgagePayments(paymentsData as MortgagePayment[]);
-  }, []);
-
   const refreshAll = useCallback(async () => {
     setLoading(true);
     await Promise.all([
@@ -157,7 +135,6 @@ export function FinancialProvider({ children }: { children: React.ReactNode }) {
       fetchExpenses(),
       fetchExpenseCategories(),
       fetchBudget(),
-      fetchMortgage(),
       fetchExchangeRate(),
     ]);
     setLoading(false);
@@ -167,7 +144,6 @@ export function FinancialProvider({ children }: { children: React.ReactNode }) {
     fetchExpenses,
     fetchExpenseCategories,
     fetchBudget,
-    fetchMortgage,
     fetchExchangeRate,
   ]);
 
@@ -186,8 +162,6 @@ export function FinancialProvider({ children }: { children: React.ReactNode }) {
         assetAccounts,
         incomeCategories,
         expenseCategories,
-        mortgages,
-        mortgagePayments,
         exchangeRate,
         loading,
         refreshWealth: fetchWealth,
@@ -195,7 +169,6 @@ export function FinancialProvider({ children }: { children: React.ReactNode }) {
         refreshExpenses: fetchExpenses,
         refreshExpenseCategories: fetchExpenseCategories,
         refreshBudget: fetchBudget,
-        refreshMortgage: fetchMortgage,
         refreshAll,
       }}
     >

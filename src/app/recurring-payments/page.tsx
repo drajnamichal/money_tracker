@@ -17,18 +17,15 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
 import { Skeleton } from '@/components/skeleton';
-import { useBudgetData } from '@/hooks/use-financial-data';
 
 interface RecurringPayment {
   id: string;
   name: string;
   amount: number;
   frequency: 'monthly' | 'yearly';
-  currency?: string;
 }
 
 export default function RecurringPaymentsPage() {
-  const { exchangeRate } = useBudgetData();
   const [loading, setLoading] = useState(true);
   const [payments, setPayments] = useState<RecurringPayment[]>([]);
   const [isAdding, setIsAdding] = useState(false);
@@ -40,7 +37,6 @@ export default function RecurringPaymentsPage() {
   const [newFrequency, setNewFrequency] = useState<'monthly' | 'yearly'>(
     'monthly'
   );
-  const [newCurrency, setNewCurrency] = useState('EUR');
 
   useEffect(() => {
     fetchPayments();
@@ -64,21 +60,11 @@ export default function RecurringPaymentsPage() {
     e.preventDefault();
     if (!newName || !newAmount) return;
 
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) {
-      toast.error('Používateľ nie je prihlásený');
-      return;
-    }
-
     const { error } = await supabase.from('recurring_payments').insert([
       {
         name: newName,
         amount: Number(newAmount),
         frequency: newFrequency,
-        currency: newCurrency,
-        user_id: user.id,
       },
     ]);
 
@@ -86,11 +72,9 @@ export default function RecurringPaymentsPage() {
       setIsAdding(false);
       setNewName('');
       setNewAmount('');
-      setNewCurrency('EUR');
       fetchPayments();
       toast.success('Platba bola pridaná');
     } else {
-      console.error('Error adding payment:', error);
       toast.error('Chyba pri pridávaní platby');
     }
   }
@@ -114,12 +98,11 @@ export default function RecurringPaymentsPage() {
     id: string,
     name: string,
     amount: number,
-    frequency: 'monthly' | 'yearly',
-    currency: string
+    frequency: 'monthly' | 'yearly'
   ) {
     const { error } = await supabase
       .from('recurring_payments')
-      .update({ name, amount, frequency, currency })
+      .update({ name, amount, frequency })
       .eq('id', id);
 
     if (!error) {
@@ -134,18 +117,14 @@ export default function RecurringPaymentsPage() {
   const monthlyPayments = payments.filter((p) => p.frequency === 'monthly');
   const yearlyPayments = payments.filter((p) => p.frequency === 'yearly');
 
-  const totalMonthly = monthlyPayments.reduce((sum, p) => {
-    const amount = Number(p.amount);
-    const amountEur = p.currency === 'CZK' ? amount / exchangeRate : amount;
-    return sum + amountEur;
-  }, 0);
-
-  const totalYearly = yearlyPayments.reduce((sum, p) => {
-    const amount = Number(p.amount);
-    const amountEur = p.currency === 'CZK' ? amount / exchangeRate : amount;
-    return sum + amountEur;
-  }, 0);
-
+  const totalMonthly = monthlyPayments.reduce(
+    (sum, p) => sum + Number(p.amount),
+    0
+  );
+  const totalYearly = yearlyPayments.reduce(
+    (sum, p) => sum + Number(p.amount),
+    0
+  );
   const totalMonthlyEquivalent = totalMonthly + totalYearly / 12;
 
   return (
@@ -156,11 +135,6 @@ export default function RecurringPaymentsPage() {
           <p className="text-slate-500">
             Správa tvojich fixných mesačných a ročných nákladov.
           </p>
-          {!loading && exchangeRate && (
-            <p className="text-[10px] text-slate-400 mt-1 uppercase tracking-wider font-bold">
-              Aktuálny kurz: 1 EUR = {exchangeRate.toFixed(2)} CZK
-            </p>
-          )}
         </div>
         {!loading && (
           <button
@@ -255,26 +229,16 @@ export default function RecurringPaymentsPage() {
               </div>
               <div className="w-full md:w-40 space-y-1.5">
                 <label className="text-xs font-bold text-slate-500 uppercase">
-                  Suma
+                  Suma (€)
                 </label>
-                <div className="flex border rounded-xl bg-slate-50 dark:bg-slate-800 focus-within:ring-2 focus-within:ring-blue-500 overflow-hidden">
-                  <input
-                    type="number"
-                    step="0.01"
-                    className="flex-1 bg-transparent px-4 py-2.5 text-sm outline-none"
-                    placeholder="0.00"
-                    value={newAmount}
-                    onChange={(e) => setNewAmount(e.target.value)}
-                  />
-                  <select
-                    className="bg-slate-100 dark:bg-slate-700 px-3 py-2.5 text-xs outline-none border-l dark:border-slate-600 font-bold"
-                    value={newCurrency}
-                    onChange={(e) => setNewCurrency(e.target.value)}
-                  >
-                    <option value="EUR">EUR</option>
-                    <option value="CZK">CZK</option>
-                  </select>
-                </div>
+                <input
+                  type="number"
+                  step="0.01"
+                  className="w-full bg-slate-50 dark:bg-slate-800 border rounded-xl px-4 py-2.5 outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="0.00"
+                  value={newAmount}
+                  onChange={(e) => setNewAmount(e.target.value)}
+                />
               </div>
               <div className="w-full md:w-48 space-y-1.5">
                 <label className="text-xs font-bold text-slate-500 uppercase">
@@ -336,9 +300,7 @@ export default function RecurringPaymentsPage() {
                     key={payment.id}
                     payment={payment}
                     onDelete={() => handleDelete(payment.id)}
-                    onUpdate={(n, a, f, c) =>
-                      handleUpdate(payment.id, n, a, f, c)
-                    }
+                    onUpdate={(n, a, f) => handleUpdate(payment.id, n, a, f)}
                     isEditing={editingId === payment.id}
                     onEdit={() => setEditingId(payment.id)}
                     onCancel={() => setEditingId(null)}
@@ -378,9 +340,7 @@ export default function RecurringPaymentsPage() {
                     key={payment.id}
                     payment={payment}
                     onDelete={() => handleDelete(payment.id)}
-                    onUpdate={(n, a, f, c) =>
-                      handleUpdate(payment.id, n, a, f, c)
-                    }
+                    onUpdate={(n, a, f) => handleUpdate(payment.id, n, a, f)}
                     isEditing={editingId === payment.id}
                     onEdit={() => setEditingId(payment.id)}
                     onCancel={() => setEditingId(null)}
@@ -413,8 +373,7 @@ function PaymentRow({
   onUpdate: (
     name: string,
     amount: number,
-    frequency: 'monthly' | 'yearly',
-    currency: string
+    frequency: 'monthly' | 'yearly'
   ) => void;
   isEditing: boolean;
   onEdit: () => void;
@@ -423,33 +382,22 @@ function PaymentRow({
   const [editName, setEditName] = useState(payment.name);
   const [editAmount, setEditAmount] = useState(payment.amount.toString());
   const [editFrequency, setEditFrequency] = useState(payment.frequency);
-  const [editCurrency, setEditCurrency] = useState(payment.currency || 'EUR');
 
   if (isEditing) {
     return (
       <div className="p-4 bg-blue-50/30 dark:bg-blue-900/10">
         <div className="flex flex-wrap gap-3">
           <input
-            className="flex-1 min-w-[200px] bg-white dark:bg-slate-800 border rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-blue-500"
+            className="flex-1 bg-white dark:bg-slate-800 border rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-blue-500"
             value={editName}
             onChange={(e) => setEditName(e.target.value)}
           />
-          <div className="flex border rounded-lg bg-white dark:bg-slate-800 focus-within:ring-2 focus-within:ring-blue-500 overflow-hidden">
-            <input
-              type="number"
-              className="w-24 bg-transparent px-3 py-2 outline-none"
-              value={editAmount}
-              onChange={(e) => setEditAmount(e.target.value)}
-            />
-            <select
-              className="bg-slate-50 dark:bg-slate-700 px-2 py-2 text-xs outline-none border-l dark:border-slate-600 font-bold"
-              value={editCurrency}
-              onChange={(e) => setEditCurrency(e.target.value)}
-            >
-              <option value="EUR">EUR</option>
-              <option value="CZK">CZK</option>
-            </select>
-          </div>
+          <input
+            type="number"
+            className="w-24 bg-white dark:bg-slate-800 border rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-blue-500"
+            value={editAmount}
+            onChange={(e) => setEditAmount(e.target.value)}
+          />
           <select
             className="w-32 bg-white dark:bg-slate-800 border rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-blue-500"
             value={editFrequency}
@@ -463,12 +411,7 @@ function PaymentRow({
           <div className="flex gap-1">
             <button
               onClick={() =>
-                onUpdate(
-                  editName,
-                  Number(editAmount),
-                  editFrequency,
-                  editCurrency
-                )
+                onUpdate(editName, Number(editAmount), editFrequency)
               }
               className="p-2 text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 rounded-lg"
             >
@@ -491,15 +434,8 @@ function PaymentRow({
       <div className="space-y-0.5">
         <p className="font-medium">{payment.name}</p>
         <p className="text-2xl font-bold text-slate-900 dark:text-white">
-          {payment.currency === 'CZK'
-            ? `${payment.amount} CZK`
-            : formatCurrency(payment.amount)}
+          {formatCurrency(payment.amount)}
         </p>
-        {payment.currency === 'CZK' && exchangeRate && (
-          <p className="text-xs text-rose-500 font-semibold italic">
-            ({formatCurrency(payment.amount / exchangeRate)})
-          </p>
-        )}
       </div>
       <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 md:opacity-100">
         <button

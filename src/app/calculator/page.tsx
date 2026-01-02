@@ -1,40 +1,23 @@
 'use client';
 
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { formatCurrency } from '@/lib/utils';
-import { useIncomeData } from '@/hooks/use-financial-data';
-import {
-  Loader2,
-  Calculator,
-  Save,
-  RefreshCw,
-  ArrowDownLeft,
-} from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { Loader2, Calculator, Save, RefreshCw } from 'lucide-react';
+import { motion } from 'framer-motion';
 import { toast } from 'sonner';
 import { Skeleton } from '@/components/skeleton';
-import { calculateSalaryResults } from '@/lib/calculations';
 
 export default function CalculatorPage() {
-  const { records: incomeRecords, loading: incomeLoading } = useIncomeData();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [salary, setSalary] = useState(7000);
   const [split, setSplit] = useState({
-    fixed_costs: 50,
-    investments: 20,
-    savings: 10,
-    fun: 20,
+    fixed_costs: 55,
+    investments: 25,
+    savings: 15,
+    fun: 5,
   });
-
-  const latestMonthIncome = useMemo(() => {
-    if (incomeRecords.length === 0) return 0;
-    const latestMonth = incomeRecords[0].record_month;
-    return incomeRecords
-      .filter((r) => r.record_month === latestMonth)
-      .reduce((sum, r) => sum + Number(r.amount_eur), 0);
-  }, [incomeRecords]);
 
   useEffect(() => {
     async function fetchSettings() {
@@ -56,27 +39,6 @@ export default function CalculatorPage() {
     fetchSettings();
   }, []);
 
-  // Auto-sync if no saved salary or default value
-  useEffect(() => {
-    if (
-      !incomeLoading &&
-      latestMonthIncome > 0 &&
-      !loading &&
-      salary === 7000
-    ) {
-      setSalary(Math.round(latestMonthIncome));
-    }
-  }, [incomeLoading, latestMonthIncome, loading, salary]);
-
-  const handleSyncFromIncome = () => {
-    if (latestMonthIncome > 0) {
-      setSalary(Math.round(latestMonthIncome));
-      toast.success('Príjem bol aktualizovaný podľa aktuálnych dát');
-    } else {
-      toast.error('Nenašli sa žiadne príjmy pre aktuálny mesiac');
-    }
-  };
-
   async function handleSave() {
     setSaving(true);
     try {
@@ -92,31 +54,26 @@ export default function CalculatorPage() {
     }
   }
 
-  const results = calculateSalaryResults(salary, split);
+  const results = [
+    {
+      name: 'Fixné náklady (Domácnosť, účty)',
+      percent: split.fixed_costs,
+      color: 'blue',
+    },
+    {
+      name: 'Investície (ETF, Akcie)',
+      percent: split.investments,
+      color: 'emerald',
+    },
+    {
+      name: 'Krátkodobé sporenie (Rezerva)',
+      percent: split.savings,
+      color: 'amber',
+    },
+    { name: 'Zábava a radosť', percent: split.fun, color: 'rose' },
+  ];
+
   const totalPercent = Object.values(split).reduce((a, b) => a + b, 0);
-
-  const tips = useMemo(
-    () => [
-      `Pravidlo 50/30/20 je základ. Ak však dokážeš znížiť fixné náklady pod 40 %, tvoja cesta k finančnej slobode sa výrazne zrýchli.`,
-      `Tvoje nastavenie (${split.fixed_costs}/${split.investments + split.savings}/${split.fun}) je skvelým krokom k budovaniu bohatstva!`,
-      'Investuj najskôr do seba. Vzdelávanie a nové zručnosti majú často vyššiu návratnosť ako akciový trh.',
-      'Vytvor si rezervu na 3-6 mesiacov života. To ti dodá pokoj pri investovaní a odvahu robiť lepšie kariérne rozhodnutia.',
-      'Zložené úročenie je ôsmy div sveta. Čím skôr začneš pravidelne investovať, tým menej musíš odkladať neskôr.',
-      'Nezabúdaj na infláciu. Peniaze na bežnom účte strácajú hodnotu. Rozmýšľaj nad nízkonákladovými indexovými fondmi (ETF).',
-      'Automatizuj svoje financie. Nastav si trvalé príkazy na investície hneď po výplate, aby si nemusel bojovať s pokušením míňať.',
-      'Zvyšuj svoje investície pri každom zvýšení platu. Vyhneš sa tak "inflácii životného štýlu".',
-    ],
-    [split]
-  );
-
-  const [activeTipIndex, setActiveTipIndex] = useState(0);
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setActiveTipIndex((prev) => (prev + 1) % tips.length);
-    }, 10000); // Change tip every 10 seconds
-    return () => clearInterval(interval);
-  }, [tips.length]);
 
   return (
     <div className="max-w-4xl mx-auto space-y-8">
@@ -130,21 +87,9 @@ export default function CalculatorPage() {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
         <div className="bg-white dark:bg-slate-900 p-8 rounded-2xl shadow-sm border space-y-6">
           <div className="space-y-2">
-            <div className="flex justify-between items-center">
-              <label className="text-sm font-semibold text-slate-500 uppercase tracking-wider">
-                Mesačný príjem (€)
-              </label>
-              {!incomeLoading && latestMonthIncome > 0 && (
-                <button
-                  onClick={handleSyncFromIncome}
-                  className="text-[10px] font-bold bg-emerald-50 text-emerald-600 dark:bg-emerald-950/30 dark:text-emerald-400 px-2 py-1 rounded-lg flex items-center gap-1 hover:bg-emerald-100 transition-colors"
-                  title="Synchronizovať s tabuľkou príjmov"
-                >
-                  <ArrowDownLeft size={12} />Z tabuľky:{' '}
-                  {formatCurrency(latestMonthIncome)}
-                </button>
-              )}
-            </div>
+            <label className="text-sm font-semibold text-slate-500 uppercase tracking-wider">
+              Mesačný príjem (€)
+            </label>
             {loading ? (
               <Skeleton className="h-12 w-full" />
             ) : (
@@ -152,7 +97,7 @@ export default function CalculatorPage() {
                 type="number"
                 className="w-full text-3xl font-bold bg-transparent border-b-2 border-slate-100 dark:border-slate-800 focus:border-blue-600 outline-none pb-2 transition-colors"
                 value={salary}
-                onChange={(e) => setSalary(Math.round(Number(e.target.value)))}
+                onChange={(e) => setSalary(Number(e.target.value))}
               />
             )}
           </div>
@@ -224,6 +169,7 @@ export default function CalculatorPage() {
           ) : (
             <>
               {results.map((item, index) => {
+                const amount = (salary * item.percent) / 100;
                 return (
                   <motion.div
                     key={item.name}
@@ -241,7 +187,7 @@ export default function CalculatorPage() {
                       <div>
                         <p className="text-sm text-slate-500">{item.name}</p>
                         <h4 className="text-xl font-bold">
-                          {formatCurrency(item.amount)}
+                          {formatCurrency(amount)}
                         </h4>
                       </div>
                     </div>
@@ -252,40 +198,16 @@ export default function CalculatorPage() {
                 );
               })}
 
-              <div className="bg-blue-600 p-6 rounded-2xl text-white shadow-lg shadow-blue-200 dark:shadow-none min-h-[160px] flex flex-col justify-between relative overflow-hidden group">
-                <div>
-                  <div className="flex items-center justify-between mb-4">
-                    <div className="flex items-center gap-3">
-                      <Calculator size={24} className="opacity-70" />
-                      <h3 className="font-bold">Rýchly tip</h3>
-                    </div>
-                    <button
-                      onClick={() =>
-                        setActiveTipIndex((prev) => (prev + 1) % tips.length)
-                      }
-                      className="p-1.5 hover:bg-white/20 rounded-lg transition-colors"
-                      title="Ďalší tip"
-                    >
-                      <RefreshCw size={16} className="opacity-70" />
-                    </button>
-                  </div>
-                  <AnimatePresence mode="wait">
-                    <motion.p
-                      key={activeTipIndex}
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -10 }}
-                      className="text-blue-100 text-sm leading-relaxed pr-4"
-                    >
-                      {tips[activeTipIndex]}
-                    </motion.p>
-                  </AnimatePresence>
+              <div className="bg-blue-600 p-6 rounded-2xl text-white shadow-lg shadow-blue-200 dark:shadow-none">
+                <div className="flex items-center gap-3 mb-4">
+                  <Calculator size={24} className="opacity-70" />
+                  <h3 className="font-bold">Rýchly tip</h3>
                 </div>
-                <div
-                  className="absolute bottom-0 left-0 h-1 bg-white/20 transition-all duration-[10000ms] ease-linear"
-                  style={{ width: '100%' }}
-                  key={`progress-${activeTipIndex}`}
-                />
+                <p className="text-blue-100 text-sm leading-relaxed">
+                  Pravidlo 50/30/20 je dobrý štart, ale tvoje nastavenie (
+                  {split.fixed_costs}/{split.investments + split.savings}/
+                  {split.fun}) je ešte ambicióznejšie pre budovanie bohatstva!
+                </p>
               </div>
             </>
           )}

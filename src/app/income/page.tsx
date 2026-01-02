@@ -1,12 +1,11 @@
 'use client';
 
-import { useState, Fragment, useMemo } from 'react';
-import { useForm, useFieldArray } from 'react-hook-form';
+import { useEffect, useState, Fragment, useMemo } from 'react';
+import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { supabase } from '@/lib/supabase';
 import { formatCurrency } from '@/lib/utils';
-import { mergeIncomeItems } from '@/lib/calculations';
 import {
   Loader2,
   Plus,
@@ -14,7 +13,9 @@ import {
   Calendar,
   Save,
   X,
+  Edit2,
   Trash2,
+  Check,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
@@ -32,22 +33,20 @@ import {
 
 const incomeSchema = z.object({
   recordMonth: z.string().min(1, 'Mesiac je povinný'),
-  items: z
-    .array(
-      z.object({
-        categoryName: z.string().min(1, 'Názov je povinný'),
-        amount: z
-          .string()
-          .refine(
-            (val) => val !== '' && !isNaN(Number(val)) && Number(val) >= 0,
-            {
-              message: 'Suma musí byť kladné číslo',
-            }
-          ),
-        currency: z.string().min(1),
-      })
-    )
-    .min(1, 'Pridajte aspoň jeden príjem'),
+  records: z.record(
+    z.string(),
+    z.object({
+      amount: z
+        .string()
+        .refine(
+          (val) => val === '' || (!isNaN(Number(val)) && Number(val) >= 0),
+          {
+            message: 'Suma musí byť kladné číslo',
+          }
+        ),
+      currency: z.string().min(1),
+    })
+  ),
 });
 
 type IncomeFormValues = z.infer<typeof incomeSchema>;
@@ -57,10 +56,14 @@ export default function IncomePage() {
     useIncomeData();
   const [saving, setSaving] = useState(false);
   const [isAdding, setIsAdding] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editValues, setEditValues] = useState<{
+    amount: string;
+    currency: string;
+  }>({ amount: '', currency: 'CZK' });
 
   const {
     register,
-    control,
     handleSubmit,
     reset,
     formState: { errors },
@@ -68,13 +71,8 @@ export default function IncomePage() {
     resolver: zodResolver(incomeSchema),
     defaultValues: {
       recordMonth: new Date().toISOString().substring(0, 7),
-      items: [{ categoryName: '', amount: '', currency: 'EUR' }],
+      records: {},
     },
-  });
-
-  const { fields, append, remove } = useFieldArray({
-    control,
-    name: 'items',
   });
 
   const chartData = useMemo(() => {
@@ -96,67 +94,120 @@ export default function IncomePage() {
       }));
   }, [records]);
 
+  useEffect(() => {
+    if (categories.length > 0) {
+      const initialRecords: Record<
+        string,
+        { amount: string; currency: string }
+      > = {};
+      categories.forEach((cat) => {
+        initialRecords[cat.id] = { amount: '', currency: 'CZK' };
+      });
+      reset({
+        recordMonth: new Date().toISOString().substring(0, 7),
+        records: initialRecords,
+      });
+    }
+  }, [categories, reset]);
+
   const onSave = async (data: IncomeFormValues) => {
     setSaving(true);
     try {
-      const inserts = [];
-      const mergedItems = mergeIncomeItems(data.items);
-      const localCategoriesMap = new Map<string, string>();
+      const inserts = Object.entries(data.records)
+        .filter(
+          ([_, record]) => record.amount !== '' && Number(record.amount) !== 0
+        )
+        .map(([categoryId, record]) => {
+          const amount = Number(record.amount);
+          const amountEur =
+            record.currency === 'CZK' ? amount / exchangeRate : amount;
 
-      // Pre-fill local map with existing categories
-      categories.forEach((cat) => {
-        localCategoriesMap.set(cat.name.toLowerCase(), cat.id);
-      });
-
-      for (const item of mergedItems) {
-        let categoryId;
-        const normalizedName = item.categoryName.trim().toLowerCase();
-
-        if (localCategoriesMap.has(normalizedName)) {
-          categoryId = localCategoriesMap.get(normalizedName);
-        } else {
-          // Create new category if it doesn't exist
-          const { data: newCat, error: catError } = await supabase
-            .from('income_categories')
-            .insert({ name: item.categoryName.trim() })
-            .select()
-            .single();
-
-          if (catError) throw catError;
-          categoryId = newCat.id;
-          localCategoriesMap.set(normalizedName, categoryId);
-        }
-
-        const amount = Number(item.amount);
-        const amountEur =
-          item.currency === 'CZK' ? amount / exchangeRate : amount;
-
-        inserts.push({
-          category_id: categoryId,
-          record_month: data.recordMonth + '-01',
-          amount: amount,
-          currency: item.currency,
-          amount_eur: amountEur,
+          return {
+            category_id: categoryId,
+            record_month: data.recordMonth + '-01',
+            amount: amount,
+            currency: record.currency,
+            amount_eur: amountEur,
+          };
         });
+
+      if (inserts.length === 0) {
+        toast.error('Prosím zadajte aspoň jednu sumu');
+        setSaving(false);
+        return;
       }
 
-      // Use upsert to handle cases where user might be updating a month
-      const { error } = await supabase.from('income_records').upsert(inserts, {
-        onConflict: 'category_id,record_month',
-      });
+      const { error } = await supabase.from('income_records').insert(inserts);
 
       if (error) throw error;
 
       setIsAdding(false);
-      reset({
-        recordMonth: new Date().toISOString().substring(0, 7),
-        items: [{ categoryName: '', amount: '', currency: 'EUR' }],
-      });
       await refresh();
       toast.success('Príjmy boli úspešne uložené');
     } catch (error) {
       console.error('Error saving income:', error);
       toast.error('Chyba pri ukladaní príjmov');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    if (!confirm('Naozaj chcete zmazať tento príjem?')) return;
+
+    try {
+      const { error } = await supabase
+        .from('income_records')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+
+      await refresh();
+      toast.success('Príjem bol zmazaný');
+    } catch (error) {
+      console.error('Error deleting income:', error);
+      toast.error('Chyba pri mazaní príjmu');
+    }
+  };
+
+  const startEditing = (record: any) => {
+    setEditingId(record.id);
+    setEditValues({
+      amount: record.amount.toString(),
+      currency: record.currency,
+    });
+  };
+
+  const handleUpdate = async (id: string) => {
+    const amount = Number(editValues.amount);
+    if (isNaN(amount) || amount <= 0) {
+      toast.error('Suma musí byť kladné číslo');
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const amountEur =
+        editValues.currency === 'CZK' ? amount / exchangeRate : amount;
+
+      const { error } = await supabase
+        .from('income_records')
+        .update({
+          amount: amount,
+          currency: editValues.currency,
+          amount_eur: amountEur,
+        })
+        .eq('id', id);
+
+      if (error) throw error;
+
+      setEditingId(null);
+      await refresh();
+      toast.success('Príjem bol upravený');
+    } catch (error) {
+      console.error('Error updating income:', error);
+      toast.error('Chyba pri úprave príjmu');
     } finally {
       setSaving(false);
     }
@@ -234,66 +285,35 @@ export default function IncomePage() {
             </div>
 
             <form onSubmit={handleSubmit(onSave)} className="space-y-4">
-              <div className="space-y-4">
-                {fields.map((field, index) => (
-                  <div key={field.id} className="flex gap-3 items-start">
-                    <div className="flex-[3] space-y-1">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {categories.map((category) => (
+                  <div key={category.id} className="space-y-1.5">
+                    <label className="text-xs font-bold text-slate-500 uppercase">
+                      {category.name}
+                    </label>
+                    <div className="flex gap-2">
                       <input
-                        {...register(`items.${index}.categoryName`)}
-                        placeholder="Odkiaľ je príjem (napr. Výplata)"
-                        className={`w-full bg-slate-50 dark:bg-slate-800 border rounded-xl px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-emerald-500 ${errors.items?.[index]?.categoryName ? 'border-rose-500 focus:ring-rose-500' : ''}`}
+                        type="number"
+                        step="0.01"
+                        className={`flex-1 bg-slate-50 dark:bg-slate-800 border rounded-xl px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-emerald-500 ${errors.records?.[category.id]?.amount ? 'border-rose-500 focus:ring-rose-500' : ''}`}
+                        {...register(`records.${category.id}.amount`)}
+                        placeholder="0.00"
                       />
-                      {errors.items?.[index]?.categoryName && (
-                        <p className="text-[10px] text-rose-500 font-medium">
-                          {errors.items[index]?.categoryName?.message}
-                        </p>
-                      )}
-                    </div>
-                    <div className="flex-[2] space-y-1">
-                      <div className="flex border rounded-xl bg-slate-50 dark:bg-slate-800 focus-within:ring-2 focus-within:ring-emerald-500 overflow-hidden">
-                        <input
-                          type="number"
-                          step="0.01"
-                          className={`flex-1 bg-transparent px-4 py-2 text-sm outline-none ${errors.items?.[index]?.amount ? 'border-rose-500' : ''}`}
-                          {...register(`items.${index}.amount`)}
-                          placeholder="0.00"
-                        />
-                        <select
-                          className="bg-slate-100 dark:bg-slate-700 px-3 py-2 text-xs outline-none border-l dark:border-slate-600 font-bold"
-                          {...register(`items.${index}.currency`)}
-                        >
-                          <option value="EUR">EUR</option>
-                          <option value="CZK">CZK</option>
-                        </select>
-                      </div>
-                      {errors.items?.[index]?.amount && (
-                        <p className="text-[10px] text-rose-500 font-medium">
-                          {errors.items[index]?.amount?.message}
-                        </p>
-                      )}
-                    </div>
-                    {fields.length > 1 && (
-                      <button
-                        type="button"
-                        onClick={() => remove(index)}
-                        className="text-slate-400 hover:text-rose-500 p-2 mt-0.5 shrink-0"
+                      <select
+                        className="bg-slate-50 dark:bg-slate-800 border rounded-xl px-2 py-2 text-xs outline-none focus:ring-2 focus:ring-emerald-500"
+                        {...register(`records.${category.id}.currency`)}
                       >
-                        <Trash2 size={18} />
-                      </button>
+                        <option value="CZK">CZK</option>
+                        <option value="EUR">EUR</option>
+                      </select>
+                    </div>
+                    {errors.records?.[category.id]?.amount && (
+                      <p className="text-[10px] text-rose-500 font-medium">
+                        {errors.records[category.id]?.amount?.message}
+                      </p>
                     )}
                   </div>
                 ))}
-
-                <button
-                  type="button"
-                  onClick={() =>
-                    append({ categoryName: '', amount: '', currency: 'EUR' })
-                  }
-                  className="flex items-center gap-2 text-emerald-600 font-bold py-2 hover:opacity-80 transition-opacity"
-                >
-                  <Plus size={20} />
-                  <span>Pridať ďalší príjem</span>
-                </button>
               </div>
 
               <div className="flex justify-end gap-3 pt-6 border-t">
@@ -412,6 +432,7 @@ export default function IncomePage() {
                   <th className="px-6 py-4 font-semibold text-right">
                     Čiastka (EUR)
                   </th>
+                  <th className="px-6 py-4 font-semibold text-right">Akcie</th>
                 </tr>
               </thead>
               <tbody className="divide-y">
@@ -420,7 +441,7 @@ export default function IncomePage() {
                     <Fragment key={month}>
                       <tr className="bg-slate-50/80 dark:bg-slate-800/40">
                         <td
-                          colSpan={3}
+                          colSpan={4}
                           className="px-6 py-3 text-left font-bold text-blue-600 uppercase text-xs tracking-wider border-y border-slate-100 dark:border-slate-800"
                         >
                           <div className="flex justify-between items-center">
@@ -448,16 +469,88 @@ export default function IncomePage() {
                           key={record.id}
                           initial={{ opacity: 0 }}
                           animate={{ opacity: 1 }}
-                          className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"
+                          className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors group"
                         >
                           <td className="px-6 py-4 text-slate-500 font-medium">
                             {record.income_categories?.name}
                           </td>
                           <td className="px-6 py-4 text-slate-400">
-                            {record.amount} {record.currency}
+                            {editingId === record.id ? (
+                              <div className="flex gap-2 max-w-[200px]">
+                                <input
+                                  type="number"
+                                  step="0.01"
+                                  className="flex-1 bg-white dark:bg-slate-800 border rounded-lg px-2 py-1 text-sm outline-none focus:ring-2 focus:ring-emerald-500"
+                                  value={editValues.amount}
+                                  onChange={(e) =>
+                                    setEditValues({
+                                      ...editValues,
+                                      amount: e.target.value,
+                                    })
+                                  }
+                                />
+                                <select
+                                  className="bg-white dark:bg-slate-800 border rounded-lg px-1 py-1 text-xs outline-none focus:ring-2 focus:ring-emerald-500"
+                                  value={editValues.currency}
+                                  onChange={(e) =>
+                                    setEditValues({
+                                      ...editValues,
+                                      currency: e.target.value,
+                                    })
+                                  }
+                                >
+                                  <option value="CZK">CZK</option>
+                                  <option value="EUR">EUR</option>
+                                </select>
+                              </div>
+                            ) : (
+                              <>
+                                {record.amount} {record.currency}
+                              </>
+                            )}
                           </td>
                           <td className="px-6 py-4 text-right font-semibold text-emerald-600">
                             {formatCurrency(record.amount_eur)}
+                          </td>
+                          <td className="px-6 py-4 text-right">
+                            <div className="flex justify-end gap-2">
+                              {editingId === record.id ? (
+                                <>
+                                  <button
+                                    onClick={() => handleUpdate(record.id)}
+                                    disabled={saving}
+                                    className="p-1.5 text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
+                                    title="Uložiť"
+                                  >
+                                    <Check size={18} />
+                                  </button>
+                                  <button
+                                    onClick={() => setEditingId(null)}
+                                    className="p-1.5 text-slate-400 hover:bg-slate-50 rounded-lg transition-colors"
+                                    title="Zrušiť"
+                                  >
+                                    <X size={18} />
+                                  </button>
+                                </>
+                              ) : (
+                                <>
+                                  <button
+                                    onClick={() => startEditing(record)}
+                                    className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
+                                    title="Upraviť"
+                                  >
+                                    <Edit2 size={18} />
+                                  </button>
+                                  <button
+                                    onClick={() => handleDelete(record.id)}
+                                    className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
+                                    title="Zmazať"
+                                  >
+                                    <Trash2 size={18} />
+                                  </button>
+                                </>
+                              )}
+                            </div>
                           </td>
                         </motion.tr>
                       ))}

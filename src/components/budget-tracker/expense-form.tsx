@@ -12,7 +12,6 @@ interface ExpenseFormProps {
   onAddExpense: (expense: {
     description: string;
     amount: number;
-    currency: string;
     file?: File;
   }) => Promise<void>;
 }
@@ -20,7 +19,6 @@ interface ExpenseFormProps {
 const ExpenseForm: React.FC<ExpenseFormProps> = ({ onAddExpense }) => {
   const [description, setDescription] = useState('');
   const [amount, setAmount] = useState('');
-  const [currency, setCurrency] = useState('EUR');
   const [error, setError] = useState('');
   const [file, setFile] = useState<File | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -45,12 +43,10 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ onAddExpense }) => {
       await onAddExpense({
         description,
         amount: numericAmount,
-        currency,
         file: file || undefined,
       });
       setDescription('');
       setAmount('');
-      setCurrency('EUR');
       setFile(null);
       setError('');
       if (fileInputRef.current) fileInputRef.current.value = '';
@@ -138,31 +134,23 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ onAddExpense }) => {
             className="block text-sm font-medium text-slate-700 dark:text-slate-300 flex items-center gap-1"
           >
             <MoneyEmoji className="w-4 h-4" />
-            Suma
+            Suma (€)
           </label>
-          <div className="flex gap-2 mt-1">
-            <div className="relative flex-1">
-              <input
-                type="number"
-                id="amount"
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-                placeholder="0.00"
-                step="0.01"
-                min="0"
-                className="block w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-md text-sm shadow-sm placeholder-slate-400
-                  focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 dark:text-slate-200"
-              />
+          <div className="relative mt-1">
+            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+              <span className="text-slate-500 text-sm">€</span>
             </div>
-            <select
-              value={currency}
-              onChange={(e) => setCurrency(e.target.value)}
-              className="block w-24 px-3 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-md text-sm shadow-sm
+            <input
+              type="number"
+              id="amount"
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+              placeholder="0.00"
+              step="0.01"
+              min="0"
+              className="block w-full pl-8 pr-3 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-md text-sm shadow-sm placeholder-slate-400
                 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 dark:text-slate-200"
-            >
-              <option value="EUR">EUR</option>
-              <option value="CZK">CZK</option>
-            </select>
+            />
           </div>
         </div>
 
