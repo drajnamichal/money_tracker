@@ -57,10 +57,9 @@ export default function Dashboard() {
     let monthlyExpenses = 0;
     let savingsRate = 0;
 
-    const investmentValue = investments.reduce(
-      (sum, inv) => sum + inv.shares * inv.current_price,
-      0
-    );
+    const investmentValue = investments
+      .filter((inv) => !inv.portfolio_id || inv.portfolio_id === 'default')
+      .reduce((sum, inv) => sum + inv.shares * inv.current_price, 0);
 
     if (wealthData && wealthData.length > 0) {
       // Get the single latest date from all wealth records
