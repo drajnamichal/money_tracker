@@ -10,8 +10,6 @@ import {
   ArrowRight,
   BrainCircuit,
   Lightbulb,
-  Flame,
-  Target,
 } from 'lucide-react';
 import {
   AreaChart,
@@ -34,8 +32,6 @@ import {
   useInvestmentData,
   useMortgageData,
 } from '@/hooks/use-financial-data';
-import { calculateFireTarget } from '@/lib/calculations';
-import Link from 'next/link';
 
 export default function Dashboard() {
   const { records: wealthData, loading: wealthLoading } = useWealthData();
@@ -64,19 +60,12 @@ export default function Dashboard() {
     );
 
     if (wealthData && wealthData.length > 0) {
-      // Latest wealth per account
-      const latestDates: Record<string, string> = {};
-      wealthData.forEach((r) => {
-        if (
-          !latestDates[r.account_id] ||
-          r.record_date > latestDates[r.account_id]
-        ) {
-          latestDates[r.account_id] = r.record_date;
-        }
-      });
+      // Get the single latest date from all wealth records
+      const allDates = wealthData.map((r) => r.record_date);
+      const latestDate = allDates.reduce((a, b) => (a > b ? a : b));
 
       const cashValue = wealthData
-        .filter((r) => r.record_date === latestDates[r.account_id])
+        .filter((r) => r.record_date === latestDate)
         .reduce((sum, r) => sum + Number(r.amount_eur), 0);
 
       const totalsByDate = wealthData.reduce((acc: any, curr: any) => {
@@ -86,11 +75,11 @@ export default function Dashboard() {
       }, {});
 
       const sortedDates = Object.keys(totalsByDate).sort();
-      const latestDate = sortedDates[sortedDates.length - 1];
       const previousDate = sortedDates[sortedDates.length - 2];
 
       totalAssets = cashValue + investmentValue;
-      const previousTotal = totalsByDate[previousDate] || totalAssets;
+      const previousTotal =
+        (totalsByDate[previousDate] || cashValue) + investmentValue;
       growth =
         previousTotal !== 0
           ? ((totalAssets - previousTotal) / previousTotal) * 100
@@ -133,8 +122,6 @@ export default function Dashboard() {
     }
 
     const netWorth = totalAssets - (mortgage?.current_principal || 0);
-    const fireTarget = calculateFireTarget(monthlyExpenses);
-    const fireProgress = fireTarget > 0 ? (netWorth / fireTarget) * 100 : 0;
 
     return {
       totalAssets,
@@ -143,8 +130,6 @@ export default function Dashboard() {
       monthlyExpenses,
       savingsRate,
       netWorth,
-      fireTarget,
-      fireProgress,
     };
   }, [wealthData, incomeData, expenseData, investments, mortgage]);
 
@@ -295,10 +280,9 @@ export default function Dashboard() {
         )}
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {loading ? (
           <>
-            <Skeleton className="h-32 rounded-2xl" />
             <Skeleton className="h-32 rounded-2xl" />
             <Skeleton className="h-32 rounded-2xl" />
             <Skeleton className="h-32 rounded-2xl" />
@@ -328,31 +312,6 @@ export default function Dashboard() {
               icon={<TrendingUp className="text-blue-500" />}
               color="blue"
             />
-            <Link href="/fire" className="block">
-              <motion.div
-                whileHover={{ y: -4 }}
-                className="bg-gradient-to-br from-orange-500 to-rose-600 p-6 rounded-2xl shadow-sm border border-orange-400/20 flex flex-col justify-between h-full text-white relative overflow-hidden group"
-              >
-                <Flame className="absolute -right-2 -bottom-2 w-24 h-24 opacity-20 group-hover:scale-110 transition-transform duration-500" />
-                <div className="flex justify-between items-start relative z-10">
-                  <p className="text-sm font-medium opacity-80">
-                    FIRE Progress
-                  </p>
-                  <Target size={18} className="opacity-80" />
-                </div>
-                <div className="relative z-10 mt-2">
-                  <h3 className="text-2xl font-black">
-                    {stats.fireProgress.toFixed(1)}%
-                  </h3>
-                  <div className="w-full bg-white/20 h-1.5 rounded-full mt-2 overflow-hidden">
-                    <div
-                      className="bg-white h-full transition-all duration-1000"
-                      style={{ width: `${Math.min(stats.fireProgress, 100)}%` }}
-                    />
-                  </div>
-                </div>
-              </motion.div>
-            </Link>
           </>
         )}
       </div>
