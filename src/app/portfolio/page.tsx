@@ -113,10 +113,10 @@ export default function PortfolioPage() {
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 px-2">
           <div>
             <div className="flex items-center gap-3">
-              <h2 className="text-3xl font-black text-purple-600 dark:text-purple-400">
+              <h2 className="text-3xl font-black text-emerald-600 dark:text-emerald-400">
                 Portfolio Markusik
               </h2>
-              <span className="px-2 py-0.5 bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 text-[10px] font-black uppercase rounded-md tracking-widest">
+              <span className="px-2 py-0.5 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 text-[10px] font-black uppercase rounded-md tracking-widest">
                 Samostatné
               </span>
             </div>
@@ -241,8 +241,8 @@ function PortfolioActions({
         disabled={isUpdating}
         className={`flex items-center gap-2 transition-all font-bold disabled:opacity-50 ${
           portfolioId === 'markusik'
-            ? 'bg-purple-600 hover:bg-purple-700 shadow-purple-200'
-            : 'bg-emerald-600 hover:bg-emerald-700 shadow-emerald-200'
+            ? 'bg-emerald-600 hover:bg-emerald-700 shadow-emerald-200'
+            : 'bg-blue-600 hover:bg-blue-700 shadow-blue-200'
         } text-white px-6 py-3 rounded-2xl shadow-lg dark:shadow-none`}
       >
         {isUpdating ? (
@@ -256,7 +256,7 @@ function PortfolioActions({
         onClick={onAddClick}
         className={`${
           portfolioId === 'markusik'
-            ? 'bg-purple-500 hover:bg-purple-600 shadow-purple-100'
+            ? 'bg-emerald-500 hover:bg-emerald-600 shadow-emerald-100'
             : 'bg-blue-600 hover:bg-blue-700 shadow-blue-200'
         } text-white px-6 py-3 rounded-2xl flex items-center gap-2 transition-all shadow-lg dark:shadow-none font-bold`}
       >
@@ -325,7 +325,7 @@ function PortfolioContent({
       <div
         className={`${
           portfolioId === 'markusik'
-            ? 'bg-slate-800 dark:bg-slate-900 border-purple-500/20'
+            ? 'bg-emerald-900 dark:bg-emerald-950 border-emerald-500/20'
             : 'bg-slate-900 dark:bg-slate-950 border-blue-500/20'
         } text-white p-8 rounded-[32px] shadow-2xl relative overflow-hidden group border`}
       >
