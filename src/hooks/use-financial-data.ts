@@ -12,6 +12,7 @@ import {
   BudgetTodoItem,
   Mortgage,
   MortgagePayment,
+  Investment,
 } from '@/types/financial';
 
 export function useWealthData() {
@@ -87,5 +88,14 @@ export function useMortgageData() {
     payments: mortgagePayments as MortgagePayment[],
     loading,
     refresh: refreshMortgage,
+  };
+}
+
+export function useInvestmentData() {
+  const { investments, loading, refreshInvestments } = useFinancialData();
+  return {
+    investments: investments as Investment[],
+    loading,
+    refresh: refreshInvestments,
   };
 }

@@ -29,14 +29,17 @@ import {
   useWealthData,
   useIncomeData,
   useExpenseData,
+  useInvestmentData,
 } from '@/hooks/use-financial-data';
 
 export default function Dashboard() {
   const { records: wealthData, loading: wealthLoading } = useWealthData();
   const { records: incomeData, loading: incomeLoading } = useIncomeData();
   const { records: expenseData, loading: expenseLoading } = useExpenseData();
+  const { investments, loading: investmentLoading } = useInvestmentData();
 
-  const loading = wealthLoading || incomeLoading || expenseLoading;
+  const loading =
+    wealthLoading || incomeLoading || expenseLoading || investmentLoading;
 
   const stats = useMemo(() => {
     let totalAssets = 0;
@@ -44,6 +47,11 @@ export default function Dashboard() {
     let monthlyIncome = 0;
     let monthlyExpenses = 0;
     let savingsRate = 0;
+
+    const investmentValue = investments.reduce(
+      (sum, inv) => sum + inv.shares * inv.current_price,
+      0
+    );
 
     if (wealthData && wealthData.length > 0) {
       const totalsByDate = wealthData.reduce((acc: any, curr: any) => {
@@ -56,12 +64,14 @@ export default function Dashboard() {
       const latestDate = sortedDates[sortedDates.length - 1];
       const previousDate = sortedDates[sortedDates.length - 2];
 
-      totalAssets = totalsByDate[latestDate];
+      totalAssets = totalsByDate[latestDate] + investmentValue;
       const previousTotal = totalsByDate[previousDate] || totalAssets;
       growth =
         previousTotal !== 0
           ? ((totalAssets - previousTotal) / previousTotal) * 100
           : 0;
+    } else {
+      totalAssets = investmentValue;
     }
 
     const monthlyData: any = {};
@@ -136,8 +146,26 @@ export default function Dashboard() {
       });
     }
 
+    // Insight 3: Portfolio Profitability
+    const investmentValue = investments.reduce(
+      (sum, inv) => sum + inv.shares * inv.current_price,
+      0
+    );
+    const investmentCost = investments.reduce(
+      (sum, inv) => sum + inv.shares * inv.avg_price,
+      0
+    );
+    const profit = investmentValue - investmentCost;
+    if (profit > 0) {
+      insights.push({
+        icon: <TrendingUp className="text-emerald-500" size={18} />,
+        text: `Tvoje portfólio je v zisku ${formatCurrency(profit)}. Najviac ti momentálne zarába ${investments.sort((a, b) => b.shares * b.current_price - b.shares * b.avg_price - (a.shares * a.current_price - a.shares * a.avg_price))[0]?.name}.`,
+        color: 'emerald',
+      });
+    }
+
     return insights;
-  }, [stats, loading]);
+  }, [stats, loading, investments]);
 
   const assetsHistory = useMemo(() => {
     if (!wealthData || wealthData.length === 0) return [];

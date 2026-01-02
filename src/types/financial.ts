@@ -93,3 +93,16 @@ export interface MortgagePayment {
   remaining_principal: number;
   created_at?: string;
 }
+
+export interface Investment {
+  id: string;
+  user_id: string;
+  name: string;
+  ticker: string | null;
+  type: 'stock' | 'etf' | 'crypto' | 'other';
+  shares: number;
+  avg_price: number;
+  current_price: number;
+  currency: 'EUR' | 'USD';
+  created_at?: string;
+}

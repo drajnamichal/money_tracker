@@ -14,6 +14,7 @@ import {
   CreditCard,
   Building2,
   Home,
+  PieChart,
 } from 'lucide-react';
 import { useState } from 'react';
 import { cn } from '@/lib/utils';
@@ -25,6 +26,7 @@ import { useRouter } from 'next/navigation';
 const navigation = [
   { name: 'Dashboard', href: '/', icon: LayoutDashboard },
   { name: 'Majetok', href: '/assets', icon: Wallet },
+  { name: 'Portfólio', href: '/portfolio', icon: PieChart },
   { name: 'Príjmy', href: '/income', icon: TrendingUp },
   { name: 'Výdaje', href: '/expenses', icon: Receipt },
   { name: 'Rozpočet bytu', href: '/budget-tracker', icon: Building2 },

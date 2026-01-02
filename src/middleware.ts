@@ -58,13 +58,24 @@ export async function middleware(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  // If no user and trying to access protected route, redirect to login
-  if (!user && !request.nextUrl.pathname.startsWith('/login')) {
+  // Protect all routes including API, except login and static assets
+  const isAuthPage = request.nextUrl.pathname.startsWith('/login');
+  const isApiRoute = request.nextUrl.pathname.startsWith('/api');
+  const isPublicAsset =
+    request.nextUrl.pathname.startsWith('/_next') ||
+    request.nextUrl.pathname.startsWith('/icons') ||
+    request.nextUrl.pathname.startsWith('/manifest.json') ||
+    request.nextUrl.pathname.includes('.');
+
+  if (!user && !isAuthPage && !isPublicAsset) {
+    if (isApiRoute) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
     return NextResponse.redirect(new URL('/login', request.url));
   }
 
   // If user and trying to access login, redirect to dashboard
-  if (user && request.nextUrl.pathname.startsWith('/login')) {
+  if (user && isAuthPage) {
     return NextResponse.redirect(new URL('/', request.url));
   }
 
@@ -73,6 +84,14 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    '/((?!api|_next/static|_next/image|favicon.ico|manifest.json|icons).*)',
+    /*
+     * Match all request paths except for the ones starting with:
+     * - _next/static (static files)
+     * - _next/image (image optimization files)
+     * - favicon.ico (favicon file)
+     * - icons (public icons)
+     * - manifest.json (PWA manifest)
+     */
+    '/((?!_next/static|_next/image|favicon.ico|icons|manifest.json).*)',
   ],
 };
