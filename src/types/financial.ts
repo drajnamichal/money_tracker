@@ -120,3 +120,15 @@ export interface Investment {
   created_at?: string;
   updated_at?: string;
 }
+
+export interface RetirementRecord {
+  id: string;
+  account_name: string;
+  account_number: string | null;
+  total_value: number;
+  total_contributions: number;
+  profit: number;
+  profit_percentage: number;
+  record_date: string;
+  created_at?: string;
+}

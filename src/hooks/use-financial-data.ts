@@ -13,6 +13,7 @@ import {
   Mortgage,
   MortgagePayment,
   RecurringPayment,
+  RetirementRecord,
   Investment,
 } from '@/types/financial';
 
@@ -99,6 +100,15 @@ export function useRecurringPaymentsData() {
     records: recurringPayments as RecurringPayment[],
     loading,
     refresh: refreshRecurringPayments,
+  };
+}
+
+export function useRetirementData() {
+  const { retirementRecords, loading, refreshRetirement } = useFinancialData();
+  return {
+    records: retirementRecords as RetirementRecord[],
+    loading,
+    refresh: refreshRetirement,
   };
 }
 

@@ -17,6 +17,7 @@ import {
   PieChart,
   Flame,
   ArrowRightLeft,
+  Palmtree,
 } from 'lucide-react';
 import { useState } from 'react';
 import { cn } from '@/lib/utils';
@@ -37,6 +38,7 @@ const navigation = [
   { name: 'Kalkulačka', href: '/calculator', icon: Calculator },
   { name: 'Prevod mien', href: '/currency-converter', icon: ArrowRightLeft },
   { name: 'FIRE', href: '/fire', icon: Flame },
+  { name: 'Dôchodok', href: '/retirement', icon: Palmtree },
 ];
 
 export function Sidebar() {

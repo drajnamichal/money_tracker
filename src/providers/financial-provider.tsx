@@ -20,6 +20,7 @@ import {
   Mortgage,
   MortgagePayment,
   RecurringPayment,
+  RetirementRecord,
   Investment,
 } from '@/types/financial';
 
@@ -35,6 +36,7 @@ interface FinancialContextType {
   mortgages: Mortgage[];
   mortgagePayments: MortgagePayment[];
   recurringPayments: RecurringPayment[];
+  retirementRecords: RetirementRecord[];
   investments: Investment[];
   exchangeRate: number;
   loading: boolean;
@@ -45,6 +47,7 @@ interface FinancialContextType {
   refreshBudget: () => Promise<void>;
   refreshMortgage: () => Promise<void>;
   refreshRecurringPayments: () => Promise<void>;
+  refreshRetirement: () => Promise<void>;
   refreshInvestments: () => Promise<void>;
   refreshAll: () => Promise<void>;
 }
@@ -72,6 +75,9 @@ export function FinancialProvider({ children }: { children: React.ReactNode }) {
   );
   const [recurringPayments, setRecurringPayments] = useState<
     RecurringPayment[]
+  >([]);
+  const [retirementRecords, setRetirementRecords] = useState<
+    RetirementRecord[]
   >([]);
   const [investments, setInvestments] = useState<Investment[]>([]);
   const [exchangeRate, setExchangeRate] = useState<number>(25.0); // Default fallback
@@ -167,6 +173,14 @@ export function FinancialProvider({ children }: { children: React.ReactNode }) {
     if (data) setRecurringPayments(data as RecurringPayment[]);
   }, []);
 
+  const fetchRetirement = useCallback(async () => {
+    const { data } = await supabase
+      .from('retirement_records')
+      .select('*')
+      .order('record_date', { ascending: false });
+    if (data) setRetirementRecords(data as RetirementRecord[]);
+  }, []);
+
   const fetchInvestments = useCallback(async () => {
     const { data } = await supabase
       .from('investments')
@@ -185,6 +199,7 @@ export function FinancialProvider({ children }: { children: React.ReactNode }) {
       fetchBudget(),
       fetchMortgage(),
       fetchRecurringPayments(),
+      fetchRetirement(),
       fetchInvestments(),
       fetchExchangeRate(),
     ]);
@@ -197,6 +212,7 @@ export function FinancialProvider({ children }: { children: React.ReactNode }) {
     fetchBudget,
     fetchMortgage,
     fetchRecurringPayments,
+    fetchRetirement,
     fetchInvestments,
     fetchExchangeRate,
   ]);
@@ -219,6 +235,7 @@ export function FinancialProvider({ children }: { children: React.ReactNode }) {
         mortgages,
         mortgagePayments,
         recurringPayments,
+        retirementRecords,
         investments,
         exchangeRate,
         loading,
@@ -229,6 +246,7 @@ export function FinancialProvider({ children }: { children: React.ReactNode }) {
         refreshBudget: fetchBudget,
         refreshMortgage: fetchMortgage,
         refreshRecurringPayments: fetchRecurringPayments,
+        refreshRetirement: fetchRetirement,
         refreshInvestments: fetchInvestments,
         refreshAll,
       }}
