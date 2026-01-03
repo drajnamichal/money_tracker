@@ -76,21 +76,13 @@ export default function ExpensesPage() {
   const [editValues, setEditValues] = useState<any>({});
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const {
-    register,
-    handleSubmit,
-    reset,
-    setValue,
-    formState: { errors },
-  } = useForm<ExpenseFormValues>({
-    resolver: zodResolver(expenseSchema),
-    defaultValues: {
-      description: '',
-      category: '',
-      amount: '',
-      record_date: new Date().toISOString().split('T')[0],
-    },
-  });
+  const groupedCategories = useMemo(() => {
+    const main = categories.filter((c) => !c.parent_id);
+    return main.map((m) => ({
+      ...m,
+      subcategories: categories.filter((c) => c.parent_id === m.id),
+    }));
+  }, [categories]);
 
   const onAddExpense = async (values: ExpenseFormValues) => {
     setIsAdding(false);
@@ -434,10 +426,17 @@ export default function ExpensesPage() {
                   {...register('category')}
                 >
                   <option value="">Vybrať...</option>
-                  {categories.map((cat) => (
-                    <option key={cat.id} value={cat.name}>
-                      {cat.name}
-                    </option>
+                  {groupedCategories.map((group) => (
+                    <optgroup key={group.id} label={group.name}>
+                      {group.subcategories.map((sub) => (
+                        <option
+                          key={sub.id}
+                          value={`${group.name}: ${sub.name}`}
+                        >
+                          {sub.name}
+                        </option>
+                      ))}
+                    </optgroup>
                   ))}
                 </select>
                 {errors.category && (
@@ -570,10 +569,17 @@ export default function ExpensesPage() {
                                   }
                                   className="w-full bg-white dark:bg-slate-800 border rounded px-2 py-1 outline-none focus:ring-1 focus:ring-rose-500"
                                 >
-                                  {categories.map((cat) => (
-                                    <option key={cat.id} value={cat.name}>
-                                      {cat.name}
-                                    </option>
+                                  {groupedCategories.map((group) => (
+                                    <optgroup key={group.id} label={group.name}>
+                                      {group.subcategories.map((sub) => (
+                                        <option
+                                          key={sub.id}
+                                          value={`${group.name}: ${sub.name}`}
+                                        >
+                                          {sub.name}
+                                        </option>
+                                      ))}
+                                    </optgroup>
                                   ))}
                                 </select>
                               </td>

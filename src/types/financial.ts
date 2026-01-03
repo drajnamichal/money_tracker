@@ -38,6 +38,7 @@ export interface IncomeRecord {
 export interface ExpenseCategory {
   id: string;
   name: string;
+  parent_id: string | null;
   created_at?: string;
 }
 

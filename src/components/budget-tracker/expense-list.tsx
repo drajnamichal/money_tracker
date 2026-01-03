@@ -11,6 +11,7 @@ import {
   AttachmentIcon,
   ImageIcon,
 } from './icons';
+import { EXPENSE_STRUCTURE } from './expense-form';
 
 interface ExpenseListProps {
   expenses: any[];
@@ -24,23 +25,10 @@ interface ExpenseListProps {
   remainingBudget: number;
 }
 
-const CATEGORIES = [
-  'Bývanie',
-  'Strava',
-  'Doprava',
-  'Voľný čas',
-  'Zdravie',
-  'Darčeky',
-  'Ostatné',
-];
-
 const ExpenseList: React.FC<ExpenseListProps> = ({
   expenses,
   onDeleteExpense,
   onUpdateExpense,
-  totalBudget,
-  totalSpent,
-  remainingBudget,
 }) => {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editedDescription, setEditedDescription] = useState('');
@@ -51,7 +39,7 @@ const ExpenseList: React.FC<ExpenseListProps> = ({
     setEditingId(expense.id);
     setEditedDescription(expense.description);
     setEditedAmount(expense.amount.toString());
-    setEditedCategory(expense.category || 'Ostatné');
+    setEditedCategory(expense.category || 'Ostatné: nezaradené');
   };
 
   const handleCancelEdit = () => {
@@ -121,10 +109,14 @@ const ExpenseList: React.FC<ExpenseListProps> = ({
                       className="block w-full px-2 py-1 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-md text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:text-slate-200"
                       aria-label="Upraviť kategóriu"
                     >
-                      {CATEGORIES.map((cat) => (
-                        <option key={cat} value={cat}>
-                          {cat}
-                        </option>
+                      {EXPENSE_STRUCTURE.map((main) => (
+                        <optgroup key={main.name} label={main.name}>
+                          {main.subcategories.map((sub) => (
+                            <option key={sub} value={`${main.name}: ${sub}`}>
+                              {sub}
+                            </option>
+                          ))}
+                        </optgroup>
                       ))}
                     </select>
                   </div>

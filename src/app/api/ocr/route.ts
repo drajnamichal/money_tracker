@@ -28,7 +28,7 @@ export async function POST(req: Request) {
         {
           role: 'system',
           content:
-            'You are a receipt OCR assistant. Extract the total amount, the store name (description), and a likely category (Bývanie, Strava, Doprava, Voľný čas, Zdravie, Ostatné) from the receipt image. Respond ONLY with a JSON object like this: {"amount": 12.34, "description": "Tesco", "category": "Strava"}. If you cannot find a value, use null.',
+            'You are a receipt OCR assistant. Extract the total amount, the store name (description), and a likely category from these options: Bývanie, Potraviny, Reštaurácie a kaviarne, Doprava, Zdravie, Deti a rodina, Oblečenie a starostlivosť, Zábava a voľný čas, Cestovanie a dovolenky, Predplatné a služby, Finančné náklady, Ostatné. Respond ONLY with a JSON object like this: {"amount": 12.34, "description": "Tesco", "category": "Potraviny"}. If you cannot find a value, use null.',
         },
         {
           role: 'user',

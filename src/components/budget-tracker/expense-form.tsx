@@ -10,14 +10,79 @@ import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'framer-motion';
 import { formatCurrency } from '@/lib/utils';
 
-const CATEGORIES = [
-  'Bývanie',
-  'Strava',
-  'Doprava',
-  'Voľný čas',
-  'Zdravie',
-  'Darčeky',
-  'Ostatné',
+export const EXPENSE_STRUCTURE = [
+  {
+    name: 'Bývanie',
+    subcategories: [
+      'nájom/hypotéka',
+      'energie',
+      'internet a TV',
+      'údržba a opravy',
+      'poistenie bývania',
+    ],
+  },
+  {
+    name: 'Potraviny',
+    subcategories: ['potraviny (obchody)', 'drogéria'],
+  },
+  {
+    name: 'Reštaurácie a kaviarne',
+    subcategories: ['reštaurácie', 'kaviarne', 'donáška jedla'],
+  },
+  {
+    name: 'Doprava',
+    subcategories: [
+      'pohonné hmoty',
+      'MHD',
+      'servis auta',
+      'parkovanie',
+      'taxi',
+    ],
+  },
+  {
+    name: 'Zdravie',
+    subcategories: [
+      'lieky',
+      'lekári',
+      'zubár',
+      'doplnky výživy',
+      'zdravotné poistenie',
+    ],
+  },
+  {
+    name: 'Deti a rodina',
+    subcategories: [
+      'plienky a výživa',
+      'oblečenie',
+      'škôlka/škola',
+      'krúžky',
+      'hračky',
+    ],
+  },
+  {
+    name: 'Oblečenie a starostlivosť',
+    subcategories: ['oblečenie', 'obuv', 'kozmetika', 'kaderník/barber'],
+  },
+  {
+    name: 'Zábava a voľný čas',
+    subcategories: ['streaming', 'šport', 'kultúra', 'hobby'],
+  },
+  {
+    name: 'Cestovanie a dovolenky',
+    subcategories: ['ubytovanie', 'doprava', 'aktivity', 'cestovné poistenie'],
+  },
+  {
+    name: 'Predplatné a služby',
+    subcategories: ['streamingové služby', 'softvér a aplikácie', 'členstvá'],
+  },
+  {
+    name: 'Finančné náklady',
+    subcategories: ['bankové poplatky', 'úroky', 'kurzové rozdiely'],
+  },
+  {
+    name: 'Ostatné',
+    subcategories: ['darčeky', 'jednorazové výdavky', 'nezaradené'],
+  },
 ];
 
 interface ExpenseFormProps {
@@ -32,7 +97,7 @@ interface ExpenseFormProps {
 const ExpenseForm: React.FC<ExpenseFormProps> = ({ onAddExpense }) => {
   const [description, setDescription] = useState('');
   const [amount, setAmount] = useState('');
-  const [category, setCategory] = useState('Ostatné');
+  const [category, setCategory] = useState('Ostatné: nezaradené');
   const [error, setError] = useState('');
   const [file, setFile] = useState<File | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -43,7 +108,6 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ onAddExpense }) => {
   const futureValue = useMemo(() => {
     const p = parseFloat(amount);
     if (isNaN(p) || p <= 0) return 0;
-    // Using 8.15% to match user's example: 5€ * (1.0815)^20 ≈ 24€
     return p * Math.pow(1.0815, 20);
   }, [amount]);
 
@@ -70,7 +134,7 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ onAddExpense }) => {
       });
       setDescription('');
       setAmount('');
-      setCategory('Ostatné');
+      setCategory('Ostatné: nezaradené');
       setFile(null);
       setError('');
       setShowSimulation(false);
@@ -119,8 +183,20 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ onAddExpense }) => {
 
       if (data.description) setDescription(data.description);
       if (data.amount) setAmount(data.amount.toString());
-      if (data.category && CATEGORIES.includes(data.category)) {
-        setCategory(data.category);
+      if (data.category) {
+        // Try to find a matching category/subcategory
+        const found = EXPENSE_STRUCTURE.find(
+          (main) =>
+            main.name === data.category ||
+            main.subcategories.includes(data.category)
+        );
+        if (found) {
+          if (found.subcategories.includes(data.category)) {
+            setCategory(`${found.name}: ${data.category}`);
+          } else {
+            setCategory(`${found.name}: ${found.subcategories[0]}`);
+          }
+        }
       }
 
       toast.success('Bloček úspešne naskenovaný!');
@@ -232,10 +308,14 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ onAddExpense }) => {
             className="mt-1 block w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-md text-sm shadow-sm
               focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 dark:text-slate-200"
           >
-            {CATEGORIES.map((cat) => (
-              <option key={cat} value={cat}>
-                {cat}
-              </option>
+            {EXPENSE_STRUCTURE.map((main) => (
+              <optgroup key={main.name} label={main.name}>
+                {main.subcategories.map((sub) => (
+                  <option key={sub} value={`${main.name}: ${sub}`}>
+                    {sub}
+                  </option>
+                ))}
+              </optgroup>
             ))}
           </select>
         </div>

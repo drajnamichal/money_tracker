@@ -134,7 +134,7 @@ export function FinancialProvider({ children }: { children: React.ReactNode }) {
   const fetchExpenseCategories = useCallback(async () => {
     const { data } = await supabase
       .from('expense_categories')
-      .select('*')
+      .select('id, name, parent_id')
       .order('name');
     if (data) setExpenseCategories(data as ExpenseCategory[]);
   }, []);
