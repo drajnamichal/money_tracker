@@ -58,6 +58,12 @@ export async function middleware(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
+  // Bypass auth for E2E tests
+  const isTestBypass = process.env.SKIP_AUTH === 'true';
+  if (isTestBypass) {
+    return response;
+  }
+
   // Protect all routes including API, except login and static assets
   const isAuthPage = request.nextUrl.pathname.startsWith('/login');
   const isApiRoute = request.nextUrl.pathname.startsWith('/api');
