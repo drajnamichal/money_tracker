@@ -25,11 +25,16 @@ import { toast } from 'sonner';
 import { Skeleton } from '@/components/skeleton';
 import { useExpenseData } from '@/hooks/use-financial-data';
 import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
   PieChart,
   Pie,
   Cell,
-  ResponsiveContainer,
-  Tooltip,
   Legend,
 } from 'recharts';
 
@@ -250,13 +255,33 @@ export default function ExpensesPage() {
 
     return Object.keys(groups)
       .sort((a, b) => b.localeCompare(a))
-      .map((key) => ({
-        month: key,
-        records: groups[key].sort((a, b) =>
+      .map((key) => {
+        const records = groups[key].sort((a, b) =>
           b.record_date.localeCompare(a.record_date)
-        ),
-        total: groups[key].reduce((sum, r) => sum + Number(r.amount_eur), 0),
-      }));
+        );
+        const total = records.reduce((sum, r) => sum + Number(r.amount_eur), 0);
+
+        const catData = records.reduce((acc: CategoryTotal[], curr) => {
+          const categoryName = curr.category || 'Ostatné';
+          const existing = acc.find((item) => item.name === categoryName);
+          if (existing) {
+            existing.value += Number(curr.amount_eur);
+          } else {
+            acc.push({
+              name: categoryName,
+              value: Number(curr.amount_eur),
+            });
+          }
+          return acc;
+        }, []);
+
+        return {
+          month: key,
+          records,
+          total,
+          categoryData: catData.sort((a, b) => b.value - a.value),
+        };
+      });
   }, [expenses]);
 
   const handleEdit = (expense: any) => {
@@ -537,6 +562,62 @@ export default function ExpensesPage() {
                     Spolu: {formatCurrency(group.total)}
                   </div>
                 </div>
+
+                {/* Monthly Chart */}
+                <div className="px-6 py-4 bg-slate-50/30 dark:bg-slate-800/10 border-b">
+                  <div className="h-[120px] w-full">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart
+                        data={group.categoryData}
+                        layout="vertical"
+                        margin={{ left: -20, right: 20, top: 0, bottom: 0 }}
+                      >
+                        <XAxis type="number" hide />
+                        <YAxis
+                          dataKey="name"
+                          type="category"
+                          hide
+                          width={100}
+                        />
+                        <Tooltip
+                          cursor={{ fill: 'transparent' }}
+                          contentStyle={{
+                            borderRadius: '12px',
+                            border: 'none',
+                            boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)',
+                          }}
+                          formatter={(value: number) => formatCurrency(value)}
+                        />
+                        <Bar
+                          dataKey="value"
+                          radius={[0, 4, 4, 0]}
+                          barSize={20}
+                        >
+                          {group.categoryData.map((_entry, index) => (
+                            <Cell
+                              key={`cell-${index}`}
+                              fill={COLORS[index % COLORS.length]}
+                            />
+                          ))}
+                        </Bar>
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                  <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2">
+                    {group.categoryData.slice(0, 5).map((cat, idx) => (
+                      <div key={cat.name} className="flex items-center gap-1.5">
+                        <div
+                          className="w-2 h-2 rounded-full"
+                          style={{ backgroundColor: COLORS[idx % COLORS.length] }}
+                        />
+                        <span className="text-[10px] font-bold text-slate-500 uppercase tracking-tight">
+                          {cat.name}: {formatCurrency(cat.value)}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm text-left">
                     <thead className="text-slate-500 font-bold uppercase text-[10px] tracking-widest border-b bg-slate-50/30 dark:bg-slate-800/20">
