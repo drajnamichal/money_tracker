@@ -11,7 +11,9 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Image is required' }, { status: 400 });
     }
 
-    if (!process.env.OPENAI_API_KEY) {
+    const apiKey = process.env.OPENAI_API_KEY || process.env.OPEN_API_KEY;
+
+    if (!apiKey) {
       return NextResponse.json(
         { error: 'OpenAI API key is missing' },
         { status: 500 }
@@ -19,7 +21,7 @@ export async function POST(req: Request) {
     }
 
     const openai = new OpenAI({
-      apiKey: process.env.OPENAI_API_KEY,
+      apiKey: apiKey,
     });
 
     const response = await openai.chat.completions.create({

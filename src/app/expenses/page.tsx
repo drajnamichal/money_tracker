@@ -87,10 +87,10 @@ function MonthlyAISummary({
         body: JSON.stringify({ month, expenses, total }),
       });
       const data = await response.json();
-      if (data.error) throw new Error(data.error);
+      if (!response.ok) throw new Error(data.error || 'Server error');
       setSummary(data.summary);
-    } catch (error) {
-      toast.error('Nepodarilo sa vygenerovať AI zhrnutie');
+    } catch (error: any) {
+      toast.error(error.message || 'Nepodarilo sa vygenerovať AI zhrnutie');
     } finally {
       setLoading(false);
     }
