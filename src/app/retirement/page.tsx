@@ -349,7 +349,7 @@ export default function RetirementPage() {
               </div>
               <div>
                 <h3 className="text-xl font-bold mb-2">
-                  Prečo tu nie sú tieto peniaze v majetku?
+                  Prečo nie sú tieto peniaze zapocitane v celkovom majetku?
                 </h3>
                 <p className="text-slate-300 leading-relaxed max-w-2xl">
                   Dôchodkové piliere (PEPP, II. a III. pilier) sú viazané
