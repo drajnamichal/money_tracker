@@ -15,6 +15,7 @@ import {
   X,
   ChevronDown,
   ChevronUp,
+  ExternalLink,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useRetirementData } from '@/hooks/use-financial-data';
@@ -143,8 +144,8 @@ export default function RetirementPage() {
             )}
           </div>
           <p className="text-slate-500 mt-1">
-            Prehľad tvojich dôchodkových pilierov (Finax PEPP, II. a III.
-            pilier).
+            Prehľad tvojich dôchodkových pilierov (Finax PEPP, II. a III. pilier
+            od UNIQA).
           </p>
         </div>
         <button
@@ -309,12 +310,28 @@ export default function RetirementPage() {
                       </div>
                     </div>
 
-                    <button
-                      onClick={() => handleEditClick(record)}
-                      className="p-3 text-slate-400 hover:text-orange-500 hover:bg-orange-50 dark:hover:bg-orange-950/30 rounded-xl transition-all"
-                    >
-                      <Edit2 size={18} />
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => handleEditClick(record)}
+                        className="p-3 text-slate-400 hover:text-orange-500 hover:bg-orange-50 dark:hover:bg-orange-950/30 rounded-xl transition-all"
+                        title="Upraviť"
+                      >
+                        <Edit2 size={18} />
+                      </button>
+                      <a
+                        href={
+                          record.account_name.includes('Finax')
+                            ? 'https://www.finax.eu/sk/login'
+                            : 'https://moja.uniqa.sk/login'
+                        }
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="p-3 text-slate-400 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-950/30 rounded-xl transition-all"
+                        title="Prihlásiť sa"
+                      >
+                        <ExternalLink size={18} />
+                      </a>
+                    </div>
                   </div>
                 </motion.div>
               ))}
