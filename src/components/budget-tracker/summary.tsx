@@ -96,5 +96,3 @@ const Summary: React.FC<SummaryProps> = ({
 };
 
 export default Summary;
-
-export default Summary;
