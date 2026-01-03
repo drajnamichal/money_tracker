@@ -18,12 +18,27 @@ import {
   ChevronDown,
   ChevronUp,
   X,
+  BrainCircuit,
+  BarChart3,
+  ShieldCheck,
+  AlertTriangle,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useInvestmentData } from '@/hooks/use-financial-data';
 import { Skeleton } from '@/components/skeleton';
 import { toast } from 'sonner';
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
+import {
+  PieChart,
+  Pie,
+  Cell,
+  ResponsiveContainer,
+  Tooltip,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+} from 'recharts';
 import { Investment } from '@/types/financial';
 
 export default function PortfolioPage() {
@@ -536,6 +551,12 @@ function PortfolioContent({
             </div>
           </div>
 
+          {/* AI Analýza */}
+          <PortfolioAIAnalysis investments={investments} />
+
+          {/* Benchmark Comparison */}
+          <BenchmarkComparison portfolioReturn={stats.profitPercentage} />
+
           {portfolioId === 'default' && pieData.length > 0 && (
             <div className="bg-gradient-to-br from-blue-600 to-indigo-700 p-6 rounded-[32px] text-white shadow-xl shadow-blue-200 dark:shadow-none relative overflow-hidden group">
               <div className="relative z-10 space-y-4">
@@ -561,6 +582,206 @@ function PortfolioContent({
           )}
         </div>
       </div>
+    </div>
+  );
+}
+
+function PortfolioAIAnalysis({ investments }: { investments: Investment[] }) {
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [analysis, setAnalysis] = useState<{
+    diversification: 'Nízka' | 'Stredná' | 'Vysoká';
+    riskProfile: 'Konzervatívny' | 'Vyvážený' | 'Agresívny';
+    score: number;
+    recommendation: string;
+  } | null>(null);
+
+  const runAnalysis = () => {
+    setIsAnalyzing(true);
+    // Simulate AI processing
+    setTimeout(() => {
+      const totalValue = investments.reduce(
+        (sum, inv) => sum + inv.shares * inv.current_price,
+        0
+      );
+      const cryptoValue = investments
+        .filter((inv) => inv.type === 'crypto')
+        .reduce((sum, inv) => sum + inv.shares * inv.current_price, 0);
+      const cryptoRatio = totalValue > 0 ? cryptoValue / totalValue : 0;
+
+      const tickers = investments.length;
+
+      let div: any = 'Nízka';
+      if (tickers > 3) div = 'Stredná';
+      if (tickers > 7) div = 'Vysoká';
+
+      let risk: any = 'Konzervatívny';
+      if (cryptoRatio > 0.1 || tickers > 5) risk = 'Vyvážený';
+      if (cryptoRatio > 0.3) risk = 'Agresívny';
+
+      setAnalysis({
+        diversification: div,
+        riskProfile: risk,
+        score: Math.min(100, Math.floor(tickers * 10 + (1 - cryptoRatio) * 30)),
+        recommendation:
+          cryptoRatio > 0.2
+            ? 'Tvoje portfólio má vysoký podiel kryptomien. Zváž zvýšenie podielu široko diverzifikovaných ETF pre stabilitu.'
+            : tickers < 5
+              ? 'Máš malý počet inštrumentov. Pre lepšie rozloženie rizika by bolo vhodné pridať aspoň 2-3 ďalšie tituly z rôznych sektorov.'
+              : 'Tvoje portfólio vyzerá zdravo diverzifikované. Pokračuj v pravidelnom rebalansovaní.',
+      });
+      setIsAnalyzing(false);
+    }, 1500);
+  };
+
+  return (
+    <div className="bg-white dark:bg-slate-900 p-6 rounded-[32px] border border-slate-100 dark:border-slate-800 shadow-sm overflow-hidden relative">
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-2">
+          <BrainCircuit size={20} className="text-purple-600" />
+          <h3 className="font-bold">AI Analýza</h3>
+        </div>
+        {!analysis && !isAnalyzing && (
+          <button
+            onClick={runAnalysis}
+            className="text-[10px] font-black uppercase tracking-widest bg-purple-600 text-white px-3 py-1.5 rounded-full hover:bg-purple-700 transition-colors"
+          >
+            Spustiť
+          </button>
+        )}
+      </div>
+
+      <AnimatePresence mode="wait">
+        {isAnalyzing ? (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="py-8 text-center space-y-3"
+          >
+            <Loader2
+              className="animate-spin mx-auto text-purple-600"
+              size={32}
+            />
+            <p className="text-sm font-medium text-slate-500 animate-pulse">
+              Analyzujem dáta a trhové trendy...
+            </p>
+          </motion.div>
+        ) : analysis ? (
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="space-y-4"
+          >
+            <div className="grid grid-cols-2 gap-3">
+              <div className="bg-slate-50 dark:bg-slate-800/50 p-3 rounded-2xl">
+                <div className="flex items-center gap-1.5 mb-1">
+                  <ShieldCheck size={14} className="text-emerald-500" />
+                  <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                    Diverzifikácia
+                  </span>
+                </div>
+                <p className="font-bold text-slate-900 dark:text-white">
+                  {analysis.diversification}
+                </p>
+              </div>
+              <div className="bg-slate-50 dark:bg-slate-800/50 p-3 rounded-2xl">
+                <div className="flex items-center gap-1.5 mb-1">
+                  <AlertTriangle size={14} className="text-amber-500" />
+                  <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                    Riziko
+                  </span>
+                </div>
+                <p className="font-bold text-slate-900 dark:text-white">
+                  {analysis.riskProfile}
+                </p>
+              </div>
+            </div>
+
+            <div className="p-3 bg-purple-50 dark:bg-purple-900/10 rounded-2xl border border-purple-100 dark:border-purple-900/30">
+              <p className="text-xs text-purple-900 dark:text-purple-300 leading-relaxed italic">
+                "{analysis.recommendation}"
+              </p>
+            </div>
+
+            <button
+              onClick={() => setAnalysis(null)}
+              className="w-full py-2 text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-purple-600 transition-colors"
+            >
+              Resetovať analýzu
+            </button>
+          </motion.div>
+        ) : (
+          <div className="py-6 text-center">
+            <p className="text-xs text-slate-400 italic">
+              Klikni na tlačidlo pre AI zhodnotenie tvojho portfólia.
+            </p>
+          </div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+function BenchmarkComparison({ portfolioReturn }: { portfolioReturn: number }) {
+  const data = [
+    { name: 'Tvoje', value: portfolioReturn, color: '#2563eb' },
+    { name: 'S&P 500', value: 24.2, color: '#10b981' },
+    { name: 'MSCI World', value: 18.5, color: '#f59e0b' },
+  ];
+
+  return (
+    <div className="bg-white dark:bg-slate-900 p-6 rounded-[32px] border border-slate-100 dark:border-slate-800 shadow-sm">
+      <div className="flex items-center gap-2 mb-6">
+        <BarChart3 size={20} className="text-blue-600" />
+        <h3 className="font-bold">Vs. Benchmark (YTD)</h3>
+      </div>
+
+      <div className="h-[200px] w-full">
+        <ResponsiveContainer width="100%" height="100%">
+          <BarChart
+            data={data}
+            margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
+          >
+            <CartesianGrid
+              strokeDasharray="3 3"
+              vertical={false}
+              stroke="#f1f5f9"
+            />
+            <XAxis
+              dataKey="name"
+              axisLine={false}
+              tickLine={false}
+              tick={{ fontSize: 10, fontWeight: 700 }}
+            />
+            <YAxis
+              axisLine={false}
+              tickLine={false}
+              tick={{ fontSize: 10 }}
+              tickFormatter={(val) => `${val}%`}
+            />
+            <Tooltip
+              cursor={{ fill: '#f8fafc' }}
+              contentStyle={{
+                borderRadius: '12px',
+                border: 'none',
+                boxShadow: '0 10px 25px -5px rgba(0,0,0,0.1)',
+                fontSize: '12px',
+                fontWeight: 700,
+              }}
+              formatter={(value: number) => [`${value.toFixed(2)}%`, 'Výnos']}
+            />
+            <Bar dataKey="value" radius={[8, 8, 0, 0]} barSize={40}>
+              {data.map((entry, index) => (
+                <Cell key={`cell-${index}`} fill={entry.color} />
+              ))}
+            </Bar>
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+
+      <p className="text-[10px] text-slate-400 text-center mt-4 font-medium italic">
+        *Benchmarky sú odhadované ročné výnosy pre rok 2024.
+      </p>
     </div>
   );
 }
