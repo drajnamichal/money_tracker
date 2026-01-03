@@ -76,6 +76,22 @@ export default function ExpensesPage() {
   const [editValues, setEditValues] = useState<any>({});
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const {
+    register,
+    handleSubmit,
+    reset,
+    setValue,
+    formState: { errors },
+  } = useForm<ExpenseFormValues>({
+    resolver: zodResolver(expenseSchema),
+    defaultValues: {
+      description: '',
+      category: '',
+      amount: '',
+      record_date: new Date().toISOString().split('T')[0],
+    },
+  });
+
   const groupedCategories = useMemo(() => {
     const main = categories.filter((c) => !c.parent_id);
     return main.map((m) => ({
@@ -407,8 +423,9 @@ export default function ExpensesPage() {
               className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end"
             >
               <div className="space-y-2">
-                <label className="text-sm font-medium">Popis</label>
+                <label htmlFor="expense-description" className="text-sm font-medium">Popis</label>
                 <input
+                  id="expense-description"
                   className={`w-full bg-slate-50 dark:bg-slate-800 border rounded-lg px-4 py-2 focus:ring-2 focus:ring-rose-500 outline-none ${errors.description ? 'border-rose-500' : ''}`}
                   {...register('description')}
                   placeholder="napr. Nákup potravín"
@@ -420,12 +437,17 @@ export default function ExpensesPage() {
                 )}
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-medium">Kategória</label>
+                <label htmlFor="expense-category" className="text-sm font-medium">Kategória</label>
                 <select
+                  id="expense-category"
+                  data-testid="expense-category-select"
                   className={`w-full bg-slate-50 dark:bg-slate-800 border rounded-lg px-4 py-2 focus:ring-2 focus:ring-rose-500 outline-none ${errors.category ? 'border-rose-500' : ''}`}
                   {...register('category')}
                 >
                   <option value="">Vybrať...</option>
+                  {groupedCategories.length === 0 && (
+                    <option value="Ostatné: nezaradené">Ostatné: nezaradené</option>
+                  )}
                   {groupedCategories.map((group) => (
                     <optgroup key={group.id} label={group.name}>
                       {group.subcategories.map((sub) => (
@@ -446,8 +468,9 @@ export default function ExpensesPage() {
                 )}
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-medium">Čiastka (€)</label>
+                <label htmlFor="expense-amount" className="text-sm font-medium">Čiastka (€)</label>
                 <input
+                  id="expense-amount"
                   type="number"
                   step="0.01"
                   className={`w-full bg-slate-50 dark:bg-slate-800 border rounded-lg px-4 py-2 focus:ring-2 focus:ring-rose-500 outline-none ${errors.amount ? 'border-rose-500' : ''}`}
@@ -463,6 +486,7 @@ export default function ExpensesPage() {
               <div className="flex gap-2">
                 <button
                   type="submit"
+                  data-testid="expense-submit-button"
                   className="flex-1 bg-rose-600 text-white rounded-lg py-2 font-medium hover:bg-rose-700 transition-colors"
                 >
                   Uložiť

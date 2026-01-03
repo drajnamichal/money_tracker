@@ -30,4 +30,33 @@ test.describe('Family Money Tracker', () => {
       page.getByText('Optimalizácia rozdelenia príjmu a simulácia bohatstva')
     ).toBeVisible();
   });
+
+  test('should add a new expense', async ({ page }) => {
+    // Intercept Supabase request to mock successful insertion
+    await page.route('**/rest/v1/expense_records*', async (route) => {
+      await route.fulfill({
+        status: 201,
+        contentType: 'application/json',
+        body: JSON.stringify([{ id: 'mock-id' }]),
+      });
+    });
+
+    await page.goto('/expenses');
+
+    // Click add button
+    await page.getByRole('button', { name: 'Pridať výdavok' }).click();
+
+    // Fill form
+    await page.locator('#expense-description').fill('Testovací výdavok');
+    await page.locator('#expense-amount').fill('10');
+
+    // Select category
+    await page.locator('#expense-category').selectOption({ index: 1 });
+
+    // Submit
+    await page.getByTestId('expense-submit-button').click();
+
+    // Verify success toast
+    await expect(page.getByText('Výdavok úspešne pridaný')).toBeVisible({ timeout: 10000 });
+  });
 });
