@@ -75,7 +75,7 @@ export function Sidebar() {
           </h1>
         </div>
 
-        <nav className="flex-1 px-4 space-y-2 mt-4">
+        <nav className="flex-1 px-4 space-y-2 mt-4 overflow-y-auto">
           {navigation.map((item) => (
             <Link
               key={item.name}
@@ -128,15 +128,15 @@ export function Sidebar() {
               animate={{ x: 0 }}
               exit={{ x: '-100%' }}
               transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-              className="fixed inset-y-0 left-0 w-64 bg-white dark:bg-slate-900 z-50 md:hidden shadow-2xl"
+              className="fixed inset-y-0 left-0 w-64 bg-white dark:bg-slate-900 z-50 md:hidden shadow-2xl flex flex-col"
             >
-              <div className="p-6 pt-16">
+              <div className="p-6 pt-16 flex-shrink-0">
                 <h1 className="text-2xl font-bold text-blue-600 dark:text-blue-400">
                   MoneyTracker
                 </h1>
               </div>
 
-              <nav className="px-4 space-y-2 mt-4">
+              <nav className="flex-1 px-4 space-y-2 mt-4 overflow-y-auto min-h-0">
                 {navigation.map((item) => (
                   <Link
                     key={item.name}
@@ -155,7 +155,7 @@ export function Sidebar() {
                 ))}
               </nav>
 
-              <div className="absolute bottom-0 left-0 right-0 p-4 border-t flex justify-between items-center bg-white dark:bg-slate-900">
+              <div className="p-4 border-t flex justify-between items-center bg-white dark:bg-slate-900 flex-shrink-0">
                 <ThemeToggle />
                 <span className="text-xs text-slate-400">v1.0.0</span>
               </div>
