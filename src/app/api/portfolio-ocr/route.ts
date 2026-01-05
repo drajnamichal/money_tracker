@@ -11,11 +11,12 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Image is required' }, { status: 400 });
     }
 
-    const apiKey = process.env.OPENAI_API_KEY || process.env.OPEN_API_KEY;
+    const apiKey = process.env.OPENAI_API_KEY || process.env.OPEN_API_KEY || process.env.OPENAI_KEY;
 
     if (!apiKey) {
+      console.error('Portfolio OCR Error: OpenAI API key is missing. Checked: OPENAI_API_KEY, OPEN_API_KEY, OPENAI_KEY');
       return NextResponse.json(
-        { error: 'OpenAI API key is missing' },
+        { error: 'OpenAI API kľúč chýba v nastaveniach (Vercel Environment Variables). Skontrolujte OPENAI_API_KEY.' },
         { status: 500 }
       );
     }

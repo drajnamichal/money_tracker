@@ -7,11 +7,12 @@ export async function POST(req: Request) {
   try {
     const { month, expenses, total } = await req.json();
 
-    const apiKey = process.env.OPENAI_API_KEY || process.env.OPEN_API_KEY;
+    const apiKey = process.env.OPENAI_API_KEY || process.env.OPEN_API_KEY || process.env.OPENAI_KEY;
 
     if (!apiKey) {
+      console.error('Expense Analysis Error: OpenAI API key is missing. Checked: OPENAI_API_KEY, OPEN_API_KEY, OPENAI_KEY');
       return NextResponse.json(
-        { error: 'OpenAI API key is missing' },
+        { error: 'OpenAI API kľúč chýba v nastaveniach (Vercel Environment Variables). Skontrolujte OPENAI_API_KEY.' },
         { status: 500 }
       );
     }
