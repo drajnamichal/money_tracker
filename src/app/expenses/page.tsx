@@ -9,7 +9,6 @@ import { formatCurrency } from '@/lib/utils';
 import {
   Loader2,
   Plus,
-  Receipt,
   PieChart as PieChartIcon,
   Trash2,
   Settings2,
@@ -18,7 +17,6 @@ import {
   Edit2,
   Check,
   Calendar,
-  ChevronRight,
   Sparkles,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -30,7 +28,6 @@ import {
   Bar,
   XAxis,
   YAxis,
-  CartesianGrid,
   Tooltip,
   ResponsiveContainer,
   PieChart,
@@ -196,21 +193,60 @@ export default function ExpensesPage() {
     if (!file) return;
 
     setIsScanning(true);
-    setIsAdding(true); // Open the form if it's closed
+    setIsAdding(true);
 
     try {
+      // 1. Create a promise to handle image compression
+      const compressImage = (file: File): Promise<string> => {
+        return new Promise((resolve, reject) => {
       const reader = new FileReader();
-      const base64Promise = new Promise<string>((resolve) => {
-        reader.onload = () => resolve(reader.result as string);
+          reader.onload = (event) => {
+            const img = new Image();
+            img.onload = () => {
+              const canvas = document.createElement('canvas');
+              const MAX_WIDTH = 1200;
+              const MAX_HEIGHT = 1200;
+              let width = img.width;
+              let height = img.height;
+
+              if (width > height) {
+                if (width > MAX_WIDTH) {
+                  height *= MAX_WIDTH / width;
+                  width = MAX_WIDTH;
+                }
+              } else {
+                if (height > MAX_HEIGHT) {
+                  width *= MAX_HEIGHT / height;
+                  height = MAX_HEIGHT;
+                }
+              }
+
+              canvas.width = width;
+              canvas.height = height;
+              const ctx = canvas.getContext('2d');
+              if (!ctx) {
+                reject(new Error('Nepodarilo sa vytvoriť canvas context'));
+                return;
+              }
+
+              ctx.drawImage(img, 0, 0, width, height);
+              // Use lower quality to reduce payload size
+              resolve(canvas.toDataURL('image/jpeg', 0.6));
+            };
+            img.onerror = () => reject(new Error('Nepodarilo sa načítať obrázok'));
+            img.src = event.target?.result as string;
+          };
+          reader.onerror = () => reject(new Error('Nepodarilo sa prečítať súbor'));
         reader.readAsDataURL(file);
       });
+      };
 
-      const base64Image = await base64Promise;
+      const compressedBase64 = await compressImage(file);
 
       const response = await fetch('/api/ocr', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ image: base64Image }),
+        body: JSON.stringify({ image: compressedBase64 }),
       });
 
       const data = await response.json();
@@ -224,7 +260,23 @@ export default function ExpensesPage() {
         if (exists) {
           setValue('category', data.category);
         } else {
-          setValue('category', 'Ostatné');
+          // Try to find if it matches a subcategory name or main category
+          const foundCategory = categories.find(c => 
+            c.name.toLowerCase() === data.category.toLowerCase() ||
+            (c.parent_id && c.name.toLowerCase().includes(data.category.toLowerCase()))
+          );
+          
+          if (foundCategory) {
+            if (foundCategory.parent_id) {
+              const parent = categories.find(c => c.id === foundCategory.parent_id);
+              setValue('category', `${parent?.name}: ${foundCategory.name}`);
+            } else {
+              // It's a main category, we should probably pick its first subcategory or handle it
+              setValue('category', 'Ostatné: nezaradené');
+            }
+          } else {
+            setValue('category', 'Ostatné: nezaradené');
+          }
         }
       }
 
@@ -541,7 +593,7 @@ export default function ExpensesPage() {
                           value={`${group.name}: ${sub.name}`}
                         >
                           {sub.name}
-                        </option>
+                    </option>
                       ))}
                     </optgroup>
                   ))}
@@ -591,13 +643,13 @@ export default function ExpensesPage() {
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
         <div className="md:col-span-2 space-y-6">
-          {loading ? (
+            {loading ? (
             <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border p-6 space-y-4">
-              <Skeleton className="h-10 w-full" />
-              <Skeleton className="h-10 w-full" />
-              <Skeleton className="h-10 w-full" />
-              <Skeleton className="h-10 w-full" />
-            </div>
+                <Skeleton className="h-10 w-full" />
+                <Skeleton className="h-10 w-full" />
+                <Skeleton className="h-10 w-full" />
+                <Skeleton className="h-10 w-full" />
+              </div>
           ) : groupedExpenses.length === 0 ? (
             <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border p-12 text-center text-slate-400">
               Žiadne výdavky nenájdené. Začni pridaním prvého.
@@ -646,7 +698,7 @@ export default function ExpensesPage() {
                             border: 'none',
                             boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)',
                           }}
-                          formatter={(value: number) => formatCurrency(value)}
+                          formatter={(value: number | string) => formatCurrency(Number(value))}
                         />
                         <Bar
                           dataKey="value"
@@ -685,7 +737,7 @@ export default function ExpensesPage() {
                 </div>
 
                 <div className="overflow-x-auto">
-                  <table className="w-full text-sm text-left">
+              <table className="w-full text-sm text-left">
                     <thead className="text-slate-500 font-bold uppercase text-[10px] tracking-widest border-b bg-slate-50/30 dark:bg-slate-800/20">
                       <tr>
                         <th className="px-6 py-3">Dátum</th>
@@ -693,12 +745,12 @@ export default function ExpensesPage() {
                         <th className="px-6 py-3">Kategória</th>
                         <th className="px-6 py-3 text-right">Suma</th>
                         <th className="px-6 py-3"></th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y">
+                  </tr>
+                </thead>
+                <tbody className="divide-y">
                       {group.records.map((expense) => (
-                        <tr
-                          key={expense.id}
+                      <tr
+                        key={expense.id}
                           className={`hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-colors group ${expense.isOptimistic ? 'opacity-50' : ''}`}
                         >
                           {editingId === expense.id ? (
@@ -794,19 +846,19 @@ export default function ExpensesPage() {
                                   day: '2-digit',
                                   month: '2-digit',
                                 })}
-                              </td>
+                        </td>
                               <td className="px-6 py-4 font-semibold text-slate-900 dark:text-slate-100">
-                                {expense.description}
-                              </td>
-                              <td className="px-6 py-4">
+                          {expense.description}
+                        </td>
+                        <td className="px-6 py-4">
                                 <span className="px-2 py-0.5 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 rounded-full text-[10px] font-black uppercase tracking-tighter">
-                                  {expense.category}
-                                </span>
-                              </td>
+                            {expense.category}
+                          </span>
+                        </td>
                               <td className="px-6 py-4 text-right font-black text-rose-600">
-                                -{formatCurrency(expense.amount_eur)}
-                              </td>
-                              <td className="px-6 py-4 text-right">
+                          -{formatCurrency(expense.amount_eur)}
+                        </td>
+                        <td className="px-6 py-4 text-right">
                                 <div className="flex gap-1 justify-end opacity-0 group-hover:opacity-100 transition-opacity">
                                   <button
                                     disabled={expense.isOptimistic}
@@ -815,25 +867,25 @@ export default function ExpensesPage() {
                                   >
                                     <Edit2 size={14} />
                                   </button>
-                                  <button
-                                    disabled={expense.isOptimistic}
-                                    onClick={() => handleDelete(expense.id)}
+                          <button
+                            disabled={expense.isOptimistic}
+                            onClick={() => handleDelete(expense.id)}
                                     className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30 rounded-md transition-all"
-                                  >
+                          >
                                     <Trash2 size={14} />
-                                  </button>
+                          </button>
                                 </div>
-                              </td>
+                        </td>
                             </>
                           )}
-                        </tr>
+                      </tr>
                       ))}
-                    </tbody>
-                  </table>
+                </tbody>
+              </table>
                 </div>
               </div>
             ))
-          )}
+            )}
         </div>
 
         <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl shadow-sm border h-fit">

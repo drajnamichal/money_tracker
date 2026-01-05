@@ -187,59 +187,100 @@ function PortfolioActions({
     if (!file) return;
 
     setIsUpdating(true);
-    const reader = new FileReader();
-    reader.onloadend = async () => {
-      const base64Image = reader.result as string;
-      try {
-        const response = await fetch('/api/portfolio-ocr', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ image: base64Image }),
+    try {
+      // Helper function to compress image
+      const compressImage = (file: File): Promise<string> => {
+        return new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = (event) => {
+            const img = new Image();
+            img.onload = () => {
+              const canvas = document.createElement('canvas');
+              const MAX_WIDTH = 1200;
+              const MAX_HEIGHT = 1200;
+              let width = img.width;
+              let height = img.height;
+
+              if (width > height) {
+                if (width > MAX_WIDTH) {
+                  height *= MAX_WIDTH / width;
+                  width = MAX_WIDTH;
+                }
+              } else {
+                if (height > MAX_HEIGHT) {
+                  width *= MAX_HEIGHT / height;
+                  height = MAX_HEIGHT;
+                }
+              }
+
+              canvas.width = width;
+              canvas.height = height;
+              const ctx = canvas.getContext('2d');
+              if (!ctx) {
+                reject(new Error('Nepodarilo sa vytvoriť canvas context'));
+                return;
+              }
+
+              ctx.drawImage(img, 0, 0, width, height);
+              resolve(canvas.toDataURL('image/jpeg', 0.6));
+            };
+            img.onerror = () => reject(new Error('Nepodarilo sa načítať obrázok'));
+            img.src = event.target?.result as string;
+          };
+          reader.onerror = () => reject(new Error('Nepodarilo sa prečítať súbor'));
+          reader.readAsDataURL(file);
+        });
+      };
+
+      const compressedBase64 = await compressImage(file);
+
+      const response = await fetch('/api/portfolio-ocr', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ image: compressedBase64 }),
+      });
+
+      const data = await response.json();
+      if (data.error) throw new Error(data.error);
+
+      if (data.investments) {
+        const updates = data.investments.map(async (newInv: any) => {
+          const existing = investments.find(
+            (i) => i.ticker === newInv.ticker || i.name === newInv.name
+          );
+
+          if (existing) {
+            return supabase
+              .from('investments')
+              .update({
+                current_price: newInv.current_price,
+                shares: newInv.shares || existing.shares,
+                avg_price: newInv.avg_price || existing.avg_price,
+              })
+              .eq('id', existing.id);
+          } else {
+            const { data: userData } = await supabase.auth.getUser();
+            return supabase.from('investments').insert([
+              {
+                ...newInv,
+                portfolio_id: portfolioId,
+                user_id: userData.user?.id,
+              },
+            ]);
+          }
         });
 
-        const data = await response.json();
-        if (data.error) throw new Error(data.error);
-
-        if (data.investments) {
-          const updates = data.investments.map(async (newInv: any) => {
-            const existing = investments.find(
-              (i) => i.ticker === newInv.ticker || i.name === newInv.name
-            );
-
-            if (existing) {
-              return supabase
-                .from('investments')
-                .update({
-                  current_price: newInv.current_price,
-                  shares: newInv.shares || existing.shares,
-                  avg_price: newInv.avg_price || existing.avg_price,
-                })
-                .eq('id', existing.id);
-            } else {
-              const { data: userData } = await supabase.auth.getUser();
-              return supabase.from('investments').insert([
-                {
-                  ...newInv,
-                  portfolio_id: portfolioId,
-                  user_id: userData.user?.id,
-                },
-              ]);
-            }
-          });
-
-          await Promise.all(updates);
-          await onRefresh();
-          toast.success(`Portfólio bolo úspešne aktualizované`);
-        }
-      } catch (error: any) {
-        console.error('Update error:', error);
-        toast.error(error.message || 'Chyba pri aktualizácii portfólia');
-      } finally {
-        setIsUpdating(false);
-        if (fileInputRef.current) fileInputRef.current.value = '';
+        await Promise.all(updates);
+        await onRefresh();
+        toast.success(`Portfólio bolo úspešne aktualizované`);
       }
-    };
-    reader.readAsDataURL(file);
+    } catch (error: any) {
+      console.error('Update error:', error);
+      toast.error(error.message || 'Chyba pri aktualizácii portfólia');
+    } finally {
+      setIsUpdating(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
   };
 
   return (
