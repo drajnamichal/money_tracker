@@ -262,14 +262,16 @@ export default function ExpensesPage() {
       if (data.description) setValue('description', data.description);
       if (data.amount) setValue('amount', data.amount.toString());
       if (data.category) {
-        const exists = categories.some((c) => c.name === data.category);
+        const categoryToMatch = String(data.category).toLowerCase();
+        const exists = categories.some((c) => c.name.toLowerCase() === categoryToMatch);
         if (exists) {
-          setValue('category', data.category);
+          const matched = categories.find(c => c.name.toLowerCase() === categoryToMatch);
+          setValue('category', matched?.name || data.category);
         } else {
           // Try to find if it matches a subcategory name or main category
           const foundCategory = categories.find(c => 
-            c.name.toLowerCase() === data.category.toLowerCase() ||
-            (c.parent_id && c.name.toLowerCase().includes(data.category.toLowerCase()))
+            c.name.toLowerCase() === categoryToMatch ||
+            (c.parent_id && c.name.toLowerCase().includes(categoryToMatch))
           );
           
           if (foundCategory) {
@@ -277,8 +279,13 @@ export default function ExpensesPage() {
               const parent = categories.find(c => c.id === foundCategory.parent_id);
               setValue('category', `${parent?.name}: ${foundCategory.name}`);
             } else {
-              // It's a main category, we should probably pick its first subcategory or handle it
-              setValue('category', 'Ostatné: nezaradené');
+              // It's a main category, try to find first subcategory or use default
+              const firstSub = categories.find(c => c.parent_id === foundCategory.id);
+              if (firstSub) {
+                setValue('category', `${foundCategory.name}: ${firstSub.name}`);
+              } else {
+                setValue('category', 'Ostatné: nezaradené');
+              }
             }
           } else {
             setValue('category', 'Ostatné: nezaradené');
@@ -438,18 +445,27 @@ export default function ExpensesPage() {
 
   const categoryData = useMemo(() => {
     return expenses.reduce((acc: CategoryTotal[], curr) => {
-      const existing = acc.find((item) => item.name === curr.category);
+      const categoryName = curr.category || 'Ostatné';
+      const existing = acc.find((item) => item.name === categoryName);
       if (existing) {
         existing.value += Number(curr.amount_eur);
       } else {
         acc.push({
-          name: curr.category || 'Ostatné',
+          name: categoryName,
           value: Number(curr.amount_eur),
         });
       }
       return acc;
     }, []);
   }, [expenses]);
+
+  const sortedCategoryData = useMemo(() => {
+    return [...categoryData].sort((a, b) => b.value - a.value);
+  }, [categoryData]);
+
+  const totalExpensesValue = useMemo(() => {
+    return categoryData.reduce((sum, cat) => sum + cat.value, 0);
+  }, [categoryData]);
 
   return (
     <div className="space-y-8">
@@ -942,9 +958,7 @@ export default function ExpensesPage() {
           </div>
 
           <div className="space-y-2 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
-            {categoryData
-              .sort((a, b) => b.value - a.value)
-              .map((item, idx) => (
+            {sortedCategoryData.map((item, idx) => (
                 <div
                   key={item.name}
                   className="flex items-center justify-between group p-1 hover:bg-slate-50 dark:hover:bg-slate-800/50 rounded-lg transition-colors"
@@ -963,7 +977,9 @@ export default function ExpensesPage() {
                       {formatCurrency(item.value)}
                     </span>
                     <span className="text-[10px] text-slate-400 w-8 text-right">
-                      {Math.round((item.value / categoryData.reduce((s, c) => s + c.value, 0)) * 100)}%
+                      {totalExpensesValue > 0 
+                        ? `${Math.round((item.value / totalExpensesValue) * 100)}%` 
+                        : '0%'}
                     </span>
                   </div>
                 </div>
