@@ -27,6 +27,8 @@ import {
 } from 'recharts';
 
 export default function CZPage() {
+  const [propertyPrice, setPropertyPrice] = useState(12000000);
+
   const accounts = [
     { name: 'Air Bank', balance: 663081.11 },
     { name: 'Moneta', balance: 931485.70 },
@@ -35,9 +37,8 @@ export default function CZPage() {
 
   const totalCZK = useMemo(() => accounts.reduce((sum, acc) => sum + acc.balance, 0), []);
   
-  const propertyPrice = 12000000;
-  const ltv80 = propertyPrice * 0.8;
-  const requiredDownPayment = propertyPrice * 0.2;
+  const ltv80 = useMemo(() => propertyPrice * 0.8, [propertyPrice]);
+  const requiredDownPayment = useMemo(() => propertyPrice * 0.2, [propertyPrice]);
   const hasEnoughForDownPayment = totalCZK >= requiredDownPayment;
   const surplus = totalCZK - requiredDownPayment;
 
@@ -59,7 +60,9 @@ export default function CZPage() {
     return principal * (monthlyRate * Math.pow(1 + monthlyRate, numberOfPayments)) / (Math.pow(1 + monthlyRate, numberOfPayments) - 1);
   };
 
-  const monthlyPayment = calculateMonthlyPayment(ltv80, lowestRate);
+  const monthlyPayment = useMemo(() => 
+    calculateMonthlyPayment(ltv80, lowestRate),
+  [ltv80, lowestRate]);
 
   const formatCZK = (val: number) => {
     return new Intl.NumberFormat('cs-CZ', {
@@ -128,9 +131,21 @@ export default function CZPage() {
               <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-2xl">
                 <Building2 className="text-blue-600" size={24} />
               </div>
-              <div>
+              <div className="flex-1">
                 <h3 className="text-xl font-black">Analýza kúpy bytu v ČR</h3>
-                <p className="text-sm text-slate-500">Cieľová nehnuteľnosť: {formatCZK(propertyPrice)}</p>
+                <div className="mt-2 flex items-center gap-2 max-w-sm">
+                  <label htmlFor="prop-price" className="text-sm text-slate-500 whitespace-nowrap">Cena nehnuteľnosti:</label>
+                  <div className="relative flex-1">
+                    <input
+                      id="prop-price"
+                      type="number"
+                      value={propertyPrice}
+                      onChange={(e) => setPropertyPrice(Number(e.target.value))}
+                      className="w-full bg-slate-50 dark:bg-slate-800 border-none rounded-xl px-3 py-1.5 text-sm font-bold focus:ring-2 focus:ring-blue-500 outline-none"
+                    />
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-black text-slate-400">CZK</span>
+                  </div>
+                </div>
               </div>
             </div>
 
