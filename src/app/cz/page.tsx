@@ -132,18 +132,18 @@ export default function CZPage() {
                 <Building2 className="text-blue-600" size={24} />
               </div>
               <div className="flex-1">
-                <h3 className="text-xl font-black">Analýza kúpy bytu v ČR</h3>
-                <div className="mt-2 flex items-center gap-2 max-w-sm">
-                  <label htmlFor="prop-price" className="text-sm text-slate-500 whitespace-nowrap">Cena nehnuteľnosti:</label>
-                  <div className="relative flex-1">
+                <h3 className="text-xl font-black text-slate-900 dark:text-white">Analýza kúpy bytu v ČR</h3>
+                <div className="mt-3 flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
+                  <label htmlFor="prop-price" className="text-sm font-bold text-slate-500 whitespace-nowrap">Cena nehnuteľnosti:</label>
+                  <div className="relative w-full sm:max-w-[200px]">
                     <input
                       id="prop-price"
                       type="number"
                       value={propertyPrice}
                       onChange={(e) => setPropertyPrice(Number(e.target.value))}
-                      className="w-full bg-slate-50 dark:bg-slate-800 border-none rounded-xl px-3 py-1.5 text-sm font-bold focus:ring-2 focus:ring-blue-500 outline-none"
+                      className="w-full bg-slate-100 dark:bg-slate-800 border-none rounded-xl pl-4 pr-12 py-2.5 text-base font-black text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none transition-all"
                     />
-                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-black text-slate-400">CZK</span>
+                    <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[10px] font-black text-slate-400">CZK</span>
                   </div>
                 </div>
               </div>
