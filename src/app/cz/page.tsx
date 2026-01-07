@@ -28,8 +28,8 @@ import {
 
 export default function CZPage() {
   const accounts = [
-    { name: 'Česká spořitelna', balance: 663081.11 },
-    { name: 'Komerční banka', balance: 931485.70 },
+    { name: 'Air Bank', balance: 663081.11 },
+    { name: 'Moneta', balance: 931485.70 },
     { name: 'Raiffeisenbank', balance: 985459.04 }
   ];
 
