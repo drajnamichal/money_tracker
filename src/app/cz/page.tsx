@@ -22,7 +22,8 @@ import {
   CartesianGrid, 
   Tooltip, 
   ResponsiveContainer,
-  Cell
+  Cell,
+  LabelList
 } from 'recharts';
 
 export default function CZPage() {
@@ -216,6 +217,13 @@ export default function CZPage() {
                     {mortgageRates.map((entry, index) => (
                       <Cell key={`cell-${index}`} fill={index === 0 ? '#10b981' : '#2563eb'} />
                     ))}
+                    <LabelList 
+                      dataKey="rate" 
+                      position="right" 
+                      formatter={(val: number) => `${val.toFixed(2)} %`}
+                      style={{ fontSize: '11px', fontWeight: 'bold', fill: '#64748b' }}
+                      offset={10}
+                    />
                   </Bar>
                 </BarChart>
               </ResponsiveContainer>
