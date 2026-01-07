@@ -36,15 +36,21 @@ import {
   Legend,
 } from 'recharts';
 
-const COLORS = [
-  '#2563eb',
-  '#10b981',
-  '#f59e0b',
-  '#ef4444',
-  '#8b5cf6',
-  '#ec4899',
-  '#06b6d4',
-];
+  const COLORS = [
+    '#2563eb', // blue
+    '#10b981', // emerald
+    '#f59e0b', // amber
+    '#ef4444', // red
+    '#8b5cf6', // violet
+    '#ec4899', // pink
+    '#06b6d4', // cyan
+    '#f97316', // orange
+    '#84cc16', // lime
+    '#a855f7', // purple
+    '#14b8a6', // teal
+    '#6366f1', // indigo
+    '#d946ef', // fuchsia
+  ];
 
 const expenseSchema = z.object({
   description: z.string().min(1, 'Popis je povinný'),
@@ -888,12 +894,12 @@ export default function ExpensesPage() {
             )}
         </div>
 
-        <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl shadow-sm border h-fit">
+        <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl shadow-sm border h-fit sticky top-8">
           <h3 className="text-lg font-semibold mb-6 flex items-center gap-2">
             <PieChartIcon size={20} className="text-rose-500" />
             Rozdelenie výdavkov
           </h3>
-          <div className="h-[250px]">
+          <div className="h-[200px] mb-8">
             {loading ? (
               <Skeleton className="w-full h-full rounded-full" />
             ) : categoryData.length > 0 ? (
@@ -903,13 +909,14 @@ export default function ExpensesPage() {
                     data={categoryData}
                     innerRadius={60}
                     outerRadius={80}
-                    paddingAngle={5}
+                    paddingAngle={2}
                     dataKey="value"
                   >
                     {categoryData.map((_entry, index) => (
                       <Cell
                         key={`cell-${index}`}
                         fill={COLORS[index % COLORS.length]}
+                        stroke="none"
                       />
                     ))}
                   </Pie>
@@ -919,12 +926,12 @@ export default function ExpensesPage() {
                       borderRadius: '12px',
                       border: 'none',
                       boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)',
+                      fontSize: '12px'
                     }}
                     formatter={(value: string | number | undefined) =>
                       formatCurrency(Number(value) || 0)
                     }
                   />
-                  <Legend verticalAlign="bottom" height={36} />
                 </PieChart>
               </ResponsiveContainer>
             ) : (
@@ -932,6 +939,35 @@ export default function ExpensesPage() {
                 Pridaj výdavky pre zobrazenie grafu
               </div>
             )}
+          </div>
+
+          <div className="space-y-2 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
+            {categoryData
+              .sort((a, b) => b.value - a.value)
+              .map((item, idx) => (
+                <div
+                  key={item.name}
+                  className="flex items-center justify-between group p-1 hover:bg-slate-50 dark:hover:bg-slate-800/50 rounded-lg transition-colors"
+                >
+                  <div className="flex items-center gap-2 min-w-0">
+                    <div
+                      className="w-2.5 h-2.5 rounded-full shrink-0"
+                      style={{ backgroundColor: COLORS[idx % COLORS.length] }}
+                    />
+                    <span className="text-[11px] font-medium text-slate-600 dark:text-slate-400 truncate" title={item.name}>
+                      {item.name}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0 ml-2">
+                    <span className="text-[11px] font-bold text-slate-900 dark:text-slate-100">
+                      {formatCurrency(item.value)}
+                    </span>
+                    <span className="text-[10px] text-slate-400 w-8 text-right">
+                      {Math.round((item.value / categoryData.reduce((s, c) => s + c.value, 0)) * 100)}%
+                    </span>
+                  </div>
+                </div>
+              ))}
           </div>
         </div>
       </div>
