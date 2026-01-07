@@ -39,6 +39,7 @@ const navigation = [
   { name: 'Prevod mien', href: '/currency-converter', icon: ArrowRightLeft },
   { name: 'FIRE', href: '/fire', icon: Flame },
   { name: 'Dôchodok', href: '/retirement', icon: Palmtree },
+  { name: 'CZ', href: '/cz', icon: ArrowRightLeft },
 ];
 
 export function Sidebar() {
