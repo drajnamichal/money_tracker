@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import {
   LayoutDashboard,
@@ -74,6 +75,16 @@ export function Sidebar() {
           <h1 className="text-2xl font-bold text-blue-600 dark:text-blue-400">
             MoneyTracker
           </h1>
+          <div className="mt-2 flex justify-center">
+            <Image 
+              src="/money-bag.png" 
+              alt="Money Bag" 
+              width={64} 
+              height={64}
+              priority
+              className="drop-shadow-sm"
+            />
+          </div>
         </div>
 
         <nav className="flex-1 px-4 space-y-2 mt-4 overflow-y-auto">
@@ -135,6 +146,15 @@ export function Sidebar() {
                 <h1 className="text-2xl font-bold text-blue-600 dark:text-blue-400">
                   MoneyTracker
                 </h1>
+                <div className="mt-2">
+                  <Image 
+                    src="/money-bag.png" 
+                    alt="Money Bag" 
+                    width={48} 
+                    height={48}
+                    priority
+                  />
+                </div>
               </div>
 
               <nav className="flex-1 px-4 space-y-2 mt-4 overflow-y-auto min-h-0">
