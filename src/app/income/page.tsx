@@ -20,6 +20,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
 import { Skeleton } from '@/components/skeleton';
 import { useIncomeData } from '@/hooks/use-financial-data';
+import { IncomeRecord } from '@/types/financial';
 import {
   BarChart,
   Bar,
@@ -78,7 +79,7 @@ export default function IncomePage() {
   });
 
   const chartData = useMemo(() => {
-    const monthlyData: any = {};
+    const monthlyData: Record<string, { month: string; total: number }> = {};
     records.forEach((r) => {
       const month = r.record_month.substring(0, 7);
       if (!monthlyData[month]) monthlyData[month] = { month, total: 0 };
@@ -86,9 +87,9 @@ export default function IncomePage() {
     });
 
     return Object.values(monthlyData)
-      .sort((a: any, b: any) => a.month.localeCompare(b.month))
+      .sort((a, b) => a.month.localeCompare(b.month))
       .slice(-12)
-      .map((item: any) => ({
+      .map((item) => ({
         name: new Date(item.month).toLocaleDateString('sk-SK', {
           month: 'short',
         }),
@@ -168,7 +169,7 @@ export default function IncomePage() {
     .reduce((sum, r) => sum + Number(r.amount_eur), 0);
 
   const groupedRecords = useMemo(() => {
-    return records.reduce((acc: any, record) => {
+    return records.reduce((acc: Record<string, IncomeRecord[]>, record) => {
       const month = record.record_month;
       if (!acc[month]) acc[month] = [];
       acc[month].push(record);
@@ -236,12 +237,15 @@ export default function IncomePage() {
             <form onSubmit={handleSubmit(onSave)} className="space-y-4">
               <div className="space-y-4">
                 {fields.map((field, index) => (
-                  <div key={field.id} className="flex gap-3 items-start">
-                    <div className="flex-[3] space-y-1">
+                  <div key={field.id} className="group relative flex flex-col sm:flex-row gap-3 items-start bg-slate-50/50 dark:bg-slate-800/50 sm:bg-transparent p-4 sm:p-0 rounded-2xl sm:rounded-none border sm:border-0 border-slate-100 dark:border-slate-800">
+                    <div className="w-full sm:flex-[3] space-y-1">
+                      <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1 block sm:hidden">
+                        Zdroj príjmu
+                      </label>
                       <input
                         {...register(`items.${index}.categoryName`)}
                         placeholder="Odkiaľ je príjem (napr. Výplata)"
-                        className={`w-full bg-slate-50 dark:bg-slate-800 border rounded-xl px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-emerald-500 ${errors.items?.[index]?.categoryName ? 'border-rose-500 focus:ring-rose-500' : ''}`}
+                        className={`w-full bg-white sm:bg-slate-50 dark:bg-slate-800 border rounded-xl px-4 py-2.5 sm:py-2 text-sm outline-none focus:ring-2 focus:ring-emerald-500 ${errors.items?.[index]?.categoryName ? 'border-rose-500 focus:ring-rose-500' : ''}`}
                       />
                       {errors.items?.[index]?.categoryName && (
                         <p className="text-[10px] text-rose-500 font-medium">
@@ -249,12 +253,15 @@ export default function IncomePage() {
                         </p>
                       )}
                     </div>
-                    <div className="flex-[2] space-y-1">
-                      <div className="flex border rounded-xl bg-slate-50 dark:bg-slate-800 focus-within:ring-2 focus-within:ring-emerald-500 overflow-hidden">
+                    <div className="w-full sm:flex-[2] space-y-1">
+                      <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1 block sm:hidden">
+                        Suma a mena
+                      </label>
+                      <div className="flex border rounded-xl bg-white sm:bg-slate-50 dark:bg-slate-800 focus-within:ring-2 focus-within:ring-emerald-500 overflow-hidden">
                         <input
                           type="number"
                           step="0.01"
-                          className={`flex-1 bg-transparent px-4 py-2 text-sm outline-none ${errors.items?.[index]?.amount ? 'border-rose-500' : ''}`}
+                          className={`flex-1 bg-transparent px-4 py-2.5 sm:py-2 text-sm outline-none ${errors.items?.[index]?.amount ? 'border-rose-500' : ''}`}
                           {...register(`items.${index}.amount`)}
                           placeholder="0.00"
                         />
@@ -276,7 +283,8 @@ export default function IncomePage() {
                       <button
                         type="button"
                         onClick={() => remove(index)}
-                        className="text-slate-400 hover:text-rose-500 p-2 mt-0.5 shrink-0"
+                        className="absolute top-2 right-2 sm:static text-slate-400 hover:text-rose-500 p-2 sm:mt-0.5 shrink-0 transition-colors"
+                        title="Odstrániť"
                       >
                         <Trash2 size={18} />
                       </button>
@@ -354,8 +362,8 @@ export default function IncomePage() {
                       border: 'none',
                       boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)',
                     }}
-                    formatter={(value: number) => [
-                      formatCurrency(value),
+                    formatter={(value: number | undefined) => [
+                      formatCurrency(value || 0),
                       'Príjem',
                     ]}
                   />
@@ -416,7 +424,7 @@ export default function IncomePage() {
               </thead>
               <tbody className="divide-y">
                 {Object.entries(groupedRecords).map(
-                  ([month, monthRecords]: [string, any]) => (
+                  ([month, monthRecords]: [string, IncomeRecord[]]) => (
                     <Fragment key={month}>
                       <tr className="bg-slate-50/80 dark:bg-slate-800/40">
                         <td
@@ -434,7 +442,7 @@ export default function IncomePage() {
                               Celkom:{' '}
                               {formatCurrency(
                                 monthRecords.reduce(
-                                  (sum: number, r: any) =>
+                                  (sum, r) =>
                                     sum + Number(r.amount_eur),
                                   0
                                 )
@@ -443,7 +451,7 @@ export default function IncomePage() {
                           </div>
                         </td>
                       </tr>
-                      {monthRecords.map((record: any) => (
+                      {monthRecords.map((record) => (
                         <motion.tr
                           key={record.id}
                           initial={{ opacity: 0 }}
