@@ -32,7 +32,6 @@ const navigation = [
   { name: 'Dashboard', href: '/', icon: LayoutDashboard },
   { name: 'Majetok', href: '/assets', icon: Wallet },
   { name: 'Portfólio', href: '/portfolio', icon: PieChart },
-  { name: 'Bloomreach RSU', href: '/bloomreach', icon: Gem },
   { name: 'Príjmy', href: '/income', icon: TrendingUp },
   { name: 'Výdaje', href: '/expenses', icon: Receipt },
   { name: 'Rozpočet bytu', href: '/budget-tracker', icon: Building2 },
@@ -43,6 +42,7 @@ const navigation = [
   { name: 'FIRE', href: '/fire', icon: Flame },
   { name: 'Dôchodok', href: '/retirement', icon: Palmtree },
   { name: 'CZ', href: '/cz', icon: ArrowRightLeft },
+  { name: 'Bloomreach RSU', href: '/bloomreach', icon: Gem },
 ];
 
 export function Sidebar() {
