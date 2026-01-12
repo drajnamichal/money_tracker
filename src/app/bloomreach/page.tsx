@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import {
   Gem,
   Clock,
@@ -12,6 +12,10 @@ import {
   Unlock,
   Info,
   Gift,
+  Calculator,
+  TrendingUp,
+  TrendingDown,
+  Minus,
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import {
@@ -28,6 +32,8 @@ import {
 } from 'recharts';
 
 export default function BloomreachPage() {
+  const [simulatedPrice, setSimulatedPrice] = useState(10.93);
+  
   // RSU Grant Details from Bloomreach
   const grantDetails = {
     type: 'New Hire',
@@ -526,11 +532,193 @@ export default function BloomreachPage() {
         </div>
       </motion.div>
 
+      {/* Price Calculator */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.5 }}
+        className="bg-white dark:bg-slate-900 p-8 rounded-[32px] border shadow-sm"
+      >
+        <div className="flex items-center gap-3 mb-8">
+          <div className="p-3 bg-amber-100 dark:bg-amber-900/30 rounded-2xl">
+            <Calculator className="text-amber-600" size={24} />
+          </div>
+          <div>
+            <h3 className="text-lg font-black text-slate-900 dark:text-white">
+              Kalkulačka hodnoty
+            </h3>
+            <p className="text-xs text-slate-400">
+              Simuluj hodnotu RSU pri rôznych cenách akcie
+            </p>
+          </div>
+        </div>
+
+        {/* Slider Section */}
+        <div className="mb-8">
+          <div className="flex items-center justify-between mb-4">
+            <span className="text-sm font-bold text-slate-600 dark:text-slate-400">
+              Cena akcie
+            </span>
+            <div className="flex items-center gap-2">
+              <span className="text-3xl font-black text-slate-900 dark:text-white">
+                {formatUSD(simulatedPrice)}
+              </span>
+              {simulatedPrice !== stockPrice && (
+                <span className={`text-sm font-bold ${simulatedPrice > stockPrice ? 'text-emerald-500' : 'text-rose-500'}`}>
+                  ({simulatedPrice > stockPrice ? '+' : ''}{((simulatedPrice - stockPrice) / stockPrice * 100).toFixed(1)}%)
+                </span>
+              )}
+            </div>
+          </div>
+          
+          <input
+            type="range"
+            min="1"
+            max="50"
+            step="0.5"
+            value={simulatedPrice}
+            onChange={(e) => setSimulatedPrice(Number(e.target.value))}
+            className="w-full h-3 bg-slate-200 dark:bg-slate-700 rounded-full appearance-none cursor-pointer accent-indigo-600"
+            style={{
+              background: `linear-gradient(to right, #4f46e5 0%, #4f46e5 ${((simulatedPrice - 1) / 49) * 100}%, #e2e8f0 ${((simulatedPrice - 1) / 49) * 100}%, #e2e8f0 100%)`,
+            }}
+          />
+          
+          <div className="flex justify-between mt-2 text-[10px] font-bold text-slate-400">
+            <span>$1</span>
+            <span className="text-indigo-600">Aktuálna: {formatUSD(stockPrice)}</span>
+            <span>$50</span>
+          </div>
+        </div>
+
+        {/* Quick Price Buttons */}
+        <div className="flex flex-wrap gap-2 mb-8">
+          {[5, 10, 15, 20, 25, 30, 40, 50].map((price) => (
+            <button
+              key={price}
+              onClick={() => setSimulatedPrice(price)}
+              className={`px-4 py-2 rounded-xl text-sm font-bold transition-all ${
+                simulatedPrice === price
+                  ? 'bg-indigo-600 text-white'
+                  : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-indigo-100 dark:hover:bg-indigo-900/30'
+              }`}
+            >
+              ${price}
+            </button>
+          ))}
+          <button
+            onClick={() => setSimulatedPrice(stockPrice)}
+            className="px-4 py-2 rounded-xl text-sm font-bold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-indigo-100 dark:hover:bg-indigo-900/30 transition-all"
+          >
+            Reset
+          </button>
+        </div>
+
+        {/* Results Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {/* Simulated Total Value */}
+          <div className="p-6 bg-gradient-to-br from-indigo-50 to-purple-50 dark:from-indigo-900/20 dark:to-purple-900/20 rounded-2xl border border-indigo-100 dark:border-indigo-900/30">
+            <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-2">
+              Celková hodnota
+            </p>
+            <p className="text-2xl font-black text-indigo-600">
+              {formatUSD(total * simulatedPrice)}
+            </p>
+            <p className="text-sm text-indigo-400 mt-1">
+              ≈ {formatEUR(total * simulatedPrice * usdToEur)}
+            </p>
+          </div>
+
+          {/* Difference */}
+          <div className={`p-6 rounded-2xl border ${
+            simulatedPrice > stockPrice 
+              ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-100 dark:border-emerald-900/30' 
+              : simulatedPrice < stockPrice
+                ? 'bg-rose-50 dark:bg-rose-900/20 border-rose-100 dark:border-rose-900/30'
+                : 'bg-slate-50 dark:bg-slate-800/50 border-slate-100 dark:border-slate-800'
+          }`}>
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">
+              Rozdiel oproti dnes
+            </p>
+            <div className="flex items-center gap-2">
+              {simulatedPrice > stockPrice ? (
+                <TrendingUp className="text-emerald-500" size={24} />
+              ) : simulatedPrice < stockPrice ? (
+                <TrendingDown className="text-rose-500" size={24} />
+              ) : (
+                <Minus className="text-slate-400" size={24} />
+              )}
+              <p className={`text-2xl font-black ${
+                simulatedPrice > stockPrice 
+                  ? 'text-emerald-600' 
+                  : simulatedPrice < stockPrice 
+                    ? 'text-rose-600' 
+                    : 'text-slate-600'
+              }`}>
+                {simulatedPrice >= stockPrice ? '+' : ''}{formatUSD((simulatedPrice - stockPrice) * total)}
+              </p>
+            </div>
+            <p className="text-sm text-slate-400 mt-1">
+              {simulatedPrice >= stockPrice ? '+' : ''}{formatEUR((simulatedPrice - stockPrice) * total * usdToEur)}
+            </p>
+          </div>
+
+          {/* Per Share Change */}
+          <div className="p-6 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-100 dark:border-slate-800">
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">
+              Zmena za akciu
+            </p>
+            <p className={`text-2xl font-black ${
+              simulatedPrice > stockPrice 
+                ? 'text-emerald-600' 
+                : simulatedPrice < stockPrice 
+                  ? 'text-rose-600' 
+                  : 'text-slate-600'
+            }`}>
+              {simulatedPrice >= stockPrice ? '+' : ''}{formatUSD(simulatedPrice - stockPrice)}
+            </p>
+            <p className={`text-sm mt-1 font-bold ${
+              simulatedPrice > stockPrice 
+                ? 'text-emerald-500' 
+                : simulatedPrice < stockPrice 
+                  ? 'text-rose-500' 
+                  : 'text-slate-400'
+            }`}>
+              {simulatedPrice >= stockPrice ? '+' : ''}{((simulatedPrice - stockPrice) / stockPrice * 100).toFixed(1)}% od aktuálnej ceny
+            </p>
+          </div>
+        </div>
+
+        {/* Scenario Summary */}
+        {simulatedPrice !== stockPrice && (
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className={`mt-6 p-4 rounded-2xl ${
+              simulatedPrice > stockPrice 
+                ? 'bg-emerald-100 dark:bg-emerald-900/30' 
+                : 'bg-rose-100 dark:bg-rose-900/30'
+            }`}
+          >
+            <p className={`text-sm font-medium ${
+              simulatedPrice > stockPrice 
+                ? 'text-emerald-700 dark:text-emerald-300' 
+                : 'text-rose-700 dark:text-rose-300'
+            }`}>
+              {simulatedPrice > stockPrice ? '📈' : '📉'} Pri cene <strong>{formatUSD(simulatedPrice)}</strong> by tvoje RSU mali hodnotu{' '}
+              <strong>{formatUSD(total * simulatedPrice)}</strong>, čo je{' '}
+              <strong>{simulatedPrice > stockPrice ? 'zisk' : 'strata'} {formatUSD(Math.abs((simulatedPrice - stockPrice) * total))}</strong>{' '}
+              oproti dnešnej hodnote.
+            </p>
+          </motion.div>
+        )}
+      </motion.div>
+
       {/* Info Note */}
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
-        transition={{ delay: 0.5 }}
+        transition={{ delay: 0.6 }}
         className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/30 p-6 rounded-2xl"
       >
         <div className="flex gap-3">
