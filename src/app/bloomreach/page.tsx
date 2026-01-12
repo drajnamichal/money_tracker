@@ -1,9 +1,8 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useMemo } from 'react';
 import {
   Gem,
-  TrendingUp,
   Clock,
   CheckCircle2,
   DollarSign,
@@ -12,6 +11,7 @@ import {
   Lock,
   Unlock,
   Info,
+  Gift,
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import {
@@ -28,18 +28,67 @@ import {
 } from 'recharts';
 
 export default function BloomreachPage() {
-  // RSU Data from Bloomreach
+  // RSU Grant Details from Bloomreach
+  const grantDetails = {
+    type: 'New Hire',
+    totalRSUs: 8194,
+    vestStartDate: new Date('2024-09-15'),
+    grantDate: new Date('2024-09-15'),
+    vestingYears: 4,
+    cliffYears: 1,
+    vestingFrequency: 'quarterly' as const,
+  };
+
   const stockPrice = 10.93; // USD as of June 30, 2025
   const priceDate = 'June 30, 2025';
   
+  // Calculate vested amount based on current date and vesting schedule
+  const calculateVesting = useMemo(() => {
+    const now = new Date();
+    const vestStart = grantDetails.vestStartDate;
+    const cliffDate = new Date(vestStart);
+    cliffDate.setFullYear(cliffDate.getFullYear() + grantDetails.cliffYears);
+    
+    // Before cliff - nothing vested
+    if (now < cliffDate) {
+      return { vested: 0, unvested: grantDetails.totalRSUs };
+    }
+    
+    // Calculate months since vest start
+    const monthsSinceStart = 
+      (now.getFullYear() - vestStart.getFullYear()) * 12 + 
+      (now.getMonth() - vestStart.getMonth());
+    
+    // Quarterly vesting over 4 years (16 quarters)
+    const totalQuarters = grantDetails.vestingYears * 4;
+    const quartersPassed = Math.floor(monthsSinceStart / 3);
+    const quartersVested = Math.min(quartersPassed, totalQuarters);
+    
+    // With cliff: 25% at cliff, then equal quarterly for remaining 75%
+    const cliffAmount = Math.floor(grantDetails.totalRSUs * 0.25);
+    const remainingAmount = grantDetails.totalRSUs - cliffAmount;
+    const quarterlyAmount = remainingAmount / (totalQuarters - 4); // 12 quarters after cliff
+    
+    let vested = 0;
+    if (quartersVested >= 4) {
+      // Past cliff
+      vested = cliffAmount + Math.floor((quartersVested - 4) * quarterlyAmount);
+    }
+    vested = Math.min(vested, grantDetails.totalRSUs);
+    
+    return {
+      vested: Math.round(vested),
+      unvested: grantDetails.totalRSUs - Math.round(vested),
+    };
+  }, []);
+
   const rsuData = {
-    vested: 2560,
-    unvested: 5634,
+    vested: 2560, // Actual current vested amount
+    unvested: 5634, // Actual current unvested amount
   };
   
-  const total = rsuData.vested + rsuData.unvested;
+  const total = grantDetails.totalRSUs;
   const vestedPercentage = ((rsuData.vested / total) * 100).toFixed(1);
-  const unvestedPercentage = ((rsuData.unvested / total) * 100).toFixed(1);
   
   const vestedValue = rsuData.vested * stockPrice;
   const unvestedValue = rsuData.unvested * stockPrice;
@@ -50,24 +99,47 @@ export default function BloomreachPage() {
   const totalValueEur = totalValue * usdToEur;
   const vestedValueEur = vestedValue * usdToEur;
 
-  // Vesting schedule simulation (quarterly vesting over 4 years)
+  // Cliff date
+  const cliffDate = new Date(grantDetails.vestStartDate);
+  cliffDate.setFullYear(cliffDate.getFullYear() + 1);
+
+  // Full vest date
+  const fullVestDate = new Date(grantDetails.vestStartDate);
+  fullVestDate.setFullYear(fullVestDate.getFullYear() + grantDetails.vestingYears);
+
+  // Vesting schedule with cliff
   const vestingSchedule = useMemo(() => {
     const schedule = [];
-    const quarterlyVest = Math.floor(total / 16); // 4 years * 4 quarters
-    let cumulative = 0;
+    const cliffAmount = Math.floor(total * 0.25); // 25% at cliff
+    const remainingAmount = total - cliffAmount;
+    const quarterlyAmount = remainingAmount / 12; // 12 quarters after cliff
     
-    for (let i = 1; i <= 16; i++) {
-      cumulative += quarterlyVest;
-      const quarter = ((i - 1) % 4) + 1;
-      const year = Math.floor((i - 1) / 4) + 1;
+    // First year - cliff period (nothing vests)
+    for (let q = 1; q <= 4; q++) {
       schedule.push({
-        period: `Y${year}Q${quarter}`,
-        vested: Math.min(cumulative, total),
-        value: Math.min(cumulative, total) * stockPrice,
+        period: `Y1Q${q}`,
+        vested: q === 4 ? cliffAmount : 0,
+        isCliff: q === 4,
+        date: new Date(2024, 8 + (q * 3), 15).toLocaleDateString('sk-SK', { month: 'short', year: '2-digit' }),
       });
     }
+    
+    // Years 2-4 - quarterly vesting
+    let cumulative = cliffAmount;
+    for (let year = 2; year <= 4; year++) {
+      for (let q = 1; q <= 4; q++) {
+        cumulative += quarterlyAmount;
+        schedule.push({
+          period: `Y${year}Q${q}`,
+          vested: Math.round(Math.min(cumulative, total)),
+          isCliff: false,
+          date: new Date(2024 + year - 1, 8 + (q * 3), 15).toLocaleDateString('sk-SK', { month: 'short', year: '2-digit' }),
+        });
+      }
+    }
+    
     return schedule;
-  }, [total, stockPrice]);
+  }, [total]);
 
   const pieData = [
     { name: 'Vested', value: rsuData.vested, color: '#10b981' },
@@ -86,6 +158,14 @@ export default function BloomreachPage() {
       style: 'currency',
       currency: 'EUR',
     }).format(val);
+  };
+
+  const formatDate = (date: Date) => {
+    return date.toLocaleDateString('sk-SK', {
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric',
+    });
   };
 
   return (
@@ -113,6 +193,67 @@ export default function BloomreachPage() {
           </span>
         </div>
       </div>
+
+      {/* Grant Details Card */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="bg-white dark:bg-slate-900 p-6 rounded-[32px] border shadow-sm"
+      >
+        <div className="flex items-center gap-3 mb-6">
+          <div className="p-3 bg-blue-100 dark:bg-blue-900/30 rounded-2xl">
+            <Gift className="text-blue-600" size={24} />
+          </div>
+          <div>
+            <h3 className="text-lg font-black text-slate-900 dark:text-white">Equity Grant Details</h3>
+            <p className="text-xs text-slate-400">New Hire Grant</p>
+          </div>
+        </div>
+        
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+          <div>
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">
+              Celkový grant
+            </p>
+            <p className="text-2xl font-black text-slate-900 dark:text-white">
+              {grantDetails.totalRSUs.toLocaleString()}
+            </p>
+            <p className="text-xs text-slate-500">RSU</p>
+          </div>
+          <div>
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">
+              Vest Start
+            </p>
+            <p className="text-lg font-bold text-slate-900 dark:text-white">
+              15. sept 2024
+            </p>
+          </div>
+          <div>
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">
+              Cliff Date
+            </p>
+            <p className="text-lg font-bold text-emerald-600">
+              15. sept 2025
+            </p>
+            <p className="text-[10px] text-emerald-500 font-bold">✓ Cliff dosiahnutý</p>
+          </div>
+          <div>
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">
+              Full Vest
+            </p>
+            <p className="text-lg font-bold text-slate-900 dark:text-white">
+              15. sept 2028
+            </p>
+          </div>
+        </div>
+
+        <div className="mt-6 p-4 bg-slate-50 dark:bg-slate-800/50 rounded-2xl">
+          <p className="text-xs text-slate-500">
+            <span className="font-bold text-slate-700 dark:text-slate-300">Vesting Schedule:</span>{' '}
+            4 roky, kvartálne vestovanie, 1 rok cliff (25% pri cliff, potom ~512 RSU každý kvartál)
+          </p>
+        </div>
+      </motion.div>
 
       {/* Main Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -300,12 +441,16 @@ export default function BloomreachPage() {
             </div>
             <div>
               <h3 className="text-lg font-black text-slate-900 dark:text-white">
-                Simulácia vestingu
+                Vesting Schedule
               </h3>
               <p className="text-xs text-slate-400">
-                Štandardný 4-ročný vesting s kvartálnym vestovaním
+                4 roky, kvartálne, 1-ročný cliff (25% pri cliff)
               </p>
             </div>
+          </div>
+          <div className="text-right">
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Aktuálny progress</p>
+            <p className="text-lg font-black text-indigo-600">{vestedPercentage}%</p>
           </div>
         </div>
 
@@ -339,11 +484,11 @@ export default function BloomreachPage() {
                 }}
                 formatter={(value: number, name: string) => [
                   name === 'vested' ? value.toLocaleString() + ' akcií' : formatUSD(value),
-                  name === 'vested' ? 'Vested' : 'Hodnota',
+                  name === 'vested' ? 'Kumulatívne vested' : 'Hodnota',
                 ]}
               />
               <Area
-                type="monotone"
+                type="stepAfter"
                 dataKey="vested"
                 stroke="#8b5cf6"
                 strokeWidth={3}
@@ -351,6 +496,33 @@ export default function BloomreachPage() {
               />
             </AreaChart>
           </ResponsiveContainer>
+        </div>
+
+        {/* Vesting Timeline */}
+        <div className="mt-6 pt-6 border-t border-slate-100 dark:border-slate-800">
+          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">
+            Kľúčové dátumy
+          </p>
+          <div className="flex flex-wrap gap-4">
+            <div className="flex items-center gap-2 px-3 py-2 bg-emerald-50 dark:bg-emerald-900/20 rounded-xl border border-emerald-100 dark:border-emerald-900/30">
+              <CheckCircle2 size={14} className="text-emerald-600" />
+              <span className="text-xs font-bold text-emerald-700 dark:text-emerald-400">
+                Cliff: 15.9.2025 (2,048 RSU)
+              </span>
+            </div>
+            <div className="flex items-center gap-2 px-3 py-2 bg-indigo-50 dark:bg-indigo-900/20 rounded-xl border border-indigo-100 dark:border-indigo-900/30">
+              <Clock size={14} className="text-indigo-600" />
+              <span className="text-xs font-bold text-indigo-700 dark:text-indigo-400">
+                Ďalší vest: Q1 2026 (~512 RSU)
+              </span>
+            </div>
+            <div className="flex items-center gap-2 px-3 py-2 bg-violet-50 dark:bg-violet-900/20 rounded-xl border border-violet-100 dark:border-violet-900/30">
+              <Calendar size={14} className="text-violet-600" />
+              <span className="text-xs font-bold text-violet-700 dark:text-violet-400">
+                Full vest: 15.9.2028
+              </span>
+            </div>
+          </div>
         </div>
       </motion.div>
 
@@ -368,9 +540,9 @@ export default function BloomreachPage() {
               Poznámka k RSU
             </h4>
             <p className="text-sm text-amber-700 dark:text-amber-300/80">
-              Hodnota RSU sa mení s cenou akcie Bloomreach. Zobrazená cena akcie ({formatUSD(stockPrice)}) je z {priceDate}. 
-              Pri vesting evente budete musieť zaplatiť daň z príjmu z hodnoty vestovaných akcií.
-              Vesting harmonogram je ilustratívny a môže sa líšiť od vášho skutočného plánu.
+              Hodnota RSU sa mení s cenou akcie Bloomreach (BRCH). Zobrazená cena ({formatUSD(stockPrice)}) je z {priceDate}. 
+              Pri každom vesting evente zaplatíš daň z príjmu z hodnoty vestovaných akcií (zvyčajne 19-25% na SK).
+              Po cliff dátume (sept 2025) ti vestuje ~512 akcií každý kvartál až do sept 2028.
             </p>
           </div>
         </div>
