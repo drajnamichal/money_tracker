@@ -19,6 +19,7 @@ import {
   Flame,
   ArrowRightLeft,
   Palmtree,
+  Gem,
 } from 'lucide-react';
 import { useState } from 'react';
 import { cn } from '@/lib/utils';
@@ -31,6 +32,7 @@ const navigation = [
   { name: 'Dashboard', href: '/', icon: LayoutDashboard },
   { name: 'Majetok', href: '/assets', icon: Wallet },
   { name: 'Portfólio', href: '/portfolio', icon: PieChart },
+  { name: 'Bloomreach RSU', href: '/bloomreach', icon: Gem },
   { name: 'Príjmy', href: '/income', icon: TrendingUp },
   { name: 'Výdaje', href: '/expenses', icon: Receipt },
   { name: 'Rozpočet bytu', href: '/budget-tracker', icon: Building2 },
