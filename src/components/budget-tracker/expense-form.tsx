@@ -19,6 +19,7 @@ export const EXPENSE_STRUCTURE = [
       'internet a TV',
       'údržba a opravy',
       'poistenie bývania',
+      'vybavenie bytu',
     ],
   },
   {

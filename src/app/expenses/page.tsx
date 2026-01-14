@@ -186,6 +186,19 @@ export default function ExpensesPage() {
 
       if (error) throw error;
 
+      // Automaticky pridať do rozpočtu bytu ak je kategória "Bývanie"
+      if (values.category.startsWith('Bývanie:')) {
+        await supabase.from('budget_expenses').insert([
+          {
+            description: values.description,
+            category: values.category,
+            amount: Number(values.amount),
+            amount_eur: Number(values.amount),
+            currency: 'EUR',
+          },
+        ]);
+      }
+
       await refresh();
       toast.success('Výdavok úspešne pridaný');
     } catch (err: unknown) {
