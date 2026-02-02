@@ -78,9 +78,9 @@ export function Sidebar() {
 
       {/* Desktop Sidebar */}
       <aside className="hidden md:flex flex-col w-64 border-r bg-slate-50 dark:bg-slate-900 h-screen sticky top-0">
-        <div className="p-6">
-          <Link href="/" className="flex flex-col items-center gap-2">
-            <div className="relative w-32 h-24">
+        <div className="p-4 pt-6">
+          <Link href="/" className="block">
+            <div className="relative w-full h-20">
               <Image 
                 src="/logo.png" 
                 alt="MoneyTracker" 
@@ -97,11 +97,11 @@ export function Sidebar() {
         </div>
 
         {/* Global Search */}
-        <div className="px-4 mt-2">
+        <div className="px-4">
           <GlobalSearch />
         </div>
 
-        <nav className="flex-1 px-4 space-y-2 mt-4 overflow-y-auto">
+        <nav className="flex-1 px-4 space-y-2 mt-3 overflow-y-auto">
           {navigation.map((item) => (
             <Link
               key={item.name}
@@ -156,9 +156,9 @@ export function Sidebar() {
               transition={{ type: 'spring', damping: 25, stiffness: 200 }}
               className="fixed inset-y-0 left-0 w-64 bg-white dark:bg-slate-900 z-50 md:hidden shadow-2xl flex flex-col"
             >
-              <div className="p-6 pt-16 flex-shrink-0">
-                <Link href="/" className="flex flex-col items-center gap-2" onClick={() => setIsOpen(false)}>
-                  <div className="relative w-28 h-20">
+              <div className="p-4 pt-16 flex-shrink-0">
+                <Link href="/" className="block" onClick={() => setIsOpen(false)}>
+                  <div className="relative w-full h-16">
                     <Image 
                       src="/logo.png" 
                       alt="MoneyTracker" 
@@ -175,11 +175,11 @@ export function Sidebar() {
               </div>
 
               {/* Mobile Global Search */}
-              <div className="px-4 mt-2">
+              <div className="px-4">
                 <GlobalSearch />
               </div>
 
-              <nav className="flex-1 px-4 space-y-2 mt-4 overflow-y-auto min-h-0">
+              <nav className="flex-1 px-4 space-y-2 mt-3 overflow-y-auto min-h-0">
                 {navigation.map((item) => (
                   <Link
                     key={item.name}
