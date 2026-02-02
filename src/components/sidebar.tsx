@@ -78,22 +78,22 @@ export function Sidebar() {
 
       {/* Desktop Sidebar */}
       <aside className="hidden md:flex flex-col w-64 border-r bg-slate-50 dark:bg-slate-900 h-screen sticky top-0">
-        <div className="p-4 pt-6">
-          <Link href="/" className="flex flex-col items-center gap-2">
-            <div className="relative w-16 h-16">
+        <div className="p-4 pt-5 pb-2">
+          <Link href="/" className="flex flex-col items-center gap-1">
+            <div className="relative w-24 h-24">
               <Image 
                 src="/logo.png" 
                 alt="MoneyTracker" 
                 fill
                 priority
-                className="object-contain"
+                className="object-contain drop-shadow-md"
                 onError={(e) => {
                   const target = e.target as HTMLImageElement;
                   target.style.display = 'none';
                 }}
               />
             </div>
-            <h1 className="text-lg font-bold text-slate-800 dark:text-slate-200">
+            <h1 className="text-xl font-bold bg-gradient-to-r from-blue-600 to-emerald-500 bg-clip-text text-transparent">
               MoneyTracker
             </h1>
           </Link>
@@ -159,22 +159,22 @@ export function Sidebar() {
               transition={{ type: 'spring', damping: 25, stiffness: 200 }}
               className="fixed inset-y-0 left-0 w-64 bg-white dark:bg-slate-900 z-50 md:hidden shadow-2xl flex flex-col"
             >
-              <div className="p-4 pt-16 flex-shrink-0">
-                <Link href="/" className="flex flex-col items-center gap-2" onClick={() => setIsOpen(false)}>
-                  <div className="relative w-14 h-14">
+              <div className="p-4 pt-16 pb-2 flex-shrink-0">
+                <Link href="/" className="flex flex-col items-center gap-1" onClick={() => setIsOpen(false)}>
+                  <div className="relative w-20 h-20">
                     <Image 
                       src="/logo.png" 
                       alt="MoneyTracker" 
                       fill
                       priority
-                      className="object-contain"
+                      className="object-contain drop-shadow-md"
                       onError={(e) => {
                         const target = e.target as HTMLImageElement;
                         target.style.display = 'none';
                       }}
                     />
                   </div>
-                  <h1 className="text-lg font-bold text-slate-800 dark:text-slate-200">
+                  <h1 className="text-lg font-bold bg-gradient-to-r from-blue-600 to-emerald-500 bg-clip-text text-transparent">
                     MoneyTracker
                   </h1>
                 </Link>
