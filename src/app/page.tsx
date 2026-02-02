@@ -56,6 +56,9 @@ export default function Dashboard() {
     let monthlyIncome = 0;
     let monthlyExpenses = 0;
     let savingsRate = 0;
+    let prevMonthIncome = 0;
+    let prevMonthExpenses = 0;
+    let prevMonthName = '';
 
     const investmentValue = investments
       .filter((inv) => !inv.portfolio_id || inv.portfolio_id === 'default')
@@ -128,6 +131,17 @@ export default function Dashboard() {
           : 0;
     }
 
+    // Previous month data
+    const prevMonth: any = combinedSorted[combinedSorted.length - 2];
+    if (prevMonth) {
+      prevMonthIncome = prevMonth.income;
+      prevMonthExpenses = prevMonth.expenses;
+      prevMonthName = new Date(prevMonth.month + '-01').toLocaleDateString('sk-SK', {
+        month: 'long',
+        year: 'numeric',
+      });
+    }
+
     return {
       totalAssets,
       growth,
@@ -135,6 +149,9 @@ export default function Dashboard() {
       monthlyExpenses,
       savingsRate,
       netWorth,
+      prevMonthIncome,
+      prevMonthExpenses,
+      prevMonthName,
     };
   }, [wealthData, incomeData, expenseData, investments, mortgage]);
 
@@ -329,6 +346,51 @@ export default function Dashboard() {
           </>
         )}
       </div>
+
+      {/* Previous Month Summary */}
+      {!loading && stats.prevMonthName && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="bg-gradient-to-r from-slate-50 to-slate-100 dark:from-slate-800/50 dark:to-slate-900/50 rounded-2xl p-6 border"
+        >
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div>
+              <p className="text-xs text-slate-500 uppercase font-bold tracking-wider mb-1">
+                Predchádzajúci mesiac
+              </p>
+              <p className="text-lg font-bold capitalize">{stats.prevMonthName}</p>
+            </div>
+            <div className="flex flex-wrap items-center gap-6">
+              <div className="text-center">
+                <p className="text-xs text-slate-500 mb-1">Príjmy</p>
+                <p className="text-lg font-bold text-emerald-600 dark:text-emerald-400">
+                  {formatCurrency(stats.prevMonthIncome)}
+                </p>
+              </div>
+              <div className="text-2xl text-slate-300 dark:text-slate-600">−</div>
+              <div className="text-center">
+                <p className="text-xs text-slate-500 mb-1">Výdavky</p>
+                <p className="text-lg font-bold text-rose-600 dark:text-rose-400">
+                  {formatCurrency(stats.prevMonthExpenses)}
+                </p>
+              </div>
+              <div className="text-2xl text-slate-300 dark:text-slate-600">=</div>
+              <div className="text-center">
+                <p className="text-xs text-slate-500 mb-1">Bilancia</p>
+                <p className={`text-xl font-black ${
+                  stats.prevMonthIncome - stats.prevMonthExpenses >= 0
+                    ? 'text-emerald-600 dark:text-emerald-400'
+                    : 'text-rose-600 dark:text-rose-400'
+                }`}>
+                  {stats.prevMonthIncome - stats.prevMonthExpenses >= 0 ? '+' : ''}
+                  {formatCurrency(stats.prevMonthIncome - stats.prevMonthExpenses)}
+                </p>
+              </div>
+            </div>
+          </div>
+        </motion.div>
+      )}
 
       {/* AI Financial Coach Section */}
       <motion.div
