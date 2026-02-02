@@ -20,10 +20,13 @@ import {
   ArrowRightLeft,
   Palmtree,
   Gem,
+  Settings,
+  Tags,
 } from 'lucide-react';
 import { useState } from 'react';
 import { cn } from '@/lib/utils';
 import { ThemeToggle } from './theme-toggle';
+import { GlobalSearch } from './global-search';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
@@ -34,6 +37,7 @@ const navigation = [
   { name: 'Portfólio', href: '/portfolio', icon: PieChart },
   { name: 'Príjmy', href: '/income', icon: TrendingUp },
   { name: 'Výdaje', href: '/expenses', icon: Receipt },
+  { name: 'Kategórie', href: '/categories', icon: Tags },
   { name: 'Rozpočet bytu', href: '/budget-tracker', icon: Building2 },
   { name: 'Pravidelné platby', href: '/recurring-payments', icon: CreditCard },
   { name: 'Hypotéka', href: '/mortgage', icon: Home },
@@ -43,6 +47,7 @@ const navigation = [
   { name: 'Dôchodok', href: '/retirement', icon: Palmtree },
   { name: 'CZ', href: '/cz', icon: ArrowRightLeft },
   { name: 'Bloomreach RSU', href: '/bloomreach', icon: Gem },
+  { name: 'Nastavenia', href: '/settings', icon: Settings },
 ];
 
 export function Sidebar() {
@@ -93,6 +98,11 @@ export function Sidebar() {
               />
             </div>
           </Link>
+        </div>
+
+        {/* Global Search */}
+        <div className="px-4 mt-2">
+          <GlobalSearch />
         </div>
 
         <nav className="flex-1 px-4 space-y-2 mt-4 overflow-y-auto">
@@ -169,6 +179,11 @@ export function Sidebar() {
                     />
                   </div>
                 </Link>
+              </div>
+
+              {/* Mobile Global Search */}
+              <div className="px-4 mt-2">
+                <GlobalSearch />
               </div>
 
               <nav className="flex-1 px-4 space-y-2 mt-4 overflow-y-auto min-h-0">
