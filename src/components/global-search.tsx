@@ -70,46 +70,50 @@ export function GlobalSearch() {
     const searchResults: SearchResult[] = [];
 
     // Search expenses
-    expenseRecords.forEach((expense) => {
+    expenseRecords?.forEach((expense) => {
+      if (!expense) return;
+      
       const matchesDescription = expense.description
-        .toLowerCase()
-        .includes(searchTerm);
+        ?.toLowerCase()
+        ?.includes(searchTerm) ?? false;
       const matchesCategory = expense.category
         ?.toLowerCase()
-        .includes(searchTerm);
-      const matchesAmount = expense.amount.toString().includes(searchTerm);
+        ?.includes(searchTerm) ?? false;
+      const matchesAmount = expense.amount?.toString()?.includes(searchTerm) ?? false;
 
       if (matchesDescription || matchesCategory || matchesAmount) {
         searchResults.push({
           id: expense.id,
           type: 'expense',
-          description: expense.description,
-          amount: expense.amount,
-          currency: expense.currency,
-          date: expense.record_date,
+          description: expense.description || '',
+          amount: expense.amount || 0,
+          currency: expense.currency || 'EUR',
+          date: expense.record_date || '',
           category: expense.category,
         });
       }
     });
 
     // Search income
-    incomeRecords.forEach((income) => {
+    incomeRecords?.forEach((income) => {
+      if (!income) return;
+      
       const matchesDescription = income.description
-        .toLowerCase()
-        .includes(searchTerm);
+        ?.toLowerCase()
+        ?.includes(searchTerm) ?? false;
       const matchesCategory = income.income_categories?.name
         ?.toLowerCase()
-        .includes(searchTerm);
-      const matchesAmount = income.amount.toString().includes(searchTerm);
+        ?.includes(searchTerm) ?? false;
+      const matchesAmount = income.amount?.toString()?.includes(searchTerm) ?? false;
 
       if (matchesDescription || matchesCategory || matchesAmount) {
         searchResults.push({
           id: income.id,
           type: 'income',
-          description: income.description,
-          amount: income.amount,
-          currency: income.currency,
-          date: income.record_month,
+          description: income.description || '',
+          amount: income.amount || 0,
+          currency: income.currency || 'EUR',
+          date: income.record_month || '',
           category: income.income_categories?.name,
         });
       }
@@ -151,12 +155,18 @@ export function GlobalSearch() {
   };
 
   const formatDate = (dateStr: string) => {
-    const date = new Date(dateStr);
-    return date.toLocaleDateString('sk-SK', {
-      day: 'numeric',
-      month: 'short',
-      year: 'numeric',
-    });
+    if (!dateStr) return '';
+    try {
+      const date = new Date(dateStr);
+      if (isNaN(date.getTime())) return dateStr;
+      return date.toLocaleDateString('sk-SK', {
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric',
+      });
+    } catch {
+      return dateStr;
+    }
   };
 
   return (
