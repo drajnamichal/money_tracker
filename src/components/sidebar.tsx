@@ -80,18 +80,14 @@ export function Sidebar() {
       <aside className="hidden md:flex flex-col w-64 border-r bg-slate-50 dark:bg-slate-900 h-screen sticky top-0">
         <div className="p-6">
           <Link href="/" className="flex flex-col items-center gap-2">
-            <h1 className="text-2xl font-bold text-blue-600 dark:text-blue-400">
-              MoneyTracker
-            </h1>
-            <div className="relative w-16 h-16">
+            <div className="relative w-32 h-24">
               <Image 
-                src="/money-bag.png" 
-                alt="" 
+                src="/logo.png" 
+                alt="MoneyTracker" 
                 fill
                 priority
-                className="object-contain drop-shadow-sm"
+                className="object-contain"
                 onError={(e) => {
-                  // Fallback to something if image fails
                   const target = e.target as HTMLImageElement;
                   target.style.display = 'none';
                 }}
@@ -162,13 +158,10 @@ export function Sidebar() {
             >
               <div className="p-6 pt-16 flex-shrink-0">
                 <Link href="/" className="flex flex-col items-center gap-2" onClick={() => setIsOpen(false)}>
-                  <h1 className="text-2xl font-bold text-blue-600 dark:text-blue-400 text-center w-full">
-                    MoneyTracker
-                  </h1>
-                  <div className="relative w-12 h-12">
+                  <div className="relative w-28 h-20">
                     <Image 
-                      src="/money-bag.png" 
-                      alt="" 
+                      src="/logo.png" 
+                      alt="MoneyTracker" 
                       fill
                       priority
                       className="object-contain"
