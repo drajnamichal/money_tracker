@@ -37,7 +37,6 @@ const navigation = [
   { name: 'Portfólio', href: '/portfolio', icon: PieChart },
   { name: 'Príjmy', href: '/income', icon: TrendingUp },
   { name: 'Výdaje', href: '/expenses', icon: Receipt },
-  { name: 'Kategórie', href: '/categories', icon: Tags },
   { name: 'Rozpočet bytu', href: '/budget-tracker', icon: Building2 },
   { name: 'Pravidelné platby', href: '/recurring-payments', icon: CreditCard },
   { name: 'Hypotéka', href: '/mortgage', icon: Home },
@@ -47,6 +46,7 @@ const navigation = [
   { name: 'Dôchodok', href: '/retirement', icon: Palmtree },
   { name: 'CZ', href: '/cz', icon: ArrowRightLeft },
   { name: 'Bloomreach RSU', href: '/bloomreach', icon: Gem },
+  { name: 'Kategórie', href: '/categories', icon: Tags },
   { name: 'Nastavenia', href: '/settings', icon: Settings },
 ];
 
