@@ -1,0 +1,193 @@
+# Page snapshot
+
+```yaml
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - complementary [ref=e3]:
+      - link "MoneyTracker MoneyTracker" [ref=e5] [cursor=pointer]:
+        - /url: /
+        - img "MoneyTracker" [ref=e7]
+        - heading "MoneyTracker" [level=1] [ref=e8]
+      - button "Hľadať... K" [ref=e10] [cursor=pointer]:
+        - img [ref=e11]
+        - generic [ref=e14]: Hľadať...
+        - generic [ref=e15]:
+          - img [ref=e16]
+          - text: K
+      - navigation [ref=e18]:
+        - link "Dashboard" [ref=e19] [cursor=pointer]:
+          - /url: /
+          - img [ref=e20]
+          - generic [ref=e25]: Dashboard
+        - link "Majetok" [ref=e26] [cursor=pointer]:
+          - /url: /assets
+          - img [ref=e27]
+          - generic [ref=e30]: Majetok
+        - link "Portfólio" [ref=e31] [cursor=pointer]:
+          - /url: /portfolio
+          - img [ref=e32]
+          - generic [ref=e35]: Portfólio
+        - link "Príjmy" [ref=e36] [cursor=pointer]:
+          - /url: /income
+          - img [ref=e37]
+          - generic [ref=e40]: Príjmy
+        - link "Výdaje" [ref=e41] [cursor=pointer]:
+          - /url: /expenses
+          - img [ref=e42]
+          - generic [ref=e45]: Výdaje
+        - link "Rozpočet bytu" [ref=e46] [cursor=pointer]:
+          - /url: /budget-tracker
+          - img [ref=e47]
+          - generic [ref=e51]: Rozpočet bytu
+        - link "Pravidelné platby" [ref=e52] [cursor=pointer]:
+          - /url: /recurring-payments
+          - img [ref=e53]
+          - generic [ref=e55]: Pravidelné platby
+        - link "Hypotéka" [ref=e56] [cursor=pointer]:
+          - /url: /mortgage
+          - img [ref=e57]
+          - generic [ref=e60]: Hypotéka
+        - link "Kalkulačka" [ref=e61] [cursor=pointer]:
+          - /url: /calculator
+          - img [ref=e62]
+          - generic [ref=e64]: Kalkulačka
+        - link "Prevod mien" [ref=e65] [cursor=pointer]:
+          - /url: /currency-converter
+          - img [ref=e66]
+          - generic [ref=e69]: Prevod mien
+        - link "FIRE" [ref=e70] [cursor=pointer]:
+          - /url: /fire
+          - img [ref=e71]
+          - generic [ref=e73]: FIRE
+        - link "Dôchodok" [ref=e74] [cursor=pointer]:
+          - /url: /retirement
+          - img [ref=e75]
+          - generic [ref=e80]: Dôchodok
+        - link "CZ" [ref=e81] [cursor=pointer]:
+          - /url: /cz
+          - img [ref=e82]
+          - generic [ref=e85]: CZ
+        - link "Bloomreach RSU" [ref=e86] [cursor=pointer]:
+          - /url: /bloomreach
+          - img [ref=e87]
+          - generic [ref=e90]: Bloomreach RSU
+        - link "Kategórie" [ref=e91] [cursor=pointer]:
+          - /url: /categories
+          - img [ref=e92]
+          - generic [ref=e96]: Kategórie
+        - link "Nastavenia" [ref=e97] [cursor=pointer]:
+          - /url: /settings
+          - img [ref=e98]
+          - generic [ref=e101]: Nastavenia
+      - generic [ref=e102]:
+        - generic [ref=e103]:
+          - button "Toggle theme" [ref=e104] [cursor=pointer]:
+            - img [ref=e105]
+            - generic [ref=e111]: Toggle theme
+          - button "Odhlásiť sa" [ref=e112] [cursor=pointer]:
+            - img [ref=e113]
+        - generic [ref=e116]: v1.0.0
+    - main [ref=e117]:
+      - generic [ref=e118]:
+        - generic [ref=e120]:
+          - generic [ref=e121]:
+            - heading "Investičná kalkulačka" [level=1] [ref=e122]
+            - paragraph [ref=e123]: Koľko investovať z príjmu a simulácia rastu portfólia.
+          - generic [ref=e124]:
+            - generic [ref=e125]:
+              - generic [ref=e126]:
+                - generic [ref=e127]:
+                  - img [ref=e128]
+                  - generic [ref=e131]: Aktuálne portfólio
+                - heading "0,00 €" [level=2] [ref=e132]
+                - paragraph [ref=e133]: Štartovacia hodnota pre simuláciu
+              - generic [ref=e134]:
+                - generic [ref=e135]:
+                  - generic [ref=e136]:
+                    - img [ref=e137]
+                    - text: Príjem za mesiac
+                  - generic [ref=e140]: 0,00 €
+                - generic [ref=e141]:
+                  - generic [ref=e142]:
+                    - img [ref=e143]
+                    - text: Percento na investície
+                  - generic [ref=e146]:
+                    - button "0%" [ref=e147] [cursor=pointer]
+                    - button "5%" [ref=e148] [cursor=pointer]
+                    - button "10%" [ref=e149] [cursor=pointer]
+                    - button "15%" [ref=e150] [cursor=pointer]
+                    - button "20%" [ref=e151] [cursor=pointer]
+                    - button "25%" [ref=e152] [cursor=pointer]
+                    - button "30%" [ref=e153] [cursor=pointer]
+                - generic [ref=e154]:
+                  - generic [ref=e155]:
+                    - generic [ref=e156]: Mesačná investícia
+                    - generic [ref=e157]: 10% z 0,00 €
+                  - generic [ref=e158]: 0,00 €
+            - generic [ref=e159]:
+              - generic [ref=e160]:
+                - generic [ref=e161]:
+                  - paragraph [ref=e162]: Štart
+                  - paragraph [ref=e163]: 0,00 €
+                - generic [ref=e164]:
+                  - paragraph [ref=e165]: Mesačne
+                  - paragraph [ref=e166]: +0,00 €
+                - generic [ref=e167]:
+                  - paragraph [ref=e168]: Ročne
+                  - paragraph [ref=e169]: +0,00 €
+                - generic [ref=e170]:
+                  - paragraph [ref=e171]: Za 20 rokov
+                  - paragraph [ref=e172]: 0,00 €
+              - generic [ref=e173]:
+                - generic [ref=e174]:
+                  - generic [ref=e175]:
+                    - img [ref=e177]
+                    - generic [ref=e180]:
+                      - heading "Simulácia rastu portfólia (S&P 500)" [level=3] [ref=e181]
+                      - paragraph [ref=e182]:
+                        - text: "Očakávaný ročný výnos:"
+                        - generic [ref=e183]: 10%
+                  - generic [ref=e184]:
+                    - generic [ref=e185]:
+                      - img [ref=e186]
+                      - generic [ref=e189]: 20 rokov
+                    - slider [ref=e190] [cursor=pointer]: "20"
+                - generic [ref=e191]:
+                  - generic [ref=e192]:
+                    - generic [ref=e193]:
+                      - paragraph [ref=e194]: Cieľová hodnota
+                      - heading "0,00 €" [level=4] [ref=e195]
+                    - generic [ref=e196]:
+                      - paragraph [ref=e197]: Celkové vklady
+                      - heading "0,00 €" [level=4] [ref=e198]
+                    - generic [ref=e199]:
+                      - paragraph [ref=e200]: Zložený úrok
+                      - heading "+0,00 €" [level=4] [ref=e201]
+                  - application [ref=e205]:
+                    - generic [ref=e210]:
+                      - generic [ref=e212]: Rok 1
+                      - generic [ref=e214]: Rok 3
+                      - generic [ref=e216]: Rok 5
+                      - generic [ref=e218]: Rok 7
+                      - generic [ref=e220]: Rok 9
+                      - generic [ref=e222]: Rok 11
+                      - generic [ref=e224]: Rok 13
+                      - generic [ref=e226]: Rok 15
+                      - generic [ref=e228]: Rok 17
+                      - generic [ref=e230]: Rok 20
+                  - generic [ref=e231]:
+                    - img [ref=e232]
+                    - paragraph [ref=e236]:
+                      - text: S aktuálnym portfóliom 0,00 € a mesačnou investíciou 0,00 € (10% z príjmu) môže tvoje portfólio za 20 rokov dosiahnuť
+                      - strong [ref=e237]: 0,00 €
+                      - text: .
+        - paragraph [ref=e239]: Vytvorené s láskou pre spoločné ciele ❤️
+  - region "Notifications alt+T"
+  - alert [ref=e240]
+  - generic [ref=e243] [cursor=pointer]:
+    - img [ref=e244]
+    - generic [ref=e246]: 1 error
+    - button "Hide Errors" [ref=e247]:
+      - img [ref=e248]
+  - generic [ref=e251]: Rok 0
+```

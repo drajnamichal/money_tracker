@@ -241,3 +241,4 @@ export default function CurrencyConverterPage() {
     </div>
   );
 }
+

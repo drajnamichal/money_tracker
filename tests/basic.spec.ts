@@ -27,7 +27,7 @@ test.describe('Family Money Tracker', () => {
   test('should load Calculator page', async ({ page }) => {
     await page.goto('/calculator');
     await expect(
-      page.getByText('Optimalizácia rozdelenia príjmu a simulácia bohatstva')
+      page.getByText('Koľko investovať z príjmu a simulácia rastu portfólia')
     ).toBeVisible();
   });
 
