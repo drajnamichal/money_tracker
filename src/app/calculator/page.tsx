@@ -14,6 +14,8 @@ import {
   ArrowUpRight,
   Target,
   Clock,
+  ChevronDown,
+  Calendar,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
@@ -56,11 +58,38 @@ export default function CalculatorPage() {
   };
 
   const [investmentHorizon, setInvestmentHorizon] = useState(20);
+  const [selectedMonth, setSelectedMonth] = useState<string>('');
   const expectedReturn = 10; // 10% for S&P 500
 
   useEffect(() => {
     setIsMounted(true);
   }, []);
+
+  // Get available months with their totals
+  const availableMonths = useMemo(() => {
+    if (!incomeRecords || incomeRecords.length === 0) return [];
+
+    const monthTotals: Record<string, number> = {};
+    
+    incomeRecords.forEach((record) => {
+      const month = record.record_month;
+      if (!monthTotals[month]) {
+        monthTotals[month] = 0;
+      }
+      monthTotals[month] += record.amount_eur || 0;
+    });
+
+    return Object.entries(monthTotals)
+      .map(([month, total]) => ({
+        month,
+        total: Math.round(total),
+        label: new Date(month + '-01').toLocaleDateString('sk-SK', {
+          month: 'long',
+          year: 'numeric',
+        }),
+      }))
+      .sort((a, b) => b.month.localeCompare(a.month)); // Newest first
+  }, [incomeRecords]);
 
   // Calculate latest month total income
   const latestMonthIncome = useMemo(() => {
@@ -75,6 +104,15 @@ export default function CalculatorPage() {
       .filter((r) => r.record_month === latestMonth)
       .reduce((sum, r) => sum + (r.amount_eur || 0), 0);
   }, [incomeRecords]);
+
+  // Handle month selection
+  const handleMonthSelect = (month: string) => {
+    setSelectedMonth(month);
+    const monthData = availableMonths.find((m) => m.month === month);
+    if (monthData) {
+      setSalary(monthData.total);
+    }
+  };
 
   // Investment projection data
   const projectionData = useMemo(() => {
@@ -112,9 +150,11 @@ export default function CalculatorPage() {
 
           if (splitSetting) setSplit(splitSetting.value);
 
-          // If we have latest month income, prioritize it, otherwise use saved setting
-          if (latestMonthIncome > 0) {
-            setSalary(Math.round(latestMonthIncome));
+          // If we have available months, select the latest one
+          if (availableMonths.length > 0) {
+            const latestMonth = availableMonths[0];
+            setSelectedMonth(latestMonth.month);
+            setSalary(latestMonth.total);
           } else if (salarySetting) {
             setSalary(salarySetting.value.amount);
           }
@@ -126,10 +166,10 @@ export default function CalculatorPage() {
       }
     }
 
-    if (!incomeLoading) {
+    if (!incomeLoading && availableMonths.length >= 0) {
       fetchSettings();
     }
-  }, [incomeLoading, latestMonthIncome]);
+  }, [incomeLoading, availableMonths]);
 
   async function handleSave() {
     setSaving(true);
@@ -183,25 +223,33 @@ export default function CalculatorPage() {
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
         {/* Left Column: Inputs */}
         <div className="lg:col-span-4 bg-white dark:bg-slate-900 p-8 rounded-3xl shadow-sm border space-y-8 h-fit">
-          <div className="space-y-3">
+          <div className="space-y-4">
             <div className="flex justify-between items-center">
               <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">
                 Mesačný príjem (€)
               </label>
-              {latestMonthIncome > 0 && (
-                <div className="flex items-center gap-1.5 px-2 py-1 bg-emerald-50 dark:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400 rounded-full border border-emerald-100 dark:border-emerald-900/50">
-                  <TrendingUp size={10} />
-                  <span className="text-[9px] font-bold uppercase tracking-tight">
-                    {new Date(
-                      incomeRecords[0]?.record_month
-                    ).toLocaleDateString('sk-SK', {
-                      month: 'long',
-                      year: 'numeric',
-                    })}
-                  </span>
-                </div>
-              )}
             </div>
+
+            {/* Month Selector */}
+            {availableMonths.length > 0 && (
+              <div className="relative">
+                <select
+                  value={selectedMonth}
+                  onChange={(e) => handleMonthSelect(e.target.value)}
+                  className="w-full appearance-none bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 pr-10 text-sm font-bold text-slate-700 dark:text-slate-300 cursor-pointer hover:border-blue-300 dark:hover:border-blue-700 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all capitalize"
+                >
+                  {availableMonths.map((m) => (
+                    <option key={m.month} value={m.month} className="capitalize">
+                      {m.label} — {formatCurrency(m.total)}
+                    </option>
+                  ))}
+                </select>
+                <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
+                  <ChevronDown size={18} className="text-slate-400" />
+                </div>
+              </div>
+            )}
+
             {loading ? (
               <Skeleton className="h-12 w-full rounded-xl" />
             ) : (
