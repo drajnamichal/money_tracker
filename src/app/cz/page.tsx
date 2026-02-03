@@ -11,7 +11,10 @@ import {
   ArrowUpRight,
   Landmark,
   Building2,
-  PieChart as PieIcon
+  PieChart as PieIcon,
+  AlertTriangle,
+  TrendingDown,
+  ShieldAlert
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { 
@@ -72,6 +75,30 @@ export default function CZPage() {
     }).format(val);
   };
 
+  const formatEUR = (val: number) => {
+    return new Intl.NumberFormat('sk-SK', {
+      style: 'currency',
+      currency: 'EUR',
+      maximumFractionDigits: 0
+    }).format(val);
+  };
+
+  // Currency risk calculations
+  const currentRate = 25.2;
+  const currentValueEUR = totalCZK / currentRate;
+  
+  // Historical CZK/EUR range (last 5 years approximately)
+  const rateScenarios = [
+    { name: 'Pesimistický', rate: 27.0, description: 'CZK oslabí' },
+    { name: 'Aktuálny', rate: currentRate, description: 'Súčasný kurz' },
+    { name: 'Optimistický', rate: 24.0, description: 'CZK posilní' },
+  ];
+
+  const worstCaseEUR = totalCZK / 27.0;
+  const bestCaseEUR = totalCZK / 24.0;
+  const potentialLoss = currentValueEUR - worstCaseEUR;
+  const potentialGain = bestCaseEUR - currentValueEUR;
+
   return (
     <div className="space-y-8 pb-20">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -115,12 +142,101 @@ export default function CZPage() {
           <div className="bg-gradient-to-br from-blue-600 to-indigo-700 p-8 rounded-[32px] text-white shadow-xl relative overflow-hidden">
             <div className="relative z-10">
               <p className="text-blue-100 text-xs font-black uppercase tracking-widest mb-2">Prepočet na EUR</p>
-              <h2 className="text-4xl font-black mb-4">~ {(totalCZK / 25.2).toLocaleString('sk-SK', { style: 'currency', currency: 'EUR' })}</h2>
+              <h2 className="text-4xl font-black mb-4">~ {formatEUR(currentValueEUR)}</h2>
               <p className="text-sm text-blue-100/80 italic">
-                *Pri kurze 1 EUR = 25.20 CZK
+                *Pri kurze 1 EUR = {currentRate} CZK
               </p>
             </div>
             <ArrowUpRight className="absolute -bottom-4 -right-4 text-white/10 w-32 h-32" />
+          </div>
+
+          {/* Currency Risk Section */}
+          <div className="bg-white dark:bg-slate-900 p-6 rounded-[32px] border shadow-sm">
+            <h3 className="text-lg font-bold mb-5 flex items-center gap-2">
+              <ShieldAlert className="text-amber-500" size={20} />
+              Riziko kurzových strát
+            </h3>
+            
+            <div className="space-y-4">
+              {/* Risk Scenarios */}
+              <div className="grid grid-cols-3 gap-3">
+                {rateScenarios.map((scenario, idx) => {
+                  const valueEUR = totalCZK / scenario.rate;
+                  const diff = valueEUR - currentValueEUR;
+                  const isNegative = diff < 0;
+                  const isCurrent = scenario.rate === currentRate;
+                  
+                  return (
+                    <motion.div
+                      key={scenario.name}
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: idx * 0.1 }}
+                      className={`p-4 rounded-2xl text-center ${
+                        isCurrent 
+                          ? 'bg-blue-50 dark:bg-blue-900/20 border-2 border-blue-200 dark:border-blue-800' 
+                          : isNegative 
+                            ? 'bg-rose-50 dark:bg-rose-900/10 border border-rose-100 dark:border-rose-900/30'
+                            : 'bg-emerald-50 dark:bg-emerald-900/10 border border-emerald-100 dark:border-emerald-900/30'
+                      }`}
+                    >
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1">
+                        {scenario.name}
+                      </p>
+                      <p className="text-xs text-slate-400 mb-2">
+                        1 EUR = {scenario.rate} CZK
+                      </p>
+                      <p className={`text-lg font-black ${
+                        isCurrent 
+                          ? 'text-blue-600 dark:text-blue-400'
+                          : isNegative 
+                            ? 'text-rose-600 dark:text-rose-400' 
+                            : 'text-emerald-600 dark:text-emerald-400'
+                      }`}>
+                        {formatEUR(valueEUR)}
+                      </p>
+                      {!isCurrent && (
+                        <p className={`text-xs font-bold mt-1 ${
+                          isNegative ? 'text-rose-500' : 'text-emerald-500'
+                        }`}>
+                          {isNegative ? '' : '+'}{formatEUR(diff)}
+                        </p>
+                      )}
+                    </motion.div>
+                  );
+                })}
+              </div>
+
+              {/* Risk Summary */}
+              <div className="mt-4 p-4 bg-amber-50 dark:bg-amber-900/10 rounded-2xl border border-amber-200 dark:border-amber-900/30">
+                <div className="flex items-start gap-3">
+                  <AlertTriangle className="text-amber-500 shrink-0 mt-0.5" size={18} />
+                  <div className="text-sm">
+                    <p className="font-bold text-amber-800 dark:text-amber-200 mb-2">
+                      Kurzové riziko
+                    </p>
+                    <p className="text-amber-700 dark:text-amber-300/80">
+                      Pri oslabení CZK na 27.00 za EUR môžete stratiť až{' '}
+                      <span className="font-bold text-rose-600">{formatEUR(potentialLoss)}</span>.
+                      Naopak, pri posilnení na 24.00 môžete získať{' '}
+                      <span className="font-bold text-emerald-600">{formatEUR(potentialGain)}</span>.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Volatility indicator */}
+              <div className="flex items-center justify-between text-xs text-slate-500 pt-2">
+                <span className="flex items-center gap-1">
+                  <TrendingDown size={12} className="text-rose-400" />
+                  Strata: až {((potentialLoss / currentValueEUR) * 100).toFixed(1)}%
+                </span>
+                <span className="flex items-center gap-1">
+                  <TrendingUp size={12} className="text-emerald-400" />
+                  Zisk: až {((potentialGain / currentValueEUR) * 100).toFixed(1)}%
+                </span>
+              </div>
+            </div>
           </div>
         </div>
 
