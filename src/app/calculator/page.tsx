@@ -65,6 +65,40 @@ export default function CalculatorPage() {
     setIsMounted(true);
   }, []);
 
+  // Helper to format month string to readable label
+  const formatMonthLabel = (monthStr: string): string => {
+    if (!monthStr) return monthStr;
+    
+    try {
+      // Handle different formats: "2026-01", "2026-01-01", "January 2026", etc.
+      let date: Date;
+      
+      // If it's in YYYY-MM format
+      if (/^\d{4}-\d{2}$/.test(monthStr)) {
+        date = new Date(monthStr + '-15'); // Use 15th to avoid timezone issues
+      } 
+      // If it's in YYYY-MM-DD format
+      else if (/^\d{4}-\d{2}-\d{2}$/.test(monthStr)) {
+        date = new Date(monthStr);
+      }
+      // Try direct parsing
+      else {
+        date = new Date(monthStr);
+      }
+      
+      if (isNaN(date.getTime())) {
+        return monthStr;
+      }
+      
+      return date.toLocaleDateString('sk-SK', {
+        month: 'long',
+        year: 'numeric',
+      });
+    } catch {
+      return monthStr;
+    }
+  };
+
   // Get available months with their totals
   const availableMonths = useMemo(() => {
     if (!incomeRecords || incomeRecords.length === 0) return [];
@@ -73,6 +107,7 @@ export default function CalculatorPage() {
     
     incomeRecords.forEach((record) => {
       const month = record.record_month;
+      if (!month) return;
       if (!monthTotals[month]) {
         monthTotals[month] = 0;
       }
@@ -83,10 +118,7 @@ export default function CalculatorPage() {
       .map(([month, total]) => ({
         month,
         total: Math.round(total),
-        label: new Date(month + '-01').toLocaleDateString('sk-SK', {
-          month: 'long',
-          year: 'numeric',
-        }),
+        label: formatMonthLabel(month),
       }))
       .sort((a, b) => b.month.localeCompare(a.month)); // Newest first
   }, [incomeRecords]);
