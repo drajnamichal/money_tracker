@@ -9,6 +9,8 @@ import {
   Briefcase,
   PieChart as PieIcon,
   Search,
+  RefreshCw,
+  Wifi,
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { Skeleton } from '@/components/skeleton';
@@ -23,6 +25,7 @@ import type { Investment } from '@/types/financial';
 import { CHART_COLORS, TOOLTIP_STYLE } from '@/lib/constants';
 import { PortfolioAIAnalysis } from './portfolio-ai-analysis';
 import { BenchmarkComparison } from './benchmark-comparison';
+import { useStockPrices } from '@/hooks/use-stock-prices';
 
 interface PortfolioContentProps {
   investments: Investment[];
@@ -39,9 +42,21 @@ export function PortfolioContent({
   search,
   setSearch,
 }: PortfolioContentProps) {
+  // Live prices from Yahoo Finance
+  const { prices: livePrices, fetchedAt, isRefreshing, refetch: refetchPrices } =
+    useStockPrices(investments);
+
+  /** Get the best available price: live Yahoo price → stored DB price */
+  const getPrice = (inv: Investment): number => {
+    if (inv.ticker && livePrices[inv.ticker]) {
+      return livePrices[inv.ticker].price;
+    }
+    return inv.current_price;
+  };
+
   const stats = useMemo(() => {
     const totalValue = investments.reduce(
-      (sum, inv) => sum + inv.shares * inv.current_price,
+      (sum, inv) => sum + inv.shares * getPrice(inv),
       0
     );
     const totalCost = investments.reduce(
@@ -52,7 +67,8 @@ export function PortfolioContent({
     const profitPercentage =
       totalCost > 0 ? (totalProfit / totalCost) * 100 : 0;
     return { totalValue, totalProfit, profitPercentage };
-  }, [investments]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [investments, livePrices]);
 
   const filteredInvestments = investments.filter(
     (inv) =>
@@ -64,10 +80,11 @@ export function PortfolioContent({
     return investments
       .map((inv) => ({
         name: inv.name,
-        value: inv.shares * inv.current_price,
+        value: inv.shares * getPrice(inv),
       }))
       .sort((a, b) => b.value - a.value);
-  }, [investments]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [investments, livePrices]);
 
   return (
     <div className="space-y-8">
@@ -100,9 +117,30 @@ export function PortfolioContent({
           <div className="grid grid-cols-2 gap-8 max-w-md mx-auto pt-6 border-t border-slate-800">
             <div>
               <p className="text-slate-500 text-[10px] uppercase font-black tracking-widest mb-1">
-                Voľné prostriedky
+                Live ceny
               </p>
-              <p className="text-lg font-bold">0.00 €</p>
+              <div className="flex items-center gap-2">
+                {Object.keys(livePrices).length > 0 ? (
+                  <div className="flex items-center gap-1.5 text-emerald-400 text-sm font-bold">
+                    <Wifi size={14} />
+                    <span>{Object.keys(livePrices).length} tickerov</span>
+                  </div>
+                ) : (
+                  <span className="text-slate-500 text-sm">--</span>
+                )}
+                <button
+                  onClick={() => refetchPrices()}
+                  disabled={isRefreshing}
+                  className="p-1 rounded-md hover:bg-white/10 transition-colors disabled:opacity-50"
+                  title="Obnoviť ceny"
+                  aria-label="Obnoviť ceny"
+                >
+                  <RefreshCw
+                    size={12}
+                    className={isRefreshing ? 'animate-spin' : ''}
+                  />
+                </button>
+              </div>
             </div>
             <div>
               <p className="text-slate-500 text-[10px] uppercase font-black tracking-widest mb-1">
@@ -158,7 +196,9 @@ export function PortfolioContent({
               ))
             ) : filteredInvestments.length > 0 ? (
               filteredInvestments.map((inv, idx) => {
-                const value = inv.shares * inv.current_price;
+                const currentPrice = getPrice(inv);
+                const isLive = !!(inv.ticker && livePrices[inv.ticker]);
+                const value = inv.shares * currentPrice;
                 const cost = inv.shares * inv.avg_price;
                 const profit = value - cost;
                 const profitPct = cost > 0 ? (profit / cost) * 100 : 0;
@@ -183,6 +223,9 @@ export function PortfolioContent({
                           <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-500 font-bold uppercase tracking-tighter">
                             {inv.type}
                           </span>
+                          {isLive && (
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" title="Live cena" />
+                          )}
                         </div>
                         <p className="text-xs text-slate-400 font-medium">
                           {inv.shares} @ {inv.avg_price}
