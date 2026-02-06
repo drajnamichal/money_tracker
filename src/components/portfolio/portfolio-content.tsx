@@ -42,25 +42,31 @@ export function PortfolioContent({
   search,
   setSearch,
 }: PortfolioContentProps) {
-  // Live prices from Yahoo Finance
-  const { prices: livePrices, fetchedAt, isRefreshing, refetch: refetchPrices } =
+  // Live prices from Yahoo Finance (includes EUR/USD rate)
+  const { prices: livePrices, usdToEur, fetchedAt, isRefreshing, refetch: refetchPrices } =
     useStockPrices(investments);
 
-  /** Get the best available price: live Yahoo price → stored DB price */
-  const getPrice = (inv: Investment): number => {
+  /** Get the best available price in EUR */
+  const getPriceEur = (inv: Investment): number => {
+    let price = inv.current_price;
     if (inv.ticker && livePrices[inv.ticker]) {
-      return livePrices[inv.ticker].price;
+      price = livePrices[inv.ticker].price;
     }
-    return inv.current_price;
+    return inv.currency === 'USD' ? price * usdToEur : price;
+  };
+
+  /** Get avg_price in EUR */
+  const getAvgPriceEur = (inv: Investment): number => {
+    return inv.currency === 'USD' ? inv.avg_price * usdToEur : inv.avg_price;
   };
 
   const stats = useMemo(() => {
     const totalValue = investments.reduce(
-      (sum, inv) => sum + inv.shares * getPrice(inv),
+      (sum, inv) => sum + inv.shares * getPriceEur(inv),
       0
     );
     const totalCost = investments.reduce(
-      (sum, inv) => sum + inv.shares * inv.avg_price,
+      (sum, inv) => sum + inv.shares * getAvgPriceEur(inv),
       0
     );
     const totalProfit = totalValue - totalCost;
@@ -80,7 +86,7 @@ export function PortfolioContent({
     return investments
       .map((inv) => ({
         name: inv.name,
-        value: inv.shares * getPrice(inv),
+        value: inv.shares * getPriceEur(inv),
       }))
       .sort((a, b) => b.value - a.value);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -196,10 +202,10 @@ export function PortfolioContent({
               ))
             ) : filteredInvestments.length > 0 ? (
               filteredInvestments.map((inv, idx) => {
-                const currentPrice = getPrice(inv);
+                const currentPrice = getPriceEur(inv);
                 const isLive = !!(inv.ticker && livePrices[inv.ticker]);
                 const value = inv.shares * currentPrice;
-                const cost = inv.shares * inv.avg_price;
+                const cost = inv.shares * getAvgPriceEur(inv);
                 const profit = value - cost;
                 const profitPct = cost > 0 ? (profit / cost) * 100 : 0;
 
