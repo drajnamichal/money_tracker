@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useMemo } from 'react';
+import { useMemo } from 'react';
 import { formatCurrency } from '@/lib/utils';
 import {
   TrendingUp,
@@ -22,9 +22,10 @@ import {
   Bar,
   Legend,
 } from 'recharts';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { Skeleton } from '@/components/skeleton';
 import { cn } from '@/lib/utils';
+import type { ReactNode } from 'react';
 import {
   useWealthData,
   useIncomeData,
@@ -99,7 +100,7 @@ export default function Dashboard() {
         .filter((r) => r.record_date === latestDate)
         .reduce((sum, r) => sum + Number(r.amount_eur), 0);
 
-      const totalsByDate = wealthData.reduce((acc: any, curr: any) => {
+      const totalsByDate = wealthData.reduce<Record<string, number>>((acc, curr) => {
         acc[curr.record_date] =
           (acc[curr.record_date] || 0) + Number(curr.amount_eur);
         return acc;
@@ -123,9 +124,15 @@ export default function Dashboard() {
     // The user specifically wants "Čistý majetok" to match the Assets page total (snapshot)
     const netWorth = totalAssets;
 
-    const monthlyData: any = {};
+    interface MonthlyBucket {
+      month: string;
+      income: number;
+      expenses: number;
+    }
+
+    const monthlyData: Record<string, MonthlyBucket> = {};
     if (incomeData) {
-      incomeData.forEach((item: any) => {
+      incomeData.forEach((item) => {
         const month = item.record_month.substring(0, 7);
         if (!monthlyData[month])
           monthlyData[month] = { month, income: 0, expenses: 0 };
@@ -134,7 +141,7 @@ export default function Dashboard() {
     }
 
     if (expenseData) {
-      expenseData.forEach((item: any) => {
+      expenseData.forEach((item) => {
         const month = item.record_date.substring(0, 7);
         if (!monthlyData[month])
           monthlyData[month] = { month, income: 0, expenses: 0 };
@@ -142,11 +149,11 @@ export default function Dashboard() {
       });
     }
 
-    const combinedSorted = Object.values(monthlyData).sort((a: any, b: any) =>
+    const combinedSorted = Object.values(monthlyData).sort((a, b) =>
       a.month.localeCompare(b.month)
     );
 
-    const latestMonth: any = combinedSorted[combinedSorted.length - 1];
+    const latestMonth = combinedSorted[combinedSorted.length - 1] as MonthlyBucket | undefined;
     if (latestMonth) {
       monthlyIncome = latestMonth.income;
       monthlyExpenses = latestMonth.expenses;
@@ -157,7 +164,7 @@ export default function Dashboard() {
     }
 
     // Previous month data
-    const prevMonth: any = combinedSorted[combinedSorted.length - 2];
+    const prevMonth = combinedSorted[combinedSorted.length - 2] as MonthlyBucket | undefined;
     if (prevMonth) {
       prevMonthIncome = prevMonth.income;
       prevMonthExpenses = prevMonth.expenses;
@@ -261,7 +268,7 @@ export default function Dashboard() {
 
   const assetsHistory = useMemo(() => {
     if (!wealthData || wealthData.length === 0) return [];
-    const totalsByDate = wealthData.reduce((acc: any, curr: any) => {
+    const totalsByDate = wealthData.reduce<Record<string, number>>((acc, curr) => {
       acc[curr.record_date] =
         (acc[curr.record_date] || 0) + Number(curr.amount_eur);
       return acc;
@@ -279,9 +286,15 @@ export default function Dashboard() {
   }, [wealthData]);
 
   const incomeVsExpenses = useMemo(() => {
-    const monthlyData: any = {};
+    interface ChartBucket {
+      month: string;
+      income: number;
+      expenses: number;
+    }
+
+    const monthlyData: Record<string, ChartBucket> = {};
     if (incomeData) {
-      incomeData.forEach((item: any) => {
+      incomeData.forEach((item) => {
         const month = item.record_month.substring(0, 7);
         if (!monthlyData[month])
           monthlyData[month] = { month, income: 0, expenses: 0 };
@@ -290,7 +303,7 @@ export default function Dashboard() {
     }
 
     if (expenseData) {
-      expenseData.forEach((item: any) => {
+      expenseData.forEach((item) => {
         const month = item.record_date.substring(0, 7);
         if (!monthlyData[month])
           monthlyData[month] = { month, income: 0, expenses: 0 };
@@ -299,8 +312,8 @@ export default function Dashboard() {
     }
 
     return Object.values(monthlyData)
-      .sort((a: any, b: any) => a.month.localeCompare(b.month))
-      .map((item: any) => ({
+      .sort((a, b) => a.month.localeCompare(b.month))
+      .map((item) => ({
         name: new Date(item.month).toLocaleDateString('sk-SK', {
           month: 'short',
           year: '2-digit',
@@ -597,7 +610,15 @@ export default function Dashboard() {
   );
 }
 
-function StatCard({ title, value, change, icon, color }: any) {
+interface StatCardProps {
+  title: string;
+  value: string;
+  change: number;
+  icon: ReactNode;
+  color: string;
+}
+
+function StatCard({ title, value, change, icon, color }: StatCardProps) {
   return (
     <motion.div
       whileHover={{ y: -4 }}

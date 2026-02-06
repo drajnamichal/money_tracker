@@ -110,8 +110,9 @@ export default function RetirementPage() {
         total_contributions: '',
         record_date: new Date().toISOString().split('T')[0],
       });
-    } catch (error: any) {
-      toast.error('Chyba pri ukladaní: ' + error.message);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Neznáma chyba';
+      toast.error('Chyba pri ukladaní: ' + message);
     }
   };
 
@@ -379,7 +380,15 @@ const retirementStatIconBg: Record<string, string> = {
   indigo: 'bg-indigo-50 dark:bg-indigo-950/50',
 };
 
-function RetirementStatCard({ title, value, percentage, icon, color }: any) {
+interface RetirementStatCardProps {
+  title: string;
+  value: string;
+  percentage?: number;
+  icon: React.ReactNode;
+  color: string;
+}
+
+function RetirementStatCard({ title, value, percentage, icon, color }: RetirementStatCardProps) {
   return (
     <motion.div
       whileHover={{ y: -4 }}

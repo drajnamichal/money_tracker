@@ -14,8 +14,8 @@ export function calculatePercentageChange(
 }
 
 export function aggregateMonthlyData(
-  incomeData: any[],
-  expenseData: any[]
+  incomeData: { record_month: string; amount_eur: number }[],
+  expenseData: { record_date: string; amount_eur: number; category?: string }[]
 ): MonthlyData[] {
   const monthlyData: Record<string, MonthlyData> = {};
 
@@ -46,7 +46,9 @@ export function aggregateMonthlyData(
   );
 }
 
-export function calculateWealthGrowth(wealthData: any[]): {
+export function calculateWealthGrowth(
+  wealthData: { record_date: string; amount_eur: number }[]
+): {
   totalAssets: number;
   growth: number;
 } {
@@ -54,7 +56,7 @@ export function calculateWealthGrowth(wealthData: any[]): {
     return { totalAssets: 0, growth: 0 };
   }
 
-  const totalsByDate = wealthData.reduce((acc: any, curr: any) => {
+  const totalsByDate = wealthData.reduce<Record<string, number>>((acc, curr) => {
     acc[curr.record_date] =
       (acc[curr.record_date] || 0) + Number(curr.amount_eur);
     return acc;
