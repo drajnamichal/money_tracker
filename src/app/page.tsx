@@ -24,6 +24,7 @@ import {
 } from 'recharts';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Skeleton } from '@/components/skeleton';
+import { cn } from '@/lib/utils';
 import {
   useWealthData,
   useIncomeData,
@@ -32,6 +33,30 @@ import {
   useMortgageData,
   useRecurringPaymentsData,
 } from '@/hooks/use-financial-data';
+
+const insightCardStyles: Record<string, { wrapper: string; iconBg: string }> = {
+  emerald: {
+    wrapper:
+      'bg-emerald-50/50 dark:bg-emerald-900/10 border-emerald-100/50 dark:border-emerald-900/20',
+    iconBg: 'bg-emerald-100 dark:bg-emerald-900/30',
+  },
+  rose: {
+    wrapper:
+      'bg-rose-50/50 dark:bg-rose-900/10 border-rose-100/50 dark:border-rose-900/20',
+    iconBg: 'bg-rose-100 dark:bg-rose-900/30',
+  },
+  indigo: {
+    wrapper:
+      'bg-indigo-50/50 dark:bg-indigo-900/10 border-indigo-100/50 dark:border-indigo-900/20',
+    iconBg: 'bg-indigo-100 dark:bg-indigo-900/30',
+  },
+};
+
+const statCardIconBg: Record<string, string> = {
+  emerald: 'bg-emerald-50 dark:bg-emerald-950',
+  rose: 'bg-rose-50 dark:bg-rose-950',
+  blue: 'bg-blue-50 dark:bg-blue-950',
+};
 
 export default function Dashboard() {
   const { records: wealthData, loading: wealthLoading } = useWealthData();
@@ -425,10 +450,16 @@ export default function Dashboard() {
                     initial={{ opacity: 0, x: -10 }}
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: idx * 0.1 }}
-                    className={`flex items-start gap-4 p-4 rounded-2xl bg-${insight.color}-50/50 dark:bg-${insight.color}-900/10 border border-${insight.color}-100/50 dark:border-${insight.color}-900/20`}
+                    className={cn(
+                      'flex items-start gap-4 p-4 rounded-2xl border',
+                      insightCardStyles[insight.color]?.wrapper
+                    )}
                   >
                     <div
-                      className={`mt-1 p-2 rounded-lg bg-${insight.color}-100 dark:bg-${insight.color}-900/30`}
+                      className={cn(
+                        'mt-1 p-2 rounded-lg',
+                        insightCardStyles[insight.color]?.iconBg
+                      )}
                     >
                       {insight.icon}
                     </div>
@@ -572,7 +603,7 @@ function StatCard({ title, value, change, icon, color }: any) {
       whileHover={{ y: -4 }}
       className="bg-white dark:bg-slate-900 p-6 rounded-2xl shadow-sm border flex items-center gap-6"
     >
-      <div className={`p-4 rounded-xl bg-${color}-50 dark:bg-${color}-950`}>
+      <div className={cn('p-4 rounded-xl', statCardIconBg[color])}>
         {icon}
       </div>
       <div>

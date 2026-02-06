@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { formatCurrency } from '@/lib/utils';
+import { formatCurrency, cn } from '@/lib/utils';
 import {
   Palmtree,
   TrendingUp,
@@ -372,6 +372,13 @@ export default function RetirementPage() {
   );
 }
 
+const retirementStatIconBg: Record<string, string> = {
+  orange: 'bg-orange-50 dark:bg-orange-950/50',
+  emerald: 'bg-emerald-50 dark:bg-emerald-950/50',
+  blue: 'bg-blue-50 dark:bg-blue-950/50',
+  indigo: 'bg-indigo-50 dark:bg-indigo-950/50',
+};
+
 function RetirementStatCard({ title, value, percentage, icon, color }: any) {
   return (
     <motion.div
@@ -380,7 +387,10 @@ function RetirementStatCard({ title, value, percentage, icon, color }: any) {
     >
       <div className="flex items-center justify-between">
         <div
-          className={`p-3 rounded-2xl bg-${color}-50 dark:bg-${color}-950/50 group-hover:scale-110 transition-transform`}
+          className={cn(
+            'p-3 rounded-2xl group-hover:scale-110 transition-transform',
+            retirementStatIconBg[color]
+          )}
         >
           {icon}
         </div>
