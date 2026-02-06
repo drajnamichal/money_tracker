@@ -1,8 +1,13 @@
 import React, { useState } from 'react';
 import { TrashIcon, CheckEmoji, CategoryEmoji, PlusEmoji } from './icons';
 
+interface TodoItem {
+  id: string;
+  text: string;
+}
+
 interface ToDoListProps {
-  items: any[];
+  items: TodoItem[];
   onAddItem: (text: string) => void;
   onDeleteItem: (id: string) => void;
 }

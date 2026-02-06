@@ -201,9 +201,10 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ onAddExpense }) => {
       }
 
       toast.success('Bloček úspešne naskenovaný!');
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('OCR Error:', error);
-      toast.error('Chyba pri skenovaní bločku: ' + error.message);
+      const message = error instanceof Error ? error.message : 'Neznáma chyba';
+      toast.error('Chyba pri skenovaní bločku: ' + message);
     } finally {
       setIsScanning(false);
     }

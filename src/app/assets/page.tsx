@@ -60,7 +60,7 @@ export default function AssetsPage() {
       .sort()
       .reverse();
 
-    const map: any = {};
+    const map: Record<string, Record<string, number>> = {};
     wealthData.forEach((r) => {
       if (!map[r.record_date]) map[r.record_date] = {};
       map[r.record_date][r.account_id] = r.amount_eur;

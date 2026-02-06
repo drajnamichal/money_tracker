@@ -103,7 +103,12 @@ export default function RecurringPaymentsPage() {
   ) {
     // Find the current payment to get its current amount
     const currentPayment = payments.find((p) => p.id === id);
-    const updateData: any = { name, amount, frequency };
+    const updateData: {
+      name: string;
+      amount: number;
+      frequency: 'monthly' | 'yearly';
+      last_amount?: number;
+    } = { name, amount, frequency };
 
     // If amount is changing, store the current amount as last_amount
     if (currentPayment && currentPayment.amount !== amount) {

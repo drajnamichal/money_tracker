@@ -13,8 +13,17 @@ import {
 } from './icons';
 import { EXPENSE_STRUCTURE } from './expense-form';
 
+interface BudgetExpenseItem {
+  id: string;
+  description: string;
+  amount: number;
+  category: string | null;
+  is_fixed: boolean;
+  attachment_url: string | null;
+}
+
 interface ExpenseListProps {
-  expenses: any[];
+  expenses: BudgetExpenseItem[];
   onDeleteExpense: (id: string) => void;
   onUpdateExpense: (
     id: string,
@@ -35,7 +44,7 @@ const ExpenseList: React.FC<ExpenseListProps> = ({
   const [editedAmount, setEditedAmount] = useState('');
   const [editedCategory, setEditedCategory] = useState('');
 
-  const handleEditStart = (expense: any) => {
+  const handleEditStart = (expense: BudgetExpenseItem) => {
     setEditingId(expense.id);
     setEditedDescription(expense.description);
     setEditedAmount(expense.amount.toString());
