@@ -155,14 +155,19 @@ export function useExpenseData(options?: ExpenseDataOptions) {
 // Budget
 // ---------------------------------------------------------------------------
 
-export function useBudgetData() {
+export function useBudgetData(options?: {
+  initialExpenses?: BudgetExpense[];
+  initialTodos?: BudgetTodoItem[];
+}) {
   const expensesQuery = useQuery({
     queryKey: queryKeys.budget.expenses,
     queryFn: () => fetchBudgetExpenses(),
+    initialData: options?.initialExpenses,
   });
   const todosQuery = useQuery({
     queryKey: queryKeys.budget.todos,
     queryFn: () => fetchBudgetTodoItems(),
+    initialData: options?.initialTodos,
   });
   const exchangeRateQuery = useExchangeRate();
 
@@ -181,14 +186,19 @@ export function useBudgetData() {
 // Mortgage
 // ---------------------------------------------------------------------------
 
-export function useMortgageData() {
+export function useMortgageData(options?: {
+  initialMortgages?: Mortgage[];
+  initialPayments?: MortgagePayment[];
+}) {
   const mortgagesQuery = useQuery({
     queryKey: queryKeys.mortgage.loans,
     queryFn: () => fetchMortgages(),
+    initialData: options?.initialMortgages,
   });
   const paymentsQuery = useQuery({
     queryKey: queryKeys.mortgage.payments,
     queryFn: () => fetchMortgagePayments(),
+    initialData: options?.initialPayments,
   });
 
   const mortgages = (mortgagesQuery.data ?? []) as Mortgage[];
@@ -229,10 +239,13 @@ export function useRecurringPaymentsData(options?: {
 // Retirement
 // ---------------------------------------------------------------------------
 
-export function useRetirementData() {
+export function useRetirementData(options?: {
+  initialRecords?: RetirementRecord[];
+}) {
   const query = useQuery({
     queryKey: queryKeys.retirement,
     queryFn: () => fetchRetirementRecords(),
+    initialData: options?.initialRecords,
   });
 
   return {
