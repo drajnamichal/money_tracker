@@ -77,7 +77,7 @@ export function Sidebar() {
       {/* Mobile Menu Button (hidden when bottom nav is visible) */}
 
       {/* Desktop Sidebar */}
-      <aside className="hidden md:flex flex-col w-64 border-r bg-slate-50 dark:bg-slate-900 h-screen sticky top-0">
+      <aside className="hidden md:flex flex-col w-64 border-r bg-slate-50 dark:bg-slate-900 h-screen sticky top-0" role="navigation" aria-label="Hlavná navigácia">
         <div className="p-4 pt-5 pb-2">
           <Link href="/" className="flex flex-col items-center gap-1">
             <div className="relative w-24 h-24">
@@ -104,22 +104,26 @@ export function Sidebar() {
           <GlobalSearch />
         </div>
 
-        <nav className="flex-1 px-4 space-y-2 mt-3 overflow-y-auto">
-          {navigation.map((item) => (
-            <Link
-              key={item.name}
-              href={item.href}
-              className={cn(
-                'flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200',
-                pathname === item.href
-                  ? 'bg-blue-600 text-white shadow-md shadow-blue-200 dark:shadow-blue-900/20'
-                  : 'text-slate-600 dark:text-slate-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:text-blue-600'
-              )}
-            >
-              <item.icon size={20} />
-              <span className="font-medium">{item.name}</span>
-            </Link>
-          ))}
+        <nav className="flex-1 px-4 space-y-2 mt-3 overflow-y-auto" aria-label="Sekcie">
+          {navigation.map((item) => {
+            const isActive = pathname === item.href;
+            return (
+              <Link
+                key={item.name}
+                href={item.href}
+                aria-current={isActive ? 'page' : undefined}
+                className={cn(
+                  'flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200',
+                  isActive
+                    ? 'bg-blue-600 text-white shadow-md shadow-blue-200 dark:shadow-blue-900/20'
+                    : 'text-slate-600 dark:text-slate-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:text-blue-600'
+                )}
+              >
+                <item.icon size={20} />
+                <span className="font-medium">{item.name}</span>
+              </Link>
+            );
+          })}
         </nav>
 
         <div className="p-4 border-t space-y-4">
@@ -129,6 +133,7 @@ export function Sidebar() {
               onClick={handleSignOut}
               className="text-slate-400 hover:text-rose-500 transition-colors"
               title="Odhlásiť sa"
+              aria-label="Odhlásiť sa"
             >
               <LogOut size={20} />
             </button>
@@ -185,23 +190,27 @@ export function Sidebar() {
                 <GlobalSearch />
               </div>
 
-              <nav className="flex-1 px-4 space-y-2 mt-3 overflow-y-auto min-h-0">
-                {navigation.map((item) => (
-                  <Link
-                    key={item.name}
-                    href={item.href}
-                    onClick={() => setIsOpen(false)}
-                    className={cn(
-                      'flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200',
-                      pathname === item.href
-                        ? 'bg-blue-600 text-white shadow-md'
-                        : 'text-slate-600 dark:text-slate-400 hover:bg-blue-50 dark:hover:bg-blue-900/20'
-                    )}
-                  >
-                    <item.icon size={20} />
-                    <span className="font-medium">{item.name}</span>
-                  </Link>
-                ))}
+              <nav className="flex-1 px-4 space-y-2 mt-3 overflow-y-auto min-h-0" aria-label="Sekcie">
+                {navigation.map((item) => {
+                  const isActive = pathname === item.href;
+                  return (
+                    <Link
+                      key={item.name}
+                      href={item.href}
+                      onClick={() => setIsOpen(false)}
+                      aria-current={isActive ? 'page' : undefined}
+                      className={cn(
+                        'flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200',
+                        isActive
+                          ? 'bg-blue-600 text-white shadow-md'
+                          : 'text-slate-600 dark:text-slate-400 hover:bg-blue-50 dark:hover:bg-blue-900/20'
+                      )}
+                    >
+                      <item.icon size={20} />
+                      <span className="font-medium">{item.name}</span>
+                    </Link>
+                  );
+                })}
               </nav>
 
               <div className="p-4 border-t flex justify-between items-center bg-white dark:bg-slate-900 flex-shrink-0">
@@ -214,7 +223,7 @@ export function Sidebar() {
       </AnimatePresence>
 
       {/* Mobile Bottom Navigation */}
-      <nav className="fixed bottom-0 left-0 right-0 z-50 md:hidden bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 safe-area-bottom">
+      <nav className="fixed bottom-0 left-0 right-0 z-50 md:hidden bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 safe-area-bottom" role="navigation" aria-label="Rýchla navigácia">
         <div className="flex items-center justify-around px-2 py-1">
           {bottomNavItems.map((item) => {
             const isActive = pathname === item.href;
@@ -222,6 +231,8 @@ export function Sidebar() {
               <Link
                 key={item.href}
                 href={item.href}
+                aria-current={isActive ? 'page' : undefined}
+                aria-label={item.name}
                 className={cn(
                   'flex flex-col items-center gap-0.5 px-3 py-2 rounded-xl transition-colors min-w-[60px]',
                   isActive
@@ -236,6 +247,7 @@ export function Sidebar() {
           })}
           <button
             onClick={() => setIsOpen(true)}
+            aria-label="Zobraziť viac sekcií"
             className={cn(
               'flex flex-col items-center gap-0.5 px-3 py-2 rounded-xl transition-colors min-w-[60px]',
               'text-slate-400 dark:text-slate-500'

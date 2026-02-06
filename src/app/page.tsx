@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo } from 'react';
+import Link from 'next/link';
 import { formatCurrency } from '@/lib/utils';
 import {
   TrendingUp,
@@ -9,6 +10,8 @@ import {
   ArrowRight,
   BrainCircuit,
   Zap,
+  Plus,
+  Receipt,
 } from 'lucide-react';
 import {
   AreaChart,
@@ -343,6 +346,45 @@ export default function Dashboard() {
       }));
   }, [incomeData, expenseData]);
 
+  const recentTransactions = useMemo(() => {
+    interface Transaction {
+      id: string;
+      type: 'expense' | 'income';
+      description: string;
+      amount: number;
+      date: string;
+      category?: string;
+    }
+
+    const transactions: Transaction[] = [];
+
+    expenseData?.slice(0, 15).forEach((e) => {
+      transactions.push({
+        id: e.id,
+        type: 'expense',
+        description: e.description || '',
+        amount: e.amount_eur,
+        date: e.record_date,
+        category: e.category,
+      });
+    });
+
+    incomeData?.slice(0, 15).forEach((i) => {
+      transactions.push({
+        id: i.id,
+        type: 'income',
+        description: i.income_categories?.name || i.description || '',
+        amount: i.amount_eur,
+        date: i.record_month,
+        category: i.income_categories?.name,
+      });
+    });
+
+    return transactions
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+      .slice(0, 6);
+  }, [expenseData, incomeData]);
+
   return (
     <div className="space-y-8 pb-12">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -404,6 +446,94 @@ export default function Dashboard() {
           </>
         )}
       </div>
+
+      {/* Quick Actions */}
+      {!loading && (
+        <div className="flex gap-3 overflow-x-auto pb-1 -mx-1 px-1">
+          <Link
+            href="/expenses?action=add"
+            className="flex items-center gap-2 px-5 py-3 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-2xl transition-colors shadow-lg shadow-rose-200 dark:shadow-none whitespace-nowrap text-sm"
+          >
+            <Plus size={18} />
+            Pridať výdavok
+          </Link>
+          <Link
+            href="/income"
+            className="flex items-center gap-2 px-5 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-2xl transition-colors shadow-lg shadow-emerald-200 dark:shadow-none whitespace-nowrap text-sm"
+          >
+            <Plus size={18} />
+            Pridať príjem
+          </Link>
+          <Link
+            href="/assets"
+            className="flex items-center gap-2 px-5 py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-2xl transition-colors shadow-lg shadow-blue-200 dark:shadow-none whitespace-nowrap text-sm"
+          >
+            <Plus size={18} />
+            Zaznamenať majetok
+          </Link>
+        </div>
+      )}
+
+      {/* Recent Transactions */}
+      {!loading && recentTransactions.length > 0 && (
+        <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border overflow-hidden">
+          <div className="p-5 border-b flex items-center justify-between">
+            <h3 className="font-semibold">Posledné transakcie</h3>
+            <Link
+              href="/expenses"
+              className="text-xs font-bold text-blue-600 hover:text-blue-700 flex items-center gap-1 transition-colors"
+            >
+              Všetky <ArrowRight size={12} />
+            </Link>
+          </div>
+          <div className="divide-y">
+            {recentTransactions.map((tx) => (
+              <div
+                key={`${tx.type}-${tx.id}`}
+                className="flex items-center gap-4 px-5 py-3.5 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"
+              >
+                <div
+                  className={cn(
+                    'w-9 h-9 rounded-xl flex items-center justify-center shrink-0',
+                    tx.type === 'expense'
+                      ? 'bg-rose-100 dark:bg-rose-900/30 text-rose-600 dark:text-rose-400'
+                      : 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400'
+                  )}
+                >
+                  {tx.type === 'expense' ? (
+                    <Receipt size={16} />
+                  ) : (
+                    <TrendingUp size={16} />
+                  )}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-slate-900 dark:text-white truncate">
+                    {tx.description}
+                  </p>
+                  <p className="text-[11px] text-slate-400">
+                    {new Date(tx.date).toLocaleDateString('sk-SK', {
+                      day: 'numeric',
+                      month: 'short',
+                    })}
+                    {tx.category && ` · ${tx.category}`}
+                  </p>
+                </div>
+                <p
+                  className={cn(
+                    'text-sm font-bold shrink-0',
+                    tx.type === 'expense'
+                      ? 'text-rose-600 dark:text-rose-400'
+                      : 'text-emerald-600 dark:text-emerald-400'
+                  )}
+                >
+                  {tx.type === 'expense' ? '-' : '+'}
+                  {formatCurrency(tx.amount)}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Previous Month Summary */}
       {!loading && stats.prevMonthName && (

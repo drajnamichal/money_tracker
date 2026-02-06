@@ -1,6 +1,7 @@
 import { OpenAI } from 'openai';
 import { NextResponse } from 'next/server';
 import { createRateLimiter, getClientIdentifier } from '@/lib/rate-limit';
+import { getOpenAIKey } from '@/lib/env';
 
 export const dynamic = 'force-dynamic';
 
@@ -18,12 +19,10 @@ export async function POST(req: Request) {
   try {
     const { month, expenses, total } = await req.json();
 
-    const apiKey = process.env.OPENAI_API_KEY || process.env.OPEN_API_KEY || process.env.OPENAI_KEY;
-
+    const apiKey = getOpenAIKey();
     if (!apiKey) {
-      console.error('Expense Analysis Error: OpenAI API key is missing. Checked: OPENAI_API_KEY, OPEN_API_KEY, OPENAI_KEY');
       return NextResponse.json(
-        { error: 'OpenAI API kľúč chýba v nastaveniach (Vercel Environment Variables). Skontrolujte OPENAI_API_KEY.' },
+        { error: 'OpenAI API kľúč chýba v nastaveniach. Skontrolujte OPENAI_API_KEY.' },
         { status: 500 }
       );
     }
