@@ -24,13 +24,19 @@ import {
   Tags,
   MoreHorizontal,
 } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { cn } from '@/lib/utils';
 import { ThemeToggle } from './theme-toggle';
 import { GlobalSearch } from './global-search';
+import { Sparkline } from './sparkline';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
+import {
+  useWealthData,
+  useIncomeData,
+  useExpenseData,
+} from '@/hooks/use-financial-data';
 
 const navigation = [
   { name: 'Dashboard', href: '/', icon: LayoutDashboard },
@@ -62,6 +68,50 @@ export function Sidebar() {
   const pathname = usePathname();
   const [isOpen, setIsOpen] = useState(false);
   const router = useRouter();
+
+  // Data for sparklines (shares TanStack Query cache — no extra fetches)
+  const { records: wealthRecords } = useWealthData();
+  const { records: incomeRecords } = useIncomeData();
+  const { records: expenseRecords } = useExpenseData();
+
+  const sparklineData = useMemo(() => {
+    const map: Record<string, number[]> = {};
+
+    // Assets: monthly totals (last 6 months)
+    const wealthByMonth: Record<string, number> = {};
+    wealthRecords.forEach((r) => {
+      const m = r.record_date.substring(0, 7);
+      wealthByMonth[m] = (wealthByMonth[m] || 0) + Number(r.amount_eur);
+    });
+    map['/assets'] = Object.entries(wealthByMonth)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .slice(-6)
+      .map(([, v]) => v);
+
+    // Income: monthly totals
+    const incByMonth: Record<string, number> = {};
+    incomeRecords.forEach((r) => {
+      const m = r.record_month.substring(0, 7);
+      incByMonth[m] = (incByMonth[m] || 0) + Number(r.amount_eur);
+    });
+    map['/income'] = Object.entries(incByMonth)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .slice(-6)
+      .map(([, v]) => v);
+
+    // Expenses: monthly totals
+    const expByMonth: Record<string, number> = {};
+    expenseRecords.forEach((r) => {
+      const m = r.record_date.substring(0, 7);
+      expByMonth[m] = (expByMonth[m] || 0) + Number(r.amount_eur);
+    });
+    map['/expenses'] = Object.entries(expByMonth)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .slice(-6)
+      .map(([, v]) => v);
+
+    return map;
+  }, [wealthRecords, incomeRecords, expenseRecords]);
 
   // Hide sidebar on login page
   if (pathname === '/login') return null;
@@ -107,6 +157,7 @@ export function Sidebar() {
         <nav className="flex-1 px-4 space-y-2 mt-3 overflow-y-auto" aria-label="Sekcie">
           {navigation.map((item) => {
             const isActive = pathname === item.href;
+            const spark = sparklineData[item.href];
             return (
               <Link
                 key={item.name}
@@ -120,7 +171,15 @@ export function Sidebar() {
                 )}
               >
                 <item.icon size={20} />
-                <span className="font-medium">{item.name}</span>
+                <span className="font-medium flex-1">{item.name}</span>
+                {spark && spark.length >= 2 && (
+                  <Sparkline
+                    data={spark}
+                    color={isActive ? '#ffffff' : '#94a3b8'}
+                    width={44}
+                    height={14}
+                  />
+                )}
               </Link>
             );
           })}

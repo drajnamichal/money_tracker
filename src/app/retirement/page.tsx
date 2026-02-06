@@ -3,8 +3,14 @@ import { fetchRetirementRecords } from '@/lib/queries';
 import { RetirementClient } from './retirement-client';
 
 export default async function RetirementPage() {
-  const supabase = await createServerSupabaseClient();
-  const records = await fetchRetirementRecords(supabase);
+  let records: Awaited<ReturnType<typeof fetchRetirementRecords>> = [];
+
+  try {
+    const supabase = await createServerSupabaseClient();
+    records = await fetchRetirementRecords(supabase);
+  } catch {
+    // Server fetch failed — client hooks will refetch
+  }
 
   return <RetirementClient initialRecords={records} />;
 }

@@ -9,15 +9,24 @@ import {
 import { FireClient } from './fire-client';
 
 export default async function FirePage() {
-  const supabase = await createServerSupabaseClient();
+  let wealth: Awaited<ReturnType<typeof fetchWealthRecords>> = [];
+  let income: Awaited<ReturnType<typeof fetchIncomeRecords>> = [];
+  let expenses: Awaited<ReturnType<typeof fetchExpenseRecords>> = [];
+  let investments: Awaited<ReturnType<typeof fetchInvestments>> = [];
+  let mortgages: Awaited<ReturnType<typeof fetchMortgages>> = [];
 
-  const [wealth, income, expenses, investments, mortgages] = await Promise.all([
-    fetchWealthRecords(supabase),
-    fetchIncomeRecords(supabase),
-    fetchExpenseRecords(supabase),
-    fetchInvestments(supabase),
-    fetchMortgages(supabase),
-  ]);
+  try {
+    const supabase = await createServerSupabaseClient();
+    [wealth, income, expenses, investments, mortgages] = await Promise.all([
+      fetchWealthRecords(supabase),
+      fetchIncomeRecords(supabase),
+      fetchExpenseRecords(supabase),
+      fetchInvestments(supabase),
+      fetchMortgages(supabase),
+    ]);
+  } catch {
+    // Server fetch failed — client hooks will refetch
+  }
 
   return (
     <FireClient

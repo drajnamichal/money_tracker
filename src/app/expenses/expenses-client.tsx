@@ -347,15 +347,13 @@ export function ExpensesClient({
           >
             <Settings2 size={24} />
           </button>
-          {!loading && (
-            <button
-              onClick={() => setIsAdding(true)}
-              className="bg-rose-600 hover:bg-rose-700 text-white px-4 py-2 rounded-xl flex items-center gap-2 transition-colors"
-            >
-              <Plus size={20} />
-              <span>Pridať výdavok</span>
-            </button>
-          )}
+          <button
+            onClick={() => setIsAdding(true)}
+            className="bg-rose-600 hover:bg-rose-700 text-white px-4 py-2 rounded-xl flex items-center gap-2 transition-colors"
+          >
+            <Plus size={20} />
+            <span>Pridať výdavok</span>
+          </button>
         </div>
       </div>
 

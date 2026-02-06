@@ -24,12 +24,14 @@ import {
   BarChart,
   Bar,
   Legend,
+  Sankey,
 } from 'recharts';
 import { motion } from 'framer-motion';
 import { Skeleton } from '@/components/skeleton';
 import { cn } from '@/lib/utils';
 import { TOOLTIP_STYLE } from '@/lib/constants';
 import type { ReactNode } from 'react';
+import { AnimatedNumber } from '@/components/animated-number';
 import {
   useWealthData,
   useIncomeData,
@@ -417,6 +419,49 @@ export function DashboardClient({
       .slice(0, 6);
   }, [expenseData, incomeData]);
 
+  const cashFlowSankey = useMemo(() => {
+    if (!stats.monthlyIncome || stats.monthlyIncome === 0) return null;
+
+    // Build top expense categories for the current month
+    const catTotals: Record<string, number> = {};
+    const latestMonthKey = incomeData?.[0]?.record_month?.substring(0, 7);
+    if (latestMonthKey) {
+      expenseData
+        ?.filter((e) => e.record_date.startsWith(latestMonthKey))
+        .forEach((e) => {
+          const cat = (e.category || 'Ostatné').split(':')[0].trim();
+          catTotals[cat] = (catTotals[cat] || 0) + Number(e.amount_eur);
+        });
+    }
+
+    const topCats = Object.entries(catTotals)
+      .sort(([, a], [, b]) => b - a)
+      .slice(0, 5);
+
+    const saving = Math.max(0, stats.monthlyIncome - stats.monthlyExpenses);
+
+    // Nodes: 0=Príjem, 1..N=categories, N+1=Úspora
+    const nodes = [
+      { name: `Príjem (${formatCurrency(stats.monthlyIncome)})` },
+      ...topCats.map(([cat, val]) => ({ name: `${cat} (${formatCurrency(val)})` })),
+      ...(saving > 0 ? [{ name: `Úspora (${formatCurrency(saving)})` }] : []),
+    ];
+
+    const links = [
+      ...topCats.map(([, val], idx) => ({
+        source: 0,
+        target: idx + 1,
+        value: val,
+      })),
+      ...(saving > 0
+        ? [{ source: 0, target: topCats.length + 1, value: saving }]
+        : []),
+    ];
+
+    if (links.length === 0) return null;
+    return { nodes, links };
+  }, [stats, expenseData, incomeData]);
+
   return (
     <div className="space-y-8 pb-12">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -435,9 +480,11 @@ export function DashboardClient({
               <p className="text-xs opacity-60 uppercase font-bold tracking-wider">
                 Čistý Majetok
               </p>
-              <p className="text-xl font-bold">
-                {formatCurrency(stats.netWorth)}
-              </p>
+              <AnimatedNumber
+                value={stats.netWorth}
+                format={formatCurrency}
+                className="text-xl font-bold"
+              />
             </div>
           </div>
         )}
@@ -454,23 +501,21 @@ export function DashboardClient({
           <>
             <StatCard
               title="Mesačný Príjem"
-              value={formatCurrency(stats.monthlyIncome)}
+              rawValue={stats.monthlyIncome}
               change={stats.incomeChange}
               icon={<TrendingUp className="text-emerald-500" />}
               color="emerald"
             />
             <StatCard
               title="Mesačné Výdavky"
-              value={formatCurrency(stats.monthlyExpenses)}
+              rawValue={stats.monthlyExpenses}
               change={stats.expenseChange}
               icon={<TrendingDown className="text-rose-500" />}
               color="rose"
             />
             <StatCard
               title="Mesačná Úspora"
-              value={formatCurrency(
-                stats.monthlyIncome - stats.monthlyExpenses
-              )}
+              rawValue={stats.monthlyIncome - stats.monthlyExpenses}
               change={stats.savingChange}
               icon={<TrendingUp className="text-blue-500" />}
               color="blue"
@@ -778,19 +823,47 @@ export function DashboardClient({
           </div>
         </div>
       </div>
+
+      {/* Cash Flow Sankey */}
+      {!loading && cashFlowSankey && (
+        <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl shadow-sm border">
+          <h3 className="text-lg font-semibold mb-6">Tok peňazí tento mesiac</h3>
+          <div className="h-[250px]" style={{ minWidth: 300, minHeight: 200 }}>
+            <ResponsiveContainer width="100%" height="100%" minWidth={300} minHeight={200}>
+              <Sankey
+                data={cashFlowSankey}
+                nodePadding={30}
+                nodeWidth={8}
+                linkCurvature={0.5}
+                margin={{ top: 10, right: 10, bottom: 10, left: 10 }}
+                link={{ stroke: '#94a3b8', strokeOpacity: 0.3 }}
+                node={{
+                  fill: '#2563eb',
+                  stroke: 'none',
+                }}
+              >
+                <Tooltip
+                  contentStyle={TOOLTIP_STYLE}
+                  formatter={(value) => formatCurrency(Number(value ?? 0))}
+                />
+              </Sankey>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
 interface StatCardProps {
   title: string;
-  value: string;
+  rawValue: number;
   change: number;
   icon: ReactNode;
   color: string;
 }
 
-function StatCard({ title, value, change, icon, color }: StatCardProps) {
+function StatCard({ title, rawValue, change, icon, color }: StatCardProps) {
   return (
     <motion.div
       whileHover={{ y: -4 }}
@@ -802,7 +875,11 @@ function StatCard({ title, value, change, icon, color }: StatCardProps) {
       <div>
         <p className="text-sm text-slate-500 font-medium">{title}</p>
         <div className="flex items-baseline gap-2">
-          <h3 className="text-2xl font-bold">{value}</h3>
+          <AnimatedNumber
+            value={rawValue}
+            format={formatCurrency}
+            className="text-2xl font-bold"
+          />
           {change !== 0 && (
             <span
               className={`text-xs font-bold ${change > 0 ? 'text-emerald-500' : 'text-rose-500'}`}

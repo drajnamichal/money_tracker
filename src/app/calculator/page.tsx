@@ -3,12 +3,18 @@ import { fetchIncomeRecords, fetchInvestments } from '@/lib/queries';
 import { CalculatorClient } from './calculator-client';
 
 export default async function CalculatorPage() {
-  const supabase = await createServerSupabaseClient();
+  let incomeRecords: Awaited<ReturnType<typeof fetchIncomeRecords>> = [];
+  let investments: Awaited<ReturnType<typeof fetchInvestments>> = [];
 
-  const [incomeRecords, investments] = await Promise.all([
-    fetchIncomeRecords(supabase),
-    fetchInvestments(supabase),
-  ]);
+  try {
+    const supabase = await createServerSupabaseClient();
+    [incomeRecords, investments] = await Promise.all([
+      fetchIncomeRecords(supabase),
+      fetchInvestments(supabase),
+    ]);
+  } catch {
+    // Server fetch failed -- client hooks will refetch
+  }
 
   return (
     <CalculatorClient

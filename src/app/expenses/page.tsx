@@ -3,12 +3,18 @@ import { fetchExpenseRecords, fetchExpenseCategories } from '@/lib/queries';
 import { ExpensesClient } from './expenses-client';
 
 export default async function ExpensesPage() {
-  const supabase = await createServerSupabaseClient();
+  let expenses: Awaited<ReturnType<typeof fetchExpenseRecords>> = [];
+  let categories: Awaited<ReturnType<typeof fetchExpenseCategories>> = [];
 
-  const [expenses, categories] = await Promise.all([
-    fetchExpenseRecords(supabase),
-    fetchExpenseCategories(supabase),
-  ]);
+  try {
+    const supabase = await createServerSupabaseClient();
+    [expenses, categories] = await Promise.all([
+      fetchExpenseRecords(supabase),
+      fetchExpenseCategories(supabase),
+    ]);
+  } catch {
+    // Server fetch failed (e.g. test env) — client hooks will refetch
+  }
 
   return (
     <ExpensesClient

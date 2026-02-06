@@ -43,6 +43,9 @@ test.describe('Family Money Tracker', () => {
 
     await page.goto('/expenses');
 
+    // Wait for hydration to complete before interacting
+    await page.waitForLoadState('networkidle');
+
     // Click add button
     await page.getByRole('button', { name: 'Pridať výdavok' }).click();
 

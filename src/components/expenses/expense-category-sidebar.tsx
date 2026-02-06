@@ -4,13 +4,7 @@ import { useMemo } from 'react';
 import { PieChart as PieChartIcon } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
 import { Skeleton } from '@/components/skeleton';
-import {
-  PieChart,
-  Pie,
-  Cell,
-  ResponsiveContainer,
-  Tooltip,
-} from 'recharts';
+import { Treemap, ResponsiveContainer, Tooltip } from 'recharts';
 import { CHART_COLORS, TOOLTIP_STYLE } from '@/lib/constants';
 import type { ExpenseRecord } from '@/types/financial';
 
@@ -23,6 +17,63 @@ interface CategoryTotal {
 interface ExpenseCategorySidebarProps {
   expenses: ExpenseRecord[];
   loading: boolean;
+}
+
+/** Custom Treemap cell content with label */
+function TreemapCell(props: {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  name: string;
+  index: number;
+  value: number;
+  root: { children: { value: number }[] };
+}) {
+  const { x, y, width, height, name, index, value, root } = props;
+  const color = CHART_COLORS[index % CHART_COLORS.length];
+  const total = root?.children?.reduce((s, c) => s + c.value, 0) ?? 1;
+  const pct = Math.round((value / total) * 100);
+  const showLabel = width > 50 && height > 32;
+  const showPct = width > 40 && height > 20;
+
+  return (
+    <g>
+      <rect
+        x={x}
+        y={y}
+        width={width}
+        height={height}
+        rx={6}
+        fill={color}
+        stroke="hsl(var(--background))"
+        strokeWidth={2}
+        className="transition-opacity hover:opacity-80"
+      />
+      {showLabel && (
+        <text
+          x={x + width / 2}
+          y={y + height / 2 - (showPct ? 6 : 0)}
+          textAnchor="middle"
+          dominantBaseline="central"
+          className="fill-white text-[9px] font-bold pointer-events-none"
+        >
+          {name.length > width / 7 ? name.slice(0, Math.floor(width / 7)) + '…' : name}
+        </text>
+      )}
+      {showLabel && showPct && (
+        <text
+          x={x + width / 2}
+          y={y + height / 2 + 10}
+          textAnchor="middle"
+          dominantBaseline="central"
+          className="fill-white/70 text-[8px] font-medium pointer-events-none"
+        >
+          {pct}%
+        </text>
+      )}
+    </g>
+  );
 }
 
 export function ExpenseCategorySidebar({
@@ -56,32 +107,22 @@ export function ExpenseCategorySidebar({
         <PieChartIcon size={20} className="text-rose-500" />
         Rozdelenie výdavkov
       </h3>
-      <div className="h-[200px] mb-8">
+      <div className="h-[220px] mb-6">
         {loading ? (
-          <Skeleton className="w-full h-full rounded-full" />
+          <Skeleton className="w-full h-full rounded-xl" />
         ) : categoryData.length > 0 ? (
           <ResponsiveContainer width="100%" height="100%">
-            <PieChart>
-              <Pie
-                data={categoryData}
-                innerRadius={60}
-                outerRadius={80}
-                paddingAngle={2}
-                dataKey="value"
-              >
-                {categoryData.map((_entry, index) => (
-                  <Cell
-                    key={`cell-${index}`}
-                    fill={CHART_COLORS[index % CHART_COLORS.length]}
-                    stroke="none"
-                  />
-                ))}
-              </Pie>
+            <Treemap
+              data={sortedCategoryData}
+              dataKey="value"
+              aspectRatio={4 / 3}
+              content={<TreemapCell x={0} y={0} width={0} height={0} name="" index={0} value={0} root={{ children: [] }} />}
+            >
               <Tooltip
                 contentStyle={{ ...TOOLTIP_STYLE, fontSize: '12px' }}
                 formatter={(value) => formatCurrency(Number(value ?? 0))}
               />
-            </PieChart>
+            </Treemap>
           </ResponsiveContainer>
         ) : (
           <div className="h-full flex items-center justify-center text-slate-400 text-sm italic">
@@ -98,7 +139,7 @@ export function ExpenseCategorySidebar({
           >
             <div className="flex items-center gap-2 min-w-0">
               <div
-                className="w-2.5 h-2.5 rounded-full shrink-0"
+                className="w-2.5 h-2.5 rounded-sm shrink-0"
                 style={{
                   backgroundColor: CHART_COLORS[idx % CHART_COLORS.length],
                 }}

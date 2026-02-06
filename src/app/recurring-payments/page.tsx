@@ -3,8 +3,14 @@ import { fetchRecurringPayments } from '@/lib/queries';
 import { RecurringPaymentsClient } from './recurring-payments-client';
 
 export default async function RecurringPaymentsPage() {
-  const supabase = await createServerSupabaseClient();
-  const payments = await fetchRecurringPayments(supabase);
+  let payments: Awaited<ReturnType<typeof fetchRecurringPayments>> = [];
+
+  try {
+    const supabase = await createServerSupabaseClient();
+    payments = await fetchRecurringPayments(supabase);
+  } catch {
+    // Server fetch failed — client hooks will refetch
+  }
 
   return (
     <RecurringPaymentsClient
