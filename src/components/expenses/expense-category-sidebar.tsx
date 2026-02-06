@@ -79,9 +79,7 @@ export function ExpenseCategorySidebar({
               </Pie>
               <Tooltip
                 contentStyle={{ ...TOOLTIP_STYLE, fontSize: '12px' }}
-                formatter={(value: string | number | undefined) =>
-                  formatCurrency(Number(value) || 0)
-                }
+                formatter={(value) => formatCurrency(Number(value ?? 0))}
               />
             </PieChart>
           </ResponsiveContainer>

@@ -684,8 +684,8 @@ export default function Dashboard() {
                   <YAxis hide domain={['auto', 'auto']} />
                   <Tooltip
                     contentStyle={TOOLTIP_STYLE}
-                    formatter={(value: number) => [
-                      formatCurrency(value),
+                    formatter={(value) => [
+                      formatCurrency(Number(value ?? 0)),
                       'Majetok',
                     ]}
                   />
@@ -725,7 +725,7 @@ export default function Dashboard() {
                   <YAxis hide />
                   <Tooltip
                     contentStyle={TOOLTIP_STYLE}
-                    formatter={(value: number) => formatCurrency(value)}
+                    formatter={(value) => formatCurrency(Number(value ?? 0))}
                   />
                   <Legend iconType="circle" />
                   <Bar

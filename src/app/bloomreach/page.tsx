@@ -323,7 +323,7 @@ export default function BloomreachPage() {
                 </Pie>
                 <Tooltip
                   contentStyle={TOOLTIP_STYLE}
-                  formatter={(value: number) => [value.toLocaleString(), 'Akcií']}
+                  formatter={(value) => [Number(value ?? 0).toLocaleString(), 'Akcií']}
                 />
               </PieChart>
             </ResponsiveContainer>
@@ -481,8 +481,8 @@ export default function BloomreachPage() {
               />
               <Tooltip
                 contentStyle={TOOLTIP_STYLE}
-                formatter={(value: number, name: string) => [
-                  name === 'vested' ? value.toLocaleString() + ' akcií' : formatUSD(value),
+                formatter={(value, name) => [
+                  name === 'vested' ? Number(value ?? 0).toLocaleString() + ' akcií' : formatUSD(Number(value ?? 0)),
                   name === 'vested' ? 'Kumulatívne vested' : 'Hodnota',
                 ]}
               />

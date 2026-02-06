@@ -59,7 +59,7 @@ export function BenchmarkComparison({
             <Tooltip
               cursor={{ fill: '#f8fafc' }}
               contentStyle={{ ...TOOLTIP_STYLE, fontSize: '12px', fontWeight: 700 }}
-              formatter={(value: number) => [`${value.toFixed(2)}%`, 'Výnos']}
+              formatter={(value) => [`${Number(value ?? 0).toFixed(2)}%`, 'Výnos']}
             />
             <Bar dataKey="value" radius={[8, 8, 0, 0]} barSize={40}>
               {data.map((entry, index) => (

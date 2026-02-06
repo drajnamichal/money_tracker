@@ -98,9 +98,7 @@ export function MonthlyExpenseGroup({
               <Tooltip
                 cursor={{ fill: 'transparent' }}
                 contentStyle={TOOLTIP_STYLE}
-                formatter={(value: number | string) =>
-                  formatCurrency(Number(value))
-                }
+                formatter={(value) => formatCurrency(Number(value ?? 0))}
               />
               <Bar dataKey="value" radius={[0, 4, 4, 0]} barSize={20}>
                 {group.categoryData.map((_entry, index) => (

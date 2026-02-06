@@ -250,7 +250,7 @@ export function PortfolioContent({
                     ))}
                   </Pie>
                   <Tooltip
-                    formatter={(value: number) => formatCurrency(value)}
+                    formatter={(value) => formatCurrency(Number(value ?? 0))}
                     contentStyle={TOOLTIP_STYLE}
                   />
                 </PieChart>

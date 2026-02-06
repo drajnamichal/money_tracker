@@ -427,8 +427,8 @@ export default function IncomePage() {
                   <Tooltip
                     cursor={{ fill: '#f1f5f9' }}
                     contentStyle={TOOLTIP_STYLE}
-                    formatter={(value: number | undefined) => [
-                      formatCurrency(value || 0),
+                    formatter={(value) => [
+                      formatCurrency(Number(value ?? 0)),
                       'Príjem',
                     ]}
                   />

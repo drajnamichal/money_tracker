@@ -254,7 +254,7 @@ export default function CZPage() {
                   <Tooltip 
                     cursor={{ fill: '#f8fafc' }}
                     contentStyle={TOOLTIP_STYLE}
-                    formatter={(val: number) => [`${val.toFixed(2)} %`, 'Úrok']}
+                    formatter={(val) => [`${Number(val ?? 0).toFixed(2)} %`, 'Úrok']}
                   />
                   <Bar dataKey="rate" radius={[0, 8, 8, 0]} barSize={20}>
                     {mortgageRates.map((entry, index) => (
@@ -263,7 +263,7 @@ export default function CZPage() {
                     <LabelList 
                       dataKey="rate" 
                       position="right" 
-                      formatter={(val: number) => `${val.toFixed(2)} %`}
+                      formatter={(val) => `${Number(val ?? 0).toFixed(2)} %`}
                       style={{ fontSize: '11px', fontWeight: 'bold', fill: '#64748b' }}
                       offset={10}
                     />

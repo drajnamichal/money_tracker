@@ -499,7 +499,7 @@ export default function MortgagePage() {
                   contentStyle={{
                     ...TOOLTIP_STYLE,
                   }}
-                  formatter={(value: number) => formatCurrency(value)}
+                  formatter={(value) => formatCurrency(Number(value ?? 0))}
                 />
                 <Bar
                   dataKey="principal_paid"
@@ -605,7 +605,7 @@ export default function MortgagePage() {
                       <Cell fill="#f43f5e" />
                     </Pie>
                     <RechartsTooltip
-                      formatter={(value: number) => formatCurrency(value)}
+                      formatter={(value) => formatCurrency(Number(value ?? 0))}
                     />
                   </PieChart>
                 </ResponsiveContainer>
