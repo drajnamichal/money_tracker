@@ -5,6 +5,7 @@ import { Loader2, Camera, Plus } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { compressImage } from '@/lib/image-utils';
 import { toast } from 'sonner';
+import { showError } from '@/lib/error-handling';
 import type { Investment } from '@/types/financial';
 
 interface PortfolioActionsProps {
@@ -83,13 +84,8 @@ export function PortfolioActions({
         await onRefresh();
         toast.success('Portfólio bolo úspešne aktualizované');
       }
-    } catch (error: unknown) {
-      console.error('Update error:', error);
-      const message =
-        error instanceof Error
-          ? error.message
-          : 'Chyba pri aktualizácii portfólia';
-      toast.error(message);
+    } catch (err) {
+      showError(err, 'Chyba pri aktualizácii portfólia');
     } finally {
       setIsUpdating(false);
       if (fileInputRef.current) fileInputRef.current.value = '';

@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Loader2, Sparkles } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { toast } from 'sonner';
+import { showError } from '@/lib/error-handling';
 import type { ExpenseRecord } from '@/types/financial';
 
 interface MonthlyAISummaryProps {
@@ -27,10 +28,8 @@ export function MonthlyAISummary({ month, expenses, total }: MonthlyAISummaryPro
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || 'Server error');
       setSummary(data.summary);
-    } catch (error: unknown) {
-      const message =
-        error instanceof Error ? error.message : 'Nepodarilo sa vygenerovať AI zhrnutie';
-      toast.error(message);
+    } catch (err) {
+      showError(err, 'Nepodarilo sa vygenerovať AI zhrnutie');
     } finally {
       setLoading(false);
     }

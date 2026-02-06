@@ -3,6 +3,7 @@
 import { useState, useRef } from 'react';
 import { useRefreshAll } from '@/hooks/use-financial-data';
 import { supabase } from '@/lib/supabase';
+import { assertSuccess, showError } from '@/lib/error-handling';
 import {
   Settings,
   Download,
@@ -116,9 +117,8 @@ export default function SettingsPage() {
       URL.revokeObjectURL(url);
 
       toast.success('Záloha bola úspešne vytvorená');
-    } catch (error) {
-      console.error('Export error:', error);
-      toast.error('Chyba pri vytváraní zálohy');
+    } catch (err) {
+      showError(err, 'Chyba pri vytváraní zálohy');
     } finally {
       setExporting(false);
     }
@@ -162,100 +162,37 @@ export default function SettingsPage() {
 
       // Import in order (respecting foreign keys)
       // 1. Categories first
-      if (data.income_categories?.length > 0) {
+      // Helper to upsert a table only if data exists
+      const upsertTable = async (table: string, rows: unknown[]) => {
+        if (!rows || rows.length === 0) return;
         const { error } = await supabase
-          .from('income_categories')
-          .upsert(data.income_categories, { onConflict: 'id' });
-        if (error) throw new Error(`Income categories: ${error.message}`);
-      }
+          .from(table)
+          .upsert(rows, { onConflict: 'id' });
+        assertSuccess(error, table);
+      };
 
-      if (data.expense_categories?.length > 0) {
-        const { error } = await supabase
-          .from('expense_categories')
-          .upsert(data.expense_categories, { onConflict: 'id' });
-        if (error) throw new Error(`Expense categories: ${error.message}`);
-      }
+      // 1. Categories first (foreign key targets)
+      await upsertTable('income_categories', data.income_categories);
+      await upsertTable('expense_categories', data.expense_categories);
 
       // 2. Asset accounts
-      if (data.asset_accounts?.length > 0) {
-        const { error } = await supabase
-          .from('asset_accounts')
-          .upsert(data.asset_accounts, { onConflict: 'id' });
-        if (error) throw new Error(`Asset accounts: ${error.message}`);
-      }
+      await upsertTable('asset_accounts', data.asset_accounts);
 
       // 3. Main records
-      if (data.wealth_records?.length > 0) {
-        const { error } = await supabase
-          .from('wealth_records')
-          .upsert(data.wealth_records, { onConflict: 'id' });
-        if (error) throw new Error(`Wealth records: ${error.message}`);
-      }
-
-      if (data.income_records?.length > 0) {
-        const { error } = await supabase
-          .from('income_records')
-          .upsert(data.income_records, { onConflict: 'id' });
-        if (error) throw new Error(`Income records: ${error.message}`);
-      }
-
-      if (data.expense_records?.length > 0) {
-        const { error } = await supabase
-          .from('expense_records')
-          .upsert(data.expense_records, { onConflict: 'id' });
-        if (error) throw new Error(`Expense records: ${error.message}`);
-      }
-
-      if (data.budget_expenses?.length > 0) {
-        const { error } = await supabase
-          .from('budget_expenses')
-          .upsert(data.budget_expenses, { onConflict: 'id' });
-        if (error) throw new Error(`Budget expenses: ${error.message}`);
-      }
-
-      if (data.budget_todo_items?.length > 0) {
-        const { error } = await supabase
-          .from('budget_todo_items')
-          .upsert(data.budget_todo_items, { onConflict: 'id' });
-        if (error) throw new Error(`Budget todo items: ${error.message}`);
-      }
+      await upsertTable('wealth_records', data.wealth_records);
+      await upsertTable('income_records', data.income_records);
+      await upsertTable('expense_records', data.expense_records);
+      await upsertTable('budget_expenses', data.budget_expenses);
+      await upsertTable('budget_todo_items', data.budget_todo_items);
 
       // 4. Mortgage
-      if (data.mortgages?.length > 0) {
-        const { error } = await supabase
-          .from('mortgages')
-          .upsert(data.mortgages, { onConflict: 'id' });
-        if (error) throw new Error(`Mortgages: ${error.message}`);
-      }
-
-      if (data.mortgage_payments?.length > 0) {
-        const { error } = await supabase
-          .from('mortgage_payments')
-          .upsert(data.mortgage_payments, { onConflict: 'id' });
-        if (error) throw new Error(`Mortgage payments: ${error.message}`);
-      }
+      await upsertTable('mortgages', data.mortgages);
+      await upsertTable('mortgage_payments', data.mortgage_payments);
 
       // 5. Other
-      if (data.recurring_payments?.length > 0) {
-        const { error } = await supabase
-          .from('recurring_payments')
-          .upsert(data.recurring_payments, { onConflict: 'id' });
-        if (error) throw new Error(`Recurring payments: ${error.message}`);
-      }
-
-      if (data.retirement_records?.length > 0) {
-        const { error } = await supabase
-          .from('retirement_records')
-          .upsert(data.retirement_records, { onConflict: 'id' });
-        if (error) throw new Error(`Retirement records: ${error.message}`);
-      }
-
-      if (data.investments?.length > 0) {
-        const { error } = await supabase
-          .from('investments')
-          .upsert(data.investments, { onConflict: 'id' });
-        if (error) throw new Error(`Investments: ${error.message}`);
-      }
+      await upsertTable('recurring_payments', data.recurring_payments);
+      await upsertTable('retirement_records', data.retirement_records);
+      await upsertTable('investments', data.investments);
 
       // Refresh all data
       await refreshAll();
@@ -265,11 +202,8 @@ export default function SettingsPage() {
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
       }
-    } catch (error) {
-      console.error('Import error:', error);
-      toast.error(
-        error instanceof Error ? error.message : 'Chyba pri obnovovaní dát'
-      );
+    } catch (err) {
+      showError(err, 'Chyba pri obnovovaní dát');
     } finally {
       setImporting(false);
     }

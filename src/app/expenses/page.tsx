@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabase';
 import { Plus, Loader2, Scan, Settings2 } from 'lucide-react';
 import { AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
+import { assertSuccess, showError } from '@/lib/error-handling';
 import { Skeleton } from '@/components/skeleton';
 import { useExpenseData } from '@/hooks/use-financial-data';
 import { compressImage } from '@/lib/image-utils';
@@ -70,8 +71,7 @@ export default function ExpensesPage() {
           currency: 'EUR',
         },
       ]);
-
-      if (error) throw error;
+      assertSuccess(error, 'Pridanie výdavku');
 
       if (values.category.startsWith('Bývanie:')) {
         await supabase.from('budget_expenses').insert([
@@ -87,9 +87,8 @@ export default function ExpensesPage() {
 
       await refresh();
       toast.success('Výdavok úspešne pridaný');
-    } catch (err: unknown) {
-      console.error('Error adding expense:', err);
-      toast.error('Chyba pri pridávaní výdavku');
+    } catch (err) {
+      showError(err, 'Chyba pri pridávaní výdavku');
     }
   };
 
@@ -103,7 +102,7 @@ export default function ExpensesPage() {
         .from('expense_records')
         .delete()
         .eq('id', id);
-      if (error) throw error;
+      assertSuccess(error, 'Mazanie výdavku');
 
       await refresh();
       toast.success('Výdavok bol vymazaný', {
@@ -122,9 +121,8 @@ export default function ExpensesPage() {
           },
         },
       });
-    } catch (err: unknown) {
-      console.error('Error deleting expense:', err);
-      toast.error('Chyba pri mazaní');
+    } catch (err) {
+      showError(err, 'Chyba pri mazaní výdavku');
     }
   };
 
@@ -151,14 +149,13 @@ export default function ExpensesPage() {
         })
         .eq('id', id);
 
-      if (error) throw error;
+      assertSuccess(error, 'Aktualizácia výdavku');
 
       setEditingId(null);
       await refresh();
       toast.success('Výdavok aktualizovaný');
-    } catch (err: unknown) {
-      console.error('Error updating expense:', err);
-      toast.error('Chyba pri aktualizácii');
+    } catch (err) {
+      showError(err, 'Chyba pri aktualizácii výdavku');
     }
   };
 
@@ -226,11 +223,8 @@ export default function ExpensesPage() {
       }
 
       toast.success('Bloček úspešne naskenovaný!');
-    } catch (err: unknown) {
-      const errorMessage =
-        err instanceof Error ? err.message : 'Neznáma chyba';
-      console.error('OCR Error:', err);
-      toast.error('Chyba pri skenovaní bločku: ' + errorMessage);
+    } catch (err) {
+      showError(err, 'Chyba pri skenovaní bločku');
     } finally {
       setIsScanning(false);
       if (fileInputRef.current) fileInputRef.current.value = '';

@@ -9,6 +9,7 @@ import {
 import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'framer-motion';
 import { formatCurrency } from '@/lib/utils';
+import { showError } from '@/lib/error-handling';
 
 export const EXPENSE_STRUCTURE = [
   {
@@ -140,7 +141,8 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ onAddExpense }) => {
       setError('');
       setShowSimulation(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
-    } catch (e) {
+    } catch (err) {
+      showError(err, 'Chyba pri ukladaní výdavku');
       setError('Chyba pri ukladaní výdavku.');
     } finally {
       setIsSubmitting(false);
@@ -201,10 +203,8 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ onAddExpense }) => {
       }
 
       toast.success('Bloček úspešne naskenovaný!');
-    } catch (error: unknown) {
-      console.error('OCR Error:', error);
-      const message = error instanceof Error ? error.message : 'Neznáma chyba';
-      toast.error('Chyba pri skenovaní bločku: ' + message);
+    } catch (err) {
+      showError(err, 'Chyba pri skenovaní bločku');
     } finally {
       setIsScanning(false);
     }

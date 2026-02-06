@@ -2,6 +2,7 @@
 
 import { useState, useMemo } from 'react';
 import { formatCurrency, cn } from '@/lib/utils';
+import { assertSuccess, showError } from '@/lib/error-handling';
 import {
   Palmtree,
   TrendingUp,
@@ -100,7 +101,7 @@ export default function RetirementPage() {
         },
       ]);
 
-      if (error) throw error;
+      assertSuccess(error, 'Uloženie dát dôchodku');
 
       toast.success(`Dáta pre ${selectedAccount} boli aktualizované`);
       await refresh();
@@ -110,9 +111,8 @@ export default function RetirementPage() {
         total_contributions: '',
         record_date: new Date().toISOString().split('T')[0],
       });
-    } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : 'Neznáma chyba';
-      toast.error('Chyba pri ukladaní: ' + message);
+    } catch (err) {
+      showError(err, 'Chyba pri ukladaní dôchodkových dát');
     }
   };
 

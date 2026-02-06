@@ -3,6 +3,7 @@
 import { useState, useMemo } from 'react';
 import { useExpenseData } from '@/hooks/use-financial-data';
 import { supabase } from '@/lib/supabase';
+import { assertSuccess, showError } from '@/lib/error-handling';
 import { ExpenseCategory } from '@/types/financial';
 import {
   Tags,
@@ -204,7 +205,7 @@ export default function CategoriesPage() {
           })
           .eq('id', editingId);
 
-        if (error) throw error;
+        assertSuccess(error, 'Aktualizácia kategórie');
         toast.success('Kategória bola aktualizovaná');
       } else {
         // Create new
@@ -214,16 +215,14 @@ export default function CategoriesPage() {
           color: formData.color,
           parent_id: formData.parent_id,
         });
-
-        if (error) throw error;
+        assertSuccess(error, 'Vytvorenie kategórie');
         toast.success('Kategória bola vytvorená');
       }
 
       await refreshCategories();
       cancelEdit();
-    } catch (error) {
-      console.error('Save error:', error);
-      toast.error('Nepodarilo sa uložiť kategóriu');
+    } catch (err) {
+      showError(err, 'Nepodarilo sa uložiť kategóriu');
     } finally {
       setSaving(false);
     }
@@ -255,13 +254,12 @@ export default function CategoriesPage() {
         .delete()
         .eq('id', category.id);
 
-      if (error) throw error;
+      assertSuccess(error, 'Odstránenie kategórie');
 
       await refreshCategories();
       toast.success('Kategória bola odstránená');
-    } catch (error) {
-      console.error('Delete error:', error);
-      toast.error('Nepodarilo sa odstrániť kategóriu');
+    } catch (err) {
+      showError(err, 'Nepodarilo sa odstrániť kategóriu');
     } finally {
       setDeleting(null);
     }

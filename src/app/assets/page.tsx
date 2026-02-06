@@ -11,6 +11,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
 import { Skeleton } from '@/components/skeleton';
 import { useWealthData } from '@/hooks/use-financial-data';
+import { assertSuccess, showError } from '@/lib/error-handling';
 
 const assetSchema = z.object({
   recordDate: z.string().min(1, 'Dátum je povinný'),
@@ -109,14 +110,13 @@ export default function AssetsPage() {
 
       const { error } = await supabase.from('wealth_records').insert(inserts);
 
-      if (error) throw error;
+      assertSuccess(error, 'Uloženie záznamov majetku');
 
       setIsAdding(false);
       await refresh();
       toast.success('Záznamy boli úspešne uložené');
-    } catch (error) {
-      console.error('Error saving records:', error);
-      toast.error('Chyba pri ukladaní záznamov');
+    } catch (err) {
+      showError(err, 'Chyba pri ukladaní záznamov');
     } finally {
       setSaving(false);
     }

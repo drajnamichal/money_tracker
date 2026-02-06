@@ -20,6 +20,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
 import { Skeleton } from '@/components/skeleton';
 import { useIncomeData } from '@/hooks/use-financial-data';
+import { assertSuccess, showError } from '@/lib/error-handling';
 import { IncomeRecord } from '@/types/financial';
 import {
   BarChart,
@@ -146,7 +147,7 @@ export default function IncomePage() {
         onConflict: 'category_id,record_month',
       });
 
-      if (error) throw error;
+      assertSuccess(error, 'Uloženie príjmov');
 
       setIsAdding(false);
       reset({
@@ -155,9 +156,8 @@ export default function IncomePage() {
       });
       await refresh();
       toast.success('Príjmy boli úspešne uložené');
-    } catch (error) {
-      console.error('Error saving income:', error);
-      toast.error('Chyba pri ukladaní príjmov');
+    } catch (err) {
+      showError(err, 'Chyba pri ukladaní príjmov');
     } finally {
       setSaving(false);
     }

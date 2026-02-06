@@ -5,6 +5,7 @@ import { X } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
+import { assertSuccess, showError } from '@/lib/error-handling';
 import type { ExpenseCategory } from '@/types/financial';
 
 interface CategoryManagerProps {
@@ -40,9 +41,8 @@ export function CategoryManager({
       setNewCategoryName('');
       await onRefresh();
       toast.success('Kategória pridaná');
-    } catch (err: unknown) {
-      console.error('Error adding category:', err);
-      toast.error('Chyba pri pridávaní kategórie');
+    } catch (err) {
+      showError(err, 'Chyba pri pridávaní kategórie');
     }
   };
 
@@ -56,7 +56,7 @@ export function CategoryManager({
         .delete()
         .eq('id', id);
 
-      if (error) throw error;
+      assertSuccess(error, 'Mazanie kategórie');
 
       await onRefresh();
       toast.success(`Kategória "${name}" vymazaná`, {
@@ -74,9 +74,8 @@ export function CategoryManager({
           },
         },
       });
-    } catch (err: unknown) {
-      console.error('Error deleting category:', err);
-      toast.error('Chyba pri mazaní kategórie');
+    } catch (err) {
+      showError(err, 'Chyba pri mazaní kategórie');
     }
   };
 

@@ -17,6 +17,7 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
 import { Skeleton } from '@/components/skeleton';
+import { assertSuccess, showError } from '@/lib/error-handling';
 
 interface RecurringPayment {
   id: string;
@@ -61,22 +62,23 @@ export default function RecurringPaymentsPage() {
     e.preventDefault();
     if (!newName || !newAmount) return;
 
-    const { error } = await supabase.from('recurring_payments').insert([
-      {
-        name: newName,
-        amount: Number(newAmount),
-        frequency: newFrequency,
-      },
-    ]);
+    try {
+      const { error } = await supabase.from('recurring_payments').insert([
+        {
+          name: newName,
+          amount: Number(newAmount),
+          frequency: newFrequency,
+        },
+      ]);
+      assertSuccess(error, 'Pridanie platby');
 
-    if (!error) {
       setIsAdding(false);
       setNewName('');
       setNewAmount('');
       fetchPayments();
       toast.success('Platba bola pridaná');
-    } else {
-      toast.error('Chyba pri pridávaní platby');
+    } catch (err) {
+      showError(err, 'Chyba pri pridávaní platby');
     }
   }
 
@@ -84,12 +86,13 @@ export default function RecurringPaymentsPage() {
     const deletedPayment = payments.find((p) => p.id === id);
     if (!deletedPayment) return;
 
-    const { error } = await supabase
-      .from('recurring_payments')
-      .delete()
-      .eq('id', id);
+    try {
+      const { error } = await supabase
+        .from('recurring_payments')
+        .delete()
+        .eq('id', id);
+      assertSuccess(error, 'Mazanie platby');
 
-    if (!error) {
       fetchPayments();
       toast.success('Platba bola odstránená', {
         action: {
@@ -106,8 +109,8 @@ export default function RecurringPaymentsPage() {
           },
         },
       });
-    } else {
-      toast.error('Chyba pri mazaní platby');
+    } catch (err) {
+      showError(err, 'Chyba pri mazaní platby');
     }
   }
 
@@ -131,17 +134,18 @@ export default function RecurringPaymentsPage() {
       updateData.last_amount = currentPayment.amount;
     }
 
-    const { error } = await supabase
-      .from('recurring_payments')
-      .update(updateData)
-      .eq('id', id);
+    try {
+      const { error } = await supabase
+        .from('recurring_payments')
+        .update(updateData)
+        .eq('id', id);
+      assertSuccess(error, 'Úprava platby');
 
-    if (!error) {
       setEditingId(null);
       fetchPayments();
       toast.success('Platba bola upravená');
-    } else {
-      toast.error('Chyba pri úprave platby');
+    } catch (err) {
+      showError(err, 'Chyba pri úprave platby');
     }
   }
 

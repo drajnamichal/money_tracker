@@ -5,6 +5,7 @@ import { Loader2, X } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { motion } from 'framer-motion';
 import { toast } from 'sonner';
+import { assertSuccess, showError } from '@/lib/error-handling';
 import type { Investment } from '@/types/financial';
 
 interface AddInstrumentModalProps {
@@ -52,7 +53,7 @@ export function AddInstrumentModal({
         },
       ]);
 
-      if (error) throw error;
+      assertSuccess(error, 'Pridanie inštrumentu');
 
       toast.success('Inštrument bol pridaný');
       await onSuccess();
@@ -66,12 +67,8 @@ export function AddInstrumentModal({
         current_price: '',
         currency: 'EUR',
       });
-    } catch (error: unknown) {
-      const message =
-        error instanceof Error
-          ? error.message
-          : 'Chyba pri pridávaní inštrumentu';
-      toast.error(message);
+    } catch (err) {
+      showError(err, 'Chyba pri pridávaní inštrumentu');
     } finally {
       setLoading(false);
     }

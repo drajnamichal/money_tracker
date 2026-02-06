@@ -3,6 +3,7 @@
 import React, { useMemo, useCallback } from 'react';
 import { useBudgetData } from '@/hooks/use-financial-data';
 import { supabase } from '@/lib/supabase';
+import { assertSuccess, showError } from '@/lib/error-handling';
 import Summary from '@/components/budget-tracker/summary';
 import ExpenseForm from '@/components/budget-tracker/expense-form';
 import ExpenseList from '@/components/budget-tracker/expense-list';
@@ -53,7 +54,7 @@ export default function BudgetTrackerPage() {
           },
         ]);
 
-        if (error) throw error;
+        assertSuccess(error, 'Pridanie výdavku do rozpočtu');
 
         toast.success('Výdavok pridaný!', {
           description: `${expense.description} (${expense.amount}€) bol úspešne pridaný.`,
@@ -81,8 +82,7 @@ export default function BudgetTrackerPage() {
 
         refresh();
       } catch (e) {
-        console.error('Error adding expense: ', e);
-        toast.error('Chyba pri pridávaní výdavku');
+        showError(e, 'Chyba pri pridávaní výdavku');
         throw e;
       }
     },
@@ -107,13 +107,12 @@ export default function BudgetTrackerPage() {
           .delete()
           .eq('id', id);
 
-        if (error) throw error;
+        assertSuccess(error, 'Odstránenie výdavku');
 
         toast.success('Výdavok odstránený!');
         refresh();
       } catch (e) {
-        console.error('Error deleting expense: ', e);
-        toast.error('Chyba pri odstraňovaní výdavku');
+        showError(e, 'Chyba pri odstraňovaní výdavku');
       }
     },
     [expenses, refresh]
@@ -130,13 +129,12 @@ export default function BudgetTrackerPage() {
           .update(newValues)
           .eq('id', id);
 
-        if (error) throw error;
+        assertSuccess(error, 'Aktualizácia výdavku');
 
         toast.success('Výdavok aktualizovaný!');
         refresh();
       } catch (e) {
-        console.error('Error updating expense: ', e);
-        toast.error('Chyba pri aktualizácii výdavku');
+        showError(e, 'Chyba pri aktualizácii výdavku');
       }
     },
     [refresh]
@@ -149,13 +147,12 @@ export default function BudgetTrackerPage() {
           .from('budget_todo_items')
           .insert([{ text }]);
 
-        if (error) throw error;
+        assertSuccess(error, 'Pridanie položky do zoznamu');
 
         toast.success('Položka pridaná do zoznamu!');
         refresh();
       } catch (e) {
-        console.error('Error adding To-Do item: ', e);
-        toast.error('Chyba pri pridávaní položky');
+        showError(e, 'Chyba pri pridávaní položky');
       }
     },
     [refresh]
@@ -169,13 +166,12 @@ export default function BudgetTrackerPage() {
           .delete()
           .eq('id', id);
 
-        if (error) throw error;
+        assertSuccess(error, 'Odstránenie položky');
 
         toast.success('Položka odstránená!');
         refresh();
       } catch (e) {
-        console.error('Error deleting To-Do item: ', e);
-        toast.error('Chyba pri odstraňovaní položky');
+        showError(e, 'Chyba pri odstraňovaní položky');
       }
     },
     [refresh]

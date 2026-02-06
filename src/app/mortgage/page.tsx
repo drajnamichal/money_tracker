@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '@/lib/supabase';
 import { formatCurrency } from '@/lib/utils';
 import { useMortgageData } from '@/hooks/use-financial-data';
+import { assertSuccess, showError } from '@/lib/error-handling';
 import {
   Home,
   Calendar,
@@ -60,8 +61,8 @@ export default function MortgagePage() {
         } else {
           setRatesError('Žiadne dáta');
         }
-      } catch (error) {
-        console.error('Error fetching market rates:', error);
+      } catch (err) {
+        console.error('Error fetching market rates:', err);
         setRatesError('Chyba spojenia');
       } finally {
         setLoadingRates(false);
@@ -170,13 +171,12 @@ export default function MortgagePage() {
         .update({ current_principal: newPrincipal })
         .eq('id', mortgage.id);
 
-      if (mortgageError) throw mortgageError;
+      assertSuccess(mortgageError, 'Aktualizácia hypotéky');
 
       await refresh();
       toast.success('Mesačná splátka bola úspešne spracovaná');
-    } catch (error) {
-      console.error('Error processing payment:', error);
-      toast.error('Chyba pri spracovaní splátky');
+    } catch (err) {
+      showError(err, 'Chyba pri spracovaní splátky');
     } finally {
       setUpdating(false);
     }
