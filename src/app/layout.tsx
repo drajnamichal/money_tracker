@@ -4,7 +4,7 @@ import './globals.css';
 import { ThemeProvider } from '@/components/theme-provider';
 import { Sidebar } from '@/components/sidebar';
 import { Toaster } from 'sonner';
-import { FinancialProvider } from '@/providers/financial-provider';
+import { QueryProvider } from '@/providers/query-provider';
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -27,7 +27,7 @@ export default function RootLayout({
           enableSystem={false}
           disableTransitionOnChange
         >
-          <FinancialProvider>
+          <QueryProvider>
             <div className="flex min-h-screen bg-background text-foreground">
               <Sidebar />
               <main className="flex-1 overflow-y-auto">
@@ -40,7 +40,7 @@ export default function RootLayout({
               </main>
             </div>
             <Toaster position="top-right" richColors />
-          </FinancialProvider>
+          </QueryProvider>
         </ThemeProvider>
       </body>
     </html>

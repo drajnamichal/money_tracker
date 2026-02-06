@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef } from 'react';
-import { useFinancialData } from '@/providers/financial-provider';
+import { useRefreshAll } from '@/hooks/use-financial-data';
 import { supabase } from '@/lib/supabase';
 import {
   Settings,
@@ -41,7 +41,7 @@ interface BackupData {
 }
 
 export default function SettingsPage() {
-  const { refreshAll } = useFinancialData();
+  const refreshAll = useRefreshAll();
   const [exporting, setExporting] = useState(false);
   const [importing, setImporting] = useState(false);
   const [importPreview, setImportPreview] = useState<BackupData | null>(null);

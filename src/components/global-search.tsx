@@ -11,7 +11,7 @@ import {
   ArrowRight,
   Command,
 } from 'lucide-react';
-import { useFinancialData } from '@/providers/financial-provider';
+import { useExpenseData, useIncomeData } from '@/hooks/use-financial-data';
 import { formatCurrency } from '@/lib/utils';
 import { cn } from '@/lib/utils';
 
@@ -33,7 +33,8 @@ export function GlobalSearch() {
   const inputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
 
-  const { expenseRecords, incomeRecords } = useFinancialData();
+  const { records: expenseRecords } = useExpenseData();
+  const { records: incomeRecords } = useIncomeData();
 
   // Keyboard shortcut to open search (Cmd+K or Ctrl+K)
   useEffect(() => {
