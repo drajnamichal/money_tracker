@@ -1,9 +1,20 @@
 import { OpenAI } from 'openai';
 import { NextResponse } from 'next/server';
+import { createRateLimiter, getClientIdentifier } from '@/lib/rate-limit';
 
 export const dynamic = 'force-dynamic';
 
+const limiter = createRateLimiter('expense-analysis', { limit: 5, windowSeconds: 60 });
+
 export async function POST(req: Request) {
+  const rateLimit = limiter.check(getClientIdentifier(req));
+  if (!rateLimit.allowed) {
+    return NextResponse.json(
+      { error: `Príliš veľa požiadaviek. Skúste znova o ${rateLimit.retryAfterSeconds}s.` },
+      { status: 429 }
+    );
+  }
+
   try {
     const { month, expenses, total } = await req.json();
 
@@ -22,14 +33,20 @@ export async function POST(req: Request) {
     });
 
     // Group expenses by category for the prompt
-    const categoryBreakdown = expenses.reduce((acc: any, curr: any) => {
+    interface ExpenseInput {
+      category?: string;
+      amount_eur?: number;
+      amount?: number;
+    }
+
+    const categoryBreakdown = (expenses as ExpenseInput[]).reduce<Record<string, number>>((acc, curr) => {
       const cat = curr.category || 'Nezaradené';
       acc[cat] = (acc[cat] || 0) + Number(curr.amount_eur || curr.amount || 0);
       return acc;
     }, {});
 
     const breakdownString = Object.entries(categoryBreakdown)
-      .map(([cat, val]) => `${cat}: ${Number(val).toFixed(2)}€`)
+      .map(([cat, val]) => `${cat}: ${val.toFixed(2)}€`)
       .join(', ');
 
     const totalNum = Number(total || 0);
@@ -58,12 +75,12 @@ Napíš krátke (max 2 vety), výstižné a akčné zhrnutie v slovenčine. Zame
 
     const summary = response.choices[0].message.content;
     return NextResponse.json({ summary });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Expense Analysis Error:', error);
+    const message = error instanceof Error ? error.message : 'Failed to analyze expenses';
     return NextResponse.json(
-      { error: error.message || 'Failed to analyze expenses' },
+      { error: message },
       { status: 500 }
     );
   }
 }
-

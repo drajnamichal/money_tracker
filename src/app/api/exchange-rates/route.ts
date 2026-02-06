@@ -1,8 +1,19 @@
 import { NextResponse } from 'next/server';
+import { createRateLimiter, getClientIdentifier } from '@/lib/rate-limit';
 
 export const dynamic = 'force-dynamic';
 
-export async function GET() {
+const limiter = createRateLimiter('exchange-rates', { limit: 20, windowSeconds: 60 });
+
+export async function GET(req: Request) {
+  const rateLimit = limiter.check(getClientIdentifier(req));
+  if (!rateLimit.allowed) {
+    return NextResponse.json(
+      { error: `Príliš veľa požiadaviek. Skúste znova o ${rateLimit.retryAfterSeconds}s.` },
+      { status: 429 }
+    );
+  }
+
   try {
     // We fetch the official daily XML from ECB
     const response = await fetch(
@@ -50,7 +61,7 @@ export async function GET() {
       date,
       source: 'ECB Official',
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error fetching exchange rates:', error);
     return NextResponse.json(
       { error: 'Failed to fetch exchange rates' },
@@ -58,4 +69,3 @@ export async function GET() {
     );
   }
 }
-

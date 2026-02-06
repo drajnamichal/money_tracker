@@ -1,9 +1,20 @@
 import { OpenAI } from 'openai';
 import { NextResponse } from 'next/server';
+import { createRateLimiter, getClientIdentifier } from '@/lib/rate-limit';
 
 export const dynamic = 'force-dynamic';
 
+const limiter = createRateLimiter('portfolio-ocr', { limit: 5, windowSeconds: 60 });
+
 export async function POST(req: Request) {
+  const rateLimit = limiter.check(getClientIdentifier(req));
+  if (!rateLimit.allowed) {
+    return NextResponse.json(
+      { error: `Príliš veľa požiadaviek. Skúste znova o ${rateLimit.retryAfterSeconds}s.` },
+      { status: 429 }
+    );
+  }
+
   try {
     const { image } = await req.json();
 
@@ -58,10 +69,11 @@ export async function POST(req: Request) {
     }
 
     return NextResponse.json(JSON.parse(content));
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Portfolio OCR Error:', error);
+    const message = error instanceof Error ? error.message : 'Failed to process screenshot';
     return NextResponse.json(
-      { error: error.message || 'Failed to process screenshot' },
+      { error: message },
       { status: 500 }
     );
   }

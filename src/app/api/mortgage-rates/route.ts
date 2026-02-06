@@ -1,8 +1,19 @@
 import { NextResponse } from 'next/server';
+import { createRateLimiter, getClientIdentifier } from '@/lib/rate-limit';
 
 export const dynamic = 'force-dynamic';
 
-export async function GET() {
+const limiter = createRateLimiter('mortgage-rates', { limit: 20, windowSeconds: 60 });
+
+export async function GET(req: Request) {
+  const rateLimit = limiter.check(getClientIdentifier(req));
+  if (!rateLimit.allowed) {
+    return NextResponse.json(
+      { error: `Príliš veľa požiadaviek. Skúste znova o ${rateLimit.retryAfterSeconds}s.` },
+      { status: 429 }
+    );
+  }
+
   try {
     const response = await fetch('https://www.financnahitparada.sk/hypoteky', {
       headers: {
@@ -79,7 +90,7 @@ export async function GET() {
     }
 
     // Deduplicate and sort
-    const uniqueMap = new Map();
+    const uniqueMap = new Map<string, { bank: string; rate: string }>();
     rates.forEach((item) => {
       if (!uniqueMap.has(item.bank)) {
         uniqueMap.set(item.bank, item);
@@ -101,7 +112,7 @@ export async function GET() {
     }
 
     return NextResponse.json(uniqueRates);
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error fetching mortgage rates:', error);
     return NextResponse.json(
       { error: 'Failed to fetch rates' },
