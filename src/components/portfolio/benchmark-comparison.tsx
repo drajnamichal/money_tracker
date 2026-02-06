@@ -1,6 +1,7 @@
 'use client';
 
 import { BarChart3 } from 'lucide-react';
+import { TOOLTIP_STYLE } from '@/lib/constants';
 import {
   BarChart,
   Bar,
@@ -57,13 +58,7 @@ export function BenchmarkComparison({
             />
             <Tooltip
               cursor={{ fill: '#f8fafc' }}
-              contentStyle={{
-                borderRadius: '12px',
-                border: 'none',
-                boxShadow: '0 10px 25px -5px rgba(0,0,0,0.1)',
-                fontSize: '12px',
-                fontWeight: 700,
-              }}
+              contentStyle={{ ...TOOLTIP_STYLE, fontSize: '12px', fontWeight: 700 }}
               formatter={(value: number) => [`${value.toFixed(2)}%`, 'Výnos']}
             />
             <Bar dataKey="value" radius={[8, 8, 0, 0]} barSize={40}>

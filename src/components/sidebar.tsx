@@ -22,6 +22,7 @@ import {
   Gem,
   Settings,
   Tags,
+  MoreHorizontal,
 } from 'lucide-react';
 import { useState } from 'react';
 import { cn } from '@/lib/utils';
@@ -50,6 +51,13 @@ const navigation = [
   { name: 'Nastavenia', href: '/settings', icon: Settings },
 ];
 
+const bottomNavItems = [
+  { name: 'Domov', href: '/', icon: LayoutDashboard },
+  { name: 'Výdaje', href: '/expenses', icon: Receipt },
+  { name: 'Príjmy', href: '/income', icon: TrendingUp },
+  { name: 'Majetok', href: '/assets', icon: Wallet },
+];
+
 export function Sidebar() {
   const pathname = usePathname();
   const [isOpen, setIsOpen] = useState(false);
@@ -66,15 +74,7 @@ export function Sidebar() {
 
   return (
     <>
-      {/* Mobile Menu Button */}
-      <div className="fixed top-4 left-4 z-50 md:hidden">
-        <button
-          onClick={() => setIsOpen(!isOpen)}
-          className="p-2 bg-blue-600 text-white rounded-md shadow-lg"
-        >
-          {isOpen ? <X size={20} /> : <Menu size={20} />}
-        </button>
-      </div>
+      {/* Mobile Menu Button (hidden when bottom nav is visible) */}
 
       {/* Desktop Sidebar */}
       <aside className="hidden md:flex flex-col w-64 border-r bg-slate-50 dark:bg-slate-900 h-screen sticky top-0">
@@ -212,6 +212,40 @@ export function Sidebar() {
           </>
         )}
       </AnimatePresence>
+
+      {/* Mobile Bottom Navigation */}
+      <nav className="fixed bottom-0 left-0 right-0 z-50 md:hidden bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 safe-area-bottom">
+        <div className="flex items-center justify-around px-2 py-1">
+          {bottomNavItems.map((item) => {
+            const isActive = pathname === item.href;
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={cn(
+                  'flex flex-col items-center gap-0.5 px-3 py-2 rounded-xl transition-colors min-w-[60px]',
+                  isActive
+                    ? 'text-blue-600 dark:text-blue-400'
+                    : 'text-slate-400 dark:text-slate-500'
+                )}
+              >
+                <item.icon size={20} strokeWidth={isActive ? 2.5 : 2} />
+                <span className="text-[10px] font-bold">{item.name}</span>
+              </Link>
+            );
+          })}
+          <button
+            onClick={() => setIsOpen(true)}
+            className={cn(
+              'flex flex-col items-center gap-0.5 px-3 py-2 rounded-xl transition-colors min-w-[60px]',
+              'text-slate-400 dark:text-slate-500'
+            )}
+          >
+            <MoreHorizontal size={20} />
+            <span className="text-[10px] font-bold">Viac</span>
+          </button>
+        </div>
+      </nav>
     </>
   );
 }

@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabase';
 import { formatCurrency } from '@/lib/utils';
 import { useMortgageData } from '@/hooks/use-financial-data';
 import { assertSuccess, showError } from '@/lib/error-handling';
+import { TOOLTIP_STYLE } from '@/lib/constants';
 import {
   Home,
   Calendar,
@@ -496,10 +497,7 @@ export default function MortgagePage() {
                 <RechartsTooltip
                   cursor={{ fill: '#f1f5f9' }}
                   contentStyle={{
-                    backgroundColor: '#fff',
-                    borderRadius: '12px',
-                    border: 'none',
-                    boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)',
+                    ...TOOLTIP_STYLE,
                   }}
                   formatter={(value: number) => formatCurrency(value)}
                 />

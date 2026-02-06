@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useRef, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
-import { Plus, Loader2, Scan, Settings2 } from 'lucide-react';
+import { Plus, Loader2, Scan, Settings2, Filter, Search } from 'lucide-react';
 import { AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
 import { assertSuccess, showError } from '@/lib/error-handling';
@@ -35,6 +35,8 @@ export default function ExpensesPage() {
   const [isAdding, setIsAdding] = useState(false);
   const [isManagingCategories, setIsManagingCategories] = useState(false);
   const [isScanning, setIsScanning] = useState(false);
+  const [filterCategory, setFilterCategory] = useState('');
+  const [filterSearch, setFilterSearch] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editValues, setEditValues] = useState({
     description: '',
@@ -231,11 +233,32 @@ export default function ExpensesPage() {
     }
   };
 
-  // ---- Grouped expense data ----
+  // ---- Filtered + Grouped expense data ----
+
+  const filteredExpenses = useMemo(() => {
+    let result = expenses;
+    if (filterCategory) {
+      result = result.filter((e) =>
+        e.category?.toLowerCase().startsWith(filterCategory.toLowerCase())
+      );
+    }
+    if (filterSearch.trim()) {
+      const term = filterSearch.toLowerCase();
+      result = result.filter(
+        (e) =>
+          e.description?.toLowerCase().includes(term) ||
+          e.category?.toLowerCase().includes(term) ||
+          e.amount?.toString().includes(term)
+      );
+    }
+    return result;
+  }, [expenses, filterCategory, filterSearch]);
+
+  const hasActiveFilters = filterCategory !== '' || filterSearch.trim() !== '';
 
   const groupedExpenses: ExpenseGroup[] = useMemo(() => {
     const groups: Record<string, ExpenseRecord[]> = {};
-    expenses.forEach((expense) => {
+    filteredExpenses.forEach((expense) => {
       const date = new Date(expense.record_date);
       const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
       if (!groups[monthKey]) groups[monthKey] = [];
@@ -271,7 +294,7 @@ export default function ExpensesPage() {
           categoryData: catData.sort((a, b) => b.value - a.value),
         };
       });
-  }, [expenses]);
+  }, [filteredExpenses]);
 
   // ---- Render ----
 
@@ -348,6 +371,53 @@ export default function ExpensesPage() {
         )}
       </AnimatePresence>
 
+      {/* Filter Bar */}
+      {!loading && expenses.length > 0 && (
+        <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center">
+          <div className="relative flex-1 max-w-xs">
+            <Search
+              size={16}
+              className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+            />
+            <input
+              type="text"
+              placeholder="Hľadať popis, kategóriu..."
+              value={filterSearch}
+              onChange={(e) => setFilterSearch(e.target.value)}
+              className="w-full bg-white dark:bg-slate-900 border rounded-xl pl-10 pr-4 py-2 text-sm outline-none focus:ring-2 focus:ring-rose-500 transition-all"
+            />
+          </div>
+          <select
+            value={filterCategory}
+            onChange={(e) => setFilterCategory(e.target.value)}
+            className="bg-white dark:bg-slate-900 border rounded-xl px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-rose-500 min-w-[180px]"
+          >
+            <option value="">Všetky kategórie</option>
+            {groupedCategories.map((group) => (
+              <optgroup key={group.id} label={group.name}>
+                {group.subcategories.map((sub) => (
+                  <option key={sub.id} value={`${group.name}: ${sub.name}`}>
+                    {sub.name}
+                  </option>
+                ))}
+              </optgroup>
+            ))}
+          </select>
+          {hasActiveFilters && (
+            <button
+              onClick={() => {
+                setFilterCategory('');
+                setFilterSearch('');
+              }}
+              className="text-xs font-bold text-rose-600 hover:text-rose-700 flex items-center gap-1 px-3 py-2 bg-rose-50 dark:bg-rose-950/30 rounded-xl transition-colors"
+            >
+              <Filter size={14} />
+              Zrušiť filtre ({filteredExpenses.length}/{expenses.length})
+            </button>
+          )}
+        </div>
+      )}
+
       <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
         <div className="md:col-span-2 space-y-6">
           {loading ? (
@@ -359,7 +429,9 @@ export default function ExpensesPage() {
             </div>
           ) : groupedExpenses.length === 0 ? (
             <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border p-12 text-center text-slate-400">
-              Žiadne výdavky nenájdené. Začni pridaním prvého.
+              {hasActiveFilters
+                ? 'Žiadne výdavky nezodpovedajú filtrom.'
+                : 'Žiadne výdavky nenájdené. Začni pridaním prvého.'}
             </div>
           ) : (
             groupedExpenses.map((group) => (
@@ -379,7 +451,7 @@ export default function ExpensesPage() {
           )}
         </div>
 
-        <ExpenseCategorySidebar expenses={expenses} loading={loading} />
+        <ExpenseCategorySidebar expenses={filteredExpenses} loading={loading} />
       </div>
     </div>
   );

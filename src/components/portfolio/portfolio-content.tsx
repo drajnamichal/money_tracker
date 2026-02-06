@@ -20,7 +20,7 @@ import {
   Tooltip,
 } from 'recharts';
 import type { Investment } from '@/types/financial';
-import { CHART_COLORS } from '@/lib/constants';
+import { CHART_COLORS, TOOLTIP_STYLE } from '@/lib/constants';
 import { PortfolioAIAnalysis } from './portfolio-ai-analysis';
 import { BenchmarkComparison } from './benchmark-comparison';
 
@@ -251,11 +251,7 @@ export function PortfolioContent({
                   </Pie>
                   <Tooltip
                     formatter={(value: number) => formatCurrency(value)}
-                    contentStyle={{
-                      borderRadius: '16px',
-                      border: 'none',
-                      boxShadow: '0 10px 25px -5px rgba(0,0,0,0.1)',
-                    }}
+                    contentStyle={TOOLTIP_STYLE}
                   />
                 </PieChart>
               </ResponsiveContainer>

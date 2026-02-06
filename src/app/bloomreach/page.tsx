@@ -18,6 +18,7 @@ import {
   Minus,
 } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { TOOLTIP_STYLE } from '@/lib/constants';
 import {
   PieChart,
   Pie,
@@ -321,11 +322,7 @@ export default function BloomreachPage() {
                   ))}
                 </Pie>
                 <Tooltip
-                  contentStyle={{
-                    borderRadius: '12px',
-                    border: 'none',
-                    boxShadow: '0 10px 25px -5px rgba(0,0,0,0.1)',
-                  }}
+                  contentStyle={TOOLTIP_STYLE}
                   formatter={(value: number) => [value.toLocaleString(), 'Akcií']}
                 />
               </PieChart>
@@ -483,11 +480,7 @@ export default function BloomreachPage() {
                 tickFormatter={(val) => `${(val / 1000).toFixed(0)}k`}
               />
               <Tooltip
-                contentStyle={{
-                  borderRadius: '16px',
-                  border: 'none',
-                  boxShadow: '0 10px 25px -5px rgba(0,0,0,0.1)',
-                }}
+                contentStyle={TOOLTIP_STYLE}
                 formatter={(value: number, name: string) => [
                   name === 'vested' ? value.toLocaleString() + ' akcií' : formatUSD(value),
                   name === 'vested' ? 'Kumulatívne vested' : 'Hodnota',

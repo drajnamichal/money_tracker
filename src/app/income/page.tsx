@@ -15,12 +15,15 @@ import {
   Save,
   X,
   Trash2,
+  Edit2,
+  Check,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
 import { Skeleton } from '@/components/skeleton';
 import { useIncomeData } from '@/hooks/use-financial-data';
 import { assertSuccess, showError } from '@/lib/error-handling';
+import { TOOLTIP_STYLE } from '@/lib/constants';
 import { IncomeRecord } from '@/types/financial';
 import {
   BarChart,
@@ -59,6 +62,8 @@ export default function IncomePage() {
     useIncomeData();
   const [saving, setSaving] = useState(false);
   const [isAdding, setIsAdding] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editValues, setEditValues] = useState({ amount: '', currency: 'EUR' });
 
   const {
     register,
@@ -160,6 +165,71 @@ export default function IncomePage() {
       showError(err, 'Chyba pri ukladaní príjmov');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    const deletedRecord = records.find((r) => r.id === id);
+    if (!deletedRecord) return;
+
+    try {
+      const { error } = await supabase
+        .from('income_records')
+        .delete()
+        .eq('id', id);
+      assertSuccess(error, 'Mazanie príjmu');
+
+      await refresh();
+      toast.success('Príjem bol vymazaný', {
+        action: {
+          label: 'Vrátiť späť',
+          onClick: async () => {
+            try {
+              // eslint-disable-next-line @typescript-eslint/no-unused-vars
+              const { id: _id, income_categories: _cat, ...rest } = deletedRecord;
+              await supabase.from('income_records').insert([rest]);
+              await refresh();
+              toast.success('Príjem bol obnovený');
+            } catch {
+              toast.error('Nepodarilo sa obnoviť príjem');
+            }
+          },
+        },
+      });
+    } catch (err) {
+      showError(err, 'Chyba pri mazaní príjmu');
+    }
+  };
+
+  const handleEdit = (record: IncomeRecord) => {
+    setEditingId(record.id);
+    setEditValues({
+      amount: record.amount.toString(),
+      currency: record.currency,
+    });
+  };
+
+  const handleUpdate = async (id: string) => {
+    try {
+      const amount = Number(editValues.amount);
+      const amountEur =
+        editValues.currency === 'CZK' ? amount / exchangeRate : amount;
+
+      const { error } = await supabase
+        .from('income_records')
+        .update({
+          amount,
+          currency: editValues.currency,
+          amount_eur: amountEur,
+        })
+        .eq('id', id);
+      assertSuccess(error, 'Aktualizácia príjmu');
+
+      setEditingId(null);
+      await refresh();
+      toast.success('Príjem aktualizovaný');
+    } catch (err) {
+      showError(err, 'Chyba pri aktualizácii príjmu');
     }
   };
 
@@ -356,12 +426,7 @@ export default function IncomePage() {
                   <YAxis hide />
                   <Tooltip
                     cursor={{ fill: '#f1f5f9' }}
-                    contentStyle={{
-                      backgroundColor: '#fff',
-                      borderRadius: '12px',
-                      border: 'none',
-                      boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)',
-                    }}
+                    contentStyle={TOOLTIP_STYLE}
                     formatter={(value: number | undefined) => [
                       formatCurrency(value || 0),
                       'Príjem',
@@ -420,6 +485,7 @@ export default function IncomePage() {
                   <th className="px-6 py-4 font-semibold text-right">
                     Čiastka (EUR)
                   </th>
+                  <th className="px-6 py-4 w-20"></th>
                 </tr>
               </thead>
               <tbody className="divide-y">
@@ -428,7 +494,7 @@ export default function IncomePage() {
                     <Fragment key={month}>
                       <tr className="bg-slate-50/80 dark:bg-slate-800/40">
                         <td
-                          colSpan={3}
+                          colSpan={4}
                           className="px-6 py-3 text-left font-bold text-blue-600 uppercase text-xs tracking-wider border-y border-slate-100 dark:border-slate-800"
                         >
                           <div className="flex justify-between items-center">
@@ -456,17 +522,84 @@ export default function IncomePage() {
                           key={record.id}
                           initial={{ opacity: 0 }}
                           animate={{ opacity: 1 }}
-                          className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"
+                          className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors group"
                         >
                           <td className="px-6 py-4 text-slate-500 font-medium">
                             {record.income_categories?.name}
                           </td>
-                          <td className="px-6 py-4 text-slate-400">
-                            {record.amount} {record.currency}
-                          </td>
-                          <td className="px-6 py-4 text-right font-semibold text-emerald-600">
-                            {formatCurrency(record.amount_eur)}
-                          </td>
+                          {editingId === record.id ? (
+                            <>
+                              <td className="px-4 py-2">
+                                <div className="flex border rounded-lg bg-white dark:bg-slate-800 overflow-hidden focus-within:ring-1 focus-within:ring-emerald-500">
+                                  <input
+                                    type="number"
+                                    step="0.01"
+                                    value={editValues.amount}
+                                    onChange={(e) =>
+                                      setEditValues({ ...editValues, amount: e.target.value })
+                                    }
+                                    className="flex-1 bg-transparent px-3 py-1.5 text-sm outline-none"
+                                  />
+                                  <select
+                                    value={editValues.currency}
+                                    onChange={(e) =>
+                                      setEditValues({ ...editValues, currency: e.target.value })
+                                    }
+                                    className="bg-slate-100 dark:bg-slate-700 px-2 py-1 text-xs outline-none border-l font-bold"
+                                  >
+                                    <option value="EUR">EUR</option>
+                                    <option value="CZK">CZK</option>
+                                  </select>
+                                </div>
+                              </td>
+                              <td className="px-6 py-2 text-right text-slate-400 text-sm">
+                                {editValues.currency === 'CZK'
+                                  ? formatCurrency(Number(editValues.amount) / exchangeRate)
+                                  : formatCurrency(Number(editValues.amount))}
+                              </td>
+                              <td className="px-4 py-2 text-right">
+                                <div className="flex gap-1 justify-end">
+                                  <button
+                                    onClick={() => handleUpdate(record.id)}
+                                    className="p-1.5 bg-emerald-100 text-emerald-600 rounded-md hover:bg-emerald-200 transition-colors"
+                                  >
+                                    <Check size={14} />
+                                  </button>
+                                  <button
+                                    onClick={() => setEditingId(null)}
+                                    className="p-1.5 bg-slate-100 text-slate-600 rounded-md hover:bg-slate-200 transition-colors"
+                                  >
+                                    <X size={14} />
+                                  </button>
+                                </div>
+                              </td>
+                            </>
+                          ) : (
+                            <>
+                              <td className="px-6 py-4 text-slate-400">
+                                {record.amount} {record.currency}
+                              </td>
+                              <td className="px-6 py-4 text-right font-semibold text-emerald-600">
+                                {formatCurrency(record.amount_eur)}
+                              </td>
+                              <td className="px-6 py-4 text-right">
+                                <div className="flex gap-1 justify-end opacity-0 group-hover:opacity-100 transition-opacity">
+                                  <button
+                                    onClick={() => handleEdit(record)}
+                                    className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/30 rounded-md transition-all"
+                                  >
+                                    <Edit2 size={14} />
+                                  </button>
+                                  <button
+                                    onClick={() => handleDelete(record.id)}
+                                    className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30 rounded-md transition-all"
+                                  >
+                                    <Trash2 size={14} />
+                                  </button>
+                                </div>
+                              </td>
+                            </>
+                          )}
                         </motion.tr>
                       ))}
                     </Fragment>

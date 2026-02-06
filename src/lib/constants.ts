@@ -14,3 +14,15 @@ export const CHART_COLORS = [
   '#6366f1', // indigo
   '#d946ef', // fuchsia
 ] as const;
+
+/**
+ * Theme-aware Recharts Tooltip style.
+ * Uses CSS variables so it works in both light and dark mode.
+ */
+export const TOOLTIP_STYLE: React.CSSProperties = {
+  backgroundColor: 'hsl(var(--card))',
+  color: 'hsl(var(--card-foreground))',
+  borderRadius: '12px',
+  border: '1px solid hsl(var(--border))',
+  boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)',
+};

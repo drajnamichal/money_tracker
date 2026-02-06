@@ -25,6 +25,7 @@ import {
 import { motion } from 'framer-motion';
 import { Skeleton } from '@/components/skeleton';
 import { cn } from '@/lib/utils';
+import { TOOLTIP_STYLE } from '@/lib/constants';
 import type { ReactNode } from 'react';
 import {
   useWealthData,
@@ -174,6 +175,22 @@ export default function Dashboard() {
       });
     }
 
+    // Month-over-month change percentages
+    const incomeChange =
+      prevMonthIncome > 0
+        ? ((monthlyIncome - prevMonthIncome) / prevMonthIncome) * 100
+        : 0;
+    const expenseChange =
+      prevMonthExpenses > 0
+        ? ((monthlyExpenses - prevMonthExpenses) / prevMonthExpenses) * 100
+        : 0;
+    const monthlySaving = monthlyIncome - monthlyExpenses;
+    const prevMonthlySaving = prevMonthIncome - prevMonthExpenses;
+    const savingChange =
+      prevMonthlySaving !== 0
+        ? ((monthlySaving - prevMonthlySaving) / Math.abs(prevMonthlySaving)) * 100
+        : 0;
+
     return {
       totalAssets,
       growth,
@@ -184,6 +201,9 @@ export default function Dashboard() {
       prevMonthIncome,
       prevMonthExpenses,
       prevMonthName,
+      incomeChange,
+      expenseChange,
+      savingChange,
     };
   }, [wealthData, incomeData, expenseData, investments, mortgage]);
 
@@ -361,14 +381,14 @@ export default function Dashboard() {
             <StatCard
               title="Mesačný Príjem"
               value={formatCurrency(stats.monthlyIncome)}
-              change={0}
+              change={stats.incomeChange}
               icon={<TrendingUp className="text-emerald-500" />}
               color="emerald"
             />
             <StatCard
               title="Mesačné Výdavky"
               value={formatCurrency(stats.monthlyExpenses)}
-              change={0}
+              change={stats.expenseChange}
               icon={<TrendingDown className="text-rose-500" />}
               color="rose"
             />
@@ -377,7 +397,7 @@ export default function Dashboard() {
               value={formatCurrency(
                 stats.monthlyIncome - stats.monthlyExpenses
               )}
-              change={0}
+              change={stats.savingChange}
               icon={<TrendingUp className="text-blue-500" />}
               color="blue"
             />
@@ -533,12 +553,7 @@ export default function Dashboard() {
                   />
                   <YAxis hide domain={['auto', 'auto']} />
                   <Tooltip
-                    contentStyle={{
-                      backgroundColor: '#fff',
-                      borderRadius: '12px',
-                      border: 'none',
-                      boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)',
-                    }}
+                    contentStyle={TOOLTIP_STYLE}
                     formatter={(value: number) => [
                       formatCurrency(value),
                       'Majetok',
@@ -579,12 +594,7 @@ export default function Dashboard() {
                   />
                   <YAxis hide />
                   <Tooltip
-                    contentStyle={{
-                      backgroundColor: '#fff',
-                      borderRadius: '12px',
-                      border: 'none',
-                      boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)',
-                    }}
+                    contentStyle={TOOLTIP_STYLE}
                     formatter={(value: number) => formatCurrency(value)}
                   />
                   <Legend iconType="circle" />

@@ -11,7 +11,7 @@ import {
   ResponsiveContainer,
   Tooltip,
 } from 'recharts';
-import { CHART_COLORS } from '@/lib/constants';
+import { CHART_COLORS, TOOLTIP_STYLE } from '@/lib/constants';
 import type { ExpenseRecord } from '@/types/financial';
 
 interface CategoryTotal {
@@ -78,13 +78,7 @@ export function ExpenseCategorySidebar({
                 ))}
               </Pie>
               <Tooltip
-                contentStyle={{
-                  backgroundColor: '#fff',
-                  borderRadius: '12px',
-                  border: 'none',
-                  boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)',
-                  fontSize: '12px',
-                }}
+                contentStyle={{ ...TOOLTIP_STYLE, fontSize: '12px' }}
                 formatter={(value: string | number | undefined) =>
                   formatCurrency(Number(value) || 0)
                 }

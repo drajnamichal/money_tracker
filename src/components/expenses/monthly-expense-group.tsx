@@ -17,7 +17,7 @@ import {
   ResponsiveContainer,
   Cell,
 } from 'recharts';
-import { CHART_COLORS } from '@/lib/constants';
+import { CHART_COLORS, TOOLTIP_STYLE } from '@/lib/constants';
 import { MonthlyAISummary } from './monthly-ai-summary';
 import type { ExpenseRecord, ExpenseCategory } from '@/types/financial';
 
@@ -97,11 +97,7 @@ export function MonthlyExpenseGroup({
               <YAxis dataKey="name" type="category" hide width={100} />
               <Tooltip
                 cursor={{ fill: 'transparent' }}
-                contentStyle={{
-                  borderRadius: '12px',
-                  border: 'none',
-                  boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)',
-                }}
+                contentStyle={TOOLTIP_STYLE}
                 formatter={(value: number | string) =>
                   formatCurrency(Number(value))
                 }

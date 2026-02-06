@@ -16,6 +16,7 @@ import {
   TrendingDown,
   ShieldAlert
 } from 'lucide-react';
+import { TOOLTIP_STYLE } from '@/lib/constants';
 import { motion } from 'framer-motion';
 import { 
   BarChart, 
@@ -252,7 +253,7 @@ export default function CZPage() {
                   />
                   <Tooltip 
                     cursor={{ fill: '#f8fafc' }}
-                    contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)' }}
+                    contentStyle={TOOLTIP_STYLE}
                     formatter={(val: number) => [`${val.toFixed(2)} %`, 'Úrok']}
                   />
                   <Bar dataKey="rate" radius={[0, 8, 8, 0]} barSize={20}>
