@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase';
+import type { SupabaseClient } from '@supabase/supabase-js';
 import {
   AssetAccount,
   WealthRecord,
@@ -47,11 +48,23 @@ export const queryKeys = {
 } as const;
 
 // ---------------------------------------------------------------------------
-// Fetch Functions – pure async, no React state, reusable in queries & prefetch
+// Helper — resolve Supabase client (server or browser)
 // ---------------------------------------------------------------------------
 
-export async function fetchAssetAccounts(): Promise<AssetAccount[]> {
-  const { data, error } = await supabase
+type SB = SupabaseClient;
+
+/** Use the provided server client, or fall back to the browser client */
+function sb(client?: SB): SB {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return (client ?? supabase) as any;
+}
+
+// ---------------------------------------------------------------------------
+// Fetch Functions — accept optional server client for SSR, fall back to browser
+// ---------------------------------------------------------------------------
+
+export async function fetchAssetAccounts(client?: SB): Promise<AssetAccount[]> {
+  const { data, error } = await sb(client)
     .from('asset_accounts')
     .select('*')
     .order('name');
@@ -59,8 +72,8 @@ export async function fetchAssetAccounts(): Promise<AssetAccount[]> {
   return (data ?? []) as AssetAccount[];
 }
 
-export async function fetchWealthRecords(): Promise<WealthRecord[]> {
-  const { data, error } = await supabase
+export async function fetchWealthRecords(client?: SB): Promise<WealthRecord[]> {
+  const { data, error } = await sb(client)
     .from('wealth_records')
     .select('*')
     .order('record_date', { ascending: false });
@@ -68,8 +81,8 @@ export async function fetchWealthRecords(): Promise<WealthRecord[]> {
   return (data ?? []) as WealthRecord[];
 }
 
-export async function fetchIncomeCategories(): Promise<IncomeCategory[]> {
-  const { data, error } = await supabase
+export async function fetchIncomeCategories(client?: SB): Promise<IncomeCategory[]> {
+  const { data, error } = await sb(client)
     .from('income_categories')
     .select('*')
     .order('name');
@@ -77,8 +90,8 @@ export async function fetchIncomeCategories(): Promise<IncomeCategory[]> {
   return (data ?? []) as IncomeCategory[];
 }
 
-export async function fetchIncomeRecords(): Promise<IncomeRecord[]> {
-  const { data, error } = await supabase
+export async function fetchIncomeRecords(client?: SB): Promise<IncomeRecord[]> {
+  const { data, error } = await sb(client)
     .from('income_records')
     .select('*, income_categories(name)')
     .order('record_month', { ascending: false });
@@ -86,8 +99,8 @@ export async function fetchIncomeRecords(): Promise<IncomeRecord[]> {
   return (data ?? []) as IncomeRecord[];
 }
 
-export async function fetchExpenseRecords(): Promise<ExpenseRecord[]> {
-  const { data, error } = await supabase
+export async function fetchExpenseRecords(client?: SB): Promise<ExpenseRecord[]> {
+  const { data, error } = await sb(client)
     .from('expense_records')
     .select('*')
     .order('record_date', { ascending: false });
@@ -95,8 +108,8 @@ export async function fetchExpenseRecords(): Promise<ExpenseRecord[]> {
   return (data ?? []) as ExpenseRecord[];
 }
 
-export async function fetchExpenseCategories(): Promise<ExpenseCategory[]> {
-  const { data, error } = await supabase
+export async function fetchExpenseCategories(client?: SB): Promise<ExpenseCategory[]> {
+  const { data, error } = await sb(client)
     .from('expense_categories')
     .select('id, name, parent_id, icon, color')
     .order('name');
@@ -104,8 +117,8 @@ export async function fetchExpenseCategories(): Promise<ExpenseCategory[]> {
   return (data ?? []) as ExpenseCategory[];
 }
 
-export async function fetchBudgetExpenses(): Promise<BudgetExpense[]> {
-  const { data, error } = await supabase
+export async function fetchBudgetExpenses(client?: SB): Promise<BudgetExpense[]> {
+  const { data, error } = await sb(client)
     .from('budget_expenses')
     .select('*')
     .order('created_at', { ascending: false });
@@ -113,8 +126,8 @@ export async function fetchBudgetExpenses(): Promise<BudgetExpense[]> {
   return (data ?? []) as BudgetExpense[];
 }
 
-export async function fetchBudgetTodoItems(): Promise<BudgetTodoItem[]> {
-  const { data, error } = await supabase
+export async function fetchBudgetTodoItems(client?: SB): Promise<BudgetTodoItem[]> {
+  const { data, error } = await sb(client)
     .from('budget_todo_items')
     .select('*')
     .order('created_at', { ascending: false });
@@ -122,8 +135,8 @@ export async function fetchBudgetTodoItems(): Promise<BudgetTodoItem[]> {
   return (data ?? []) as BudgetTodoItem[];
 }
 
-export async function fetchMortgages(): Promise<Mortgage[]> {
-  const { data, error } = await supabase
+export async function fetchMortgages(client?: SB): Promise<Mortgage[]> {
+  const { data, error } = await sb(client)
     .from('mortgages')
     .select('*')
     .order('created_at', { ascending: false });
@@ -131,8 +144,8 @@ export async function fetchMortgages(): Promise<Mortgage[]> {
   return (data ?? []) as Mortgage[];
 }
 
-export async function fetchMortgagePayments(): Promise<MortgagePayment[]> {
-  const { data, error } = await supabase
+export async function fetchMortgagePayments(client?: SB): Promise<MortgagePayment[]> {
+  const { data, error } = await sb(client)
     .from('mortgage_payments')
     .select('*')
     .order('payment_date', { ascending: false });
@@ -140,8 +153,8 @@ export async function fetchMortgagePayments(): Promise<MortgagePayment[]> {
   return (data ?? []) as MortgagePayment[];
 }
 
-export async function fetchRecurringPayments(): Promise<RecurringPayment[]> {
-  const { data, error } = await supabase
+export async function fetchRecurringPayments(client?: SB): Promise<RecurringPayment[]> {
+  const { data, error } = await sb(client)
     .from('recurring_payments')
     .select('*')
     .order('name');
@@ -149,8 +162,8 @@ export async function fetchRecurringPayments(): Promise<RecurringPayment[]> {
   return (data ?? []) as RecurringPayment[];
 }
 
-export async function fetchRetirementRecords(): Promise<RetirementRecord[]> {
-  const { data, error } = await supabase
+export async function fetchRetirementRecords(client?: SB): Promise<RetirementRecord[]> {
+  const { data, error } = await sb(client)
     .from('retirement_records')
     .select('*')
     .order('record_date', { ascending: false });
@@ -158,8 +171,8 @@ export async function fetchRetirementRecords(): Promise<RetirementRecord[]> {
   return (data ?? []) as RetirementRecord[];
 }
 
-export async function fetchInvestments(): Promise<Investment[]> {
-  const { data, error } = await supabase
+export async function fetchInvestments(client?: SB): Promise<Investment[]> {
+  const { data, error } = await sb(client)
     .from('investments')
     .select('*')
     .order('name');

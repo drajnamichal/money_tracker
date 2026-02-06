@@ -38,11 +38,12 @@ import type {
 // Shared: Exchange Rate (1 hour stale time – external API, rarely changes)
 // ---------------------------------------------------------------------------
 
-export function useExchangeRate() {
+export function useExchangeRate(initial?: number) {
   return useQuery({
     queryKey: queryKeys.exchangeRate,
     queryFn: fetchExchangeRate,
-    staleTime: 60 * 60 * 1000, // 1 hour
+    staleTime: 60 * 60 * 1000,
+    initialData: initial,
   });
 }
 
@@ -50,16 +51,24 @@ export function useExchangeRate() {
 // Wealth
 // ---------------------------------------------------------------------------
 
-export function useWealthData() {
+export interface WealthDataOptions {
+  initialRecords?: WealthRecord[];
+  initialAccounts?: AssetAccount[];
+  initialExchangeRate?: number;
+}
+
+export function useWealthData(options?: WealthDataOptions) {
   const accountsQuery = useQuery({
     queryKey: queryKeys.wealth.accounts,
-    queryFn: fetchAssetAccounts,
+    queryFn: () => fetchAssetAccounts(),
+    initialData: options?.initialAccounts,
   });
   const recordsQuery = useQuery({
     queryKey: queryKeys.wealth.records,
-    queryFn: fetchWealthRecords,
+    queryFn: () => fetchWealthRecords(),
+    initialData: options?.initialRecords,
   });
-  const exchangeRateQuery = useExchangeRate();
+  const exchangeRateQuery = useExchangeRate(options?.initialExchangeRate);
 
   return {
     records: (recordsQuery.data ?? []) as WealthRecord[],
@@ -76,16 +85,24 @@ export function useWealthData() {
 // Income
 // ---------------------------------------------------------------------------
 
-export function useIncomeData() {
+export interface IncomeDataOptions {
+  initialRecords?: IncomeRecord[];
+  initialCategories?: IncomeCategory[];
+  initialExchangeRate?: number;
+}
+
+export function useIncomeData(options?: IncomeDataOptions) {
   const categoriesQuery = useQuery({
     queryKey: queryKeys.income.categories,
-    queryFn: fetchIncomeCategories,
+    queryFn: () => fetchIncomeCategories(),
+    initialData: options?.initialCategories,
   });
   const recordsQuery = useQuery({
     queryKey: queryKeys.income.records,
-    queryFn: fetchIncomeRecords,
+    queryFn: () => fetchIncomeRecords(),
+    initialData: options?.initialRecords,
   });
-  const exchangeRateQuery = useExchangeRate();
+  const exchangeRateQuery = useExchangeRate(options?.initialExchangeRate);
 
   return {
     records: (recordsQuery.data ?? []) as IncomeRecord[],
@@ -102,14 +119,21 @@ export function useIncomeData() {
 // Expenses
 // ---------------------------------------------------------------------------
 
-export function useExpenseData() {
+export interface ExpenseDataOptions {
+  initialRecords?: ExpenseRecord[];
+  initialCategories?: ExpenseCategory[];
+}
+
+export function useExpenseData(options?: ExpenseDataOptions) {
   const recordsQuery = useQuery({
     queryKey: queryKeys.expenses.records,
-    queryFn: fetchExpenseRecords,
+    queryFn: () => fetchExpenseRecords(),
+    initialData: options?.initialRecords,
   });
   const categoriesQuery = useQuery({
     queryKey: queryKeys.expenses.categories,
-    queryFn: fetchExpenseCategories,
+    queryFn: () => fetchExpenseCategories(),
+    initialData: options?.initialCategories,
   });
   const exchangeRateQuery = useExchangeRate();
 
@@ -134,11 +158,11 @@ export function useExpenseData() {
 export function useBudgetData() {
   const expensesQuery = useQuery({
     queryKey: queryKeys.budget.expenses,
-    queryFn: fetchBudgetExpenses,
+    queryFn: () => fetchBudgetExpenses(),
   });
   const todosQuery = useQuery({
     queryKey: queryKeys.budget.todos,
-    queryFn: fetchBudgetTodoItems,
+    queryFn: () => fetchBudgetTodoItems(),
   });
   const exchangeRateQuery = useExchangeRate();
 
@@ -160,11 +184,11 @@ export function useBudgetData() {
 export function useMortgageData() {
   const mortgagesQuery = useQuery({
     queryKey: queryKeys.mortgage.loans,
-    queryFn: fetchMortgages,
+    queryFn: () => fetchMortgages(),
   });
   const paymentsQuery = useQuery({
     queryKey: queryKeys.mortgage.payments,
-    queryFn: fetchMortgagePayments,
+    queryFn: () => fetchMortgagePayments(),
   });
 
   const mortgages = (mortgagesQuery.data ?? []) as Mortgage[];
@@ -183,10 +207,13 @@ export function useMortgageData() {
 // Recurring Payments
 // ---------------------------------------------------------------------------
 
-export function useRecurringPaymentsData() {
+export function useRecurringPaymentsData(options?: {
+  initialRecords?: RecurringPayment[];
+}) {
   const query = useQuery({
     queryKey: queryKeys.recurringPayments,
-    queryFn: fetchRecurringPayments,
+    queryFn: () => fetchRecurringPayments(),
+    initialData: options?.initialRecords,
   });
 
   return {
@@ -205,7 +232,7 @@ export function useRecurringPaymentsData() {
 export function useRetirementData() {
   const query = useQuery({
     queryKey: queryKeys.retirement,
-    queryFn: fetchRetirementRecords,
+    queryFn: () => fetchRetirementRecords(),
   });
 
   return {
@@ -221,10 +248,13 @@ export function useRetirementData() {
 // Investments
 // ---------------------------------------------------------------------------
 
-export function useInvestmentData() {
+export function useInvestmentData(options?: {
+  initialInvestments?: Investment[];
+}) {
   const query = useQuery({
     queryKey: queryKeys.investments,
-    queryFn: fetchInvestments,
+    queryFn: () => fetchInvestments(),
+    initialData: options?.initialInvestments,
   });
 
   return {
