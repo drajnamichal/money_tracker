@@ -94,7 +94,9 @@ export default function ExpensesPage() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Naozaj chcete vymazať tento výdavok?')) return;
+    // Capture the record before deleting so we can restore it
+    const deletedRecord = expenses.find((e) => e.id === id);
+    if (!deletedRecord) return;
 
     try {
       const { error } = await supabase
@@ -104,7 +106,22 @@ export default function ExpensesPage() {
       if (error) throw error;
 
       await refresh();
-      toast.success('Výdavok bol vymazaný');
+      toast.success('Výdavok bol vymazaný', {
+        action: {
+          label: 'Vrátiť späť',
+          onClick: async () => {
+            try {
+              // eslint-disable-next-line @typescript-eslint/no-unused-vars
+              const { id: _id, isOptimistic: _opt, ...rest } = deletedRecord;
+              await supabase.from('expense_records').insert([rest]);
+              await refresh();
+              toast.success('Výdavok bol obnovený');
+            } catch {
+              toast.error('Nepodarilo sa obnoviť výdavok');
+            }
+          },
+        },
+      });
     } catch (err: unknown) {
       console.error('Error deleting expense:', err);
       toast.error('Chyba pri mazaní');

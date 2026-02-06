@@ -47,7 +47,8 @@ export function CategoryManager({
   };
 
   const handleDeleteCategory = async (id: string, name: string) => {
-    if (!confirm(`Naozaj chcete vymazať kategóriu "${name}"?`)) return;
+    const deletedCategory = categories.find((c) => c.id === id);
+    if (!deletedCategory) return;
 
     try {
       const { error } = await supabase
@@ -58,7 +59,21 @@ export function CategoryManager({
       if (error) throw error;
 
       await onRefresh();
-      toast.success('Kategória vymazaná');
+      toast.success(`Kategória "${name}" vymazaná`, {
+        action: {
+          label: 'Vrátiť späť',
+          onClick: async () => {
+            try {
+              const { id: _id, created_at: _, ...rest } = deletedCategory;
+              await supabase.from('expense_categories').insert([rest]);
+              await onRefresh();
+              toast.success('Kategória bola obnovená');
+            } catch {
+              toast.error('Nepodarilo sa obnoviť kategóriu');
+            }
+          },
+        },
+      });
     } catch (err: unknown) {
       console.error('Error deleting category:', err);
       toast.error('Chyba pri mazaní kategórie');

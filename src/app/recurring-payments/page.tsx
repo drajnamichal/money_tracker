@@ -81,7 +81,9 @@ export default function RecurringPaymentsPage() {
   }
 
   async function handleDelete(id: string) {
-    if (!confirm('Naozaj chcete vymazať túto platbu?')) return;
+    const deletedPayment = payments.find((p) => p.id === id);
+    if (!deletedPayment) return;
+
     const { error } = await supabase
       .from('recurring_payments')
       .delete()
@@ -89,7 +91,21 @@ export default function RecurringPaymentsPage() {
 
     if (!error) {
       fetchPayments();
-      toast.success('Platba bola odstránená');
+      toast.success('Platba bola odstránená', {
+        action: {
+          label: 'Vrátiť späť',
+          onClick: async () => {
+            try {
+              const { id: _id, ...rest } = deletedPayment;
+              await supabase.from('recurring_payments').insert([rest]);
+              fetchPayments();
+              toast.success('Platba bola obnovená');
+            } catch {
+              toast.error('Nepodarilo sa obnoviť platbu');
+            }
+          },
+        },
+      });
     } else {
       toast.error('Chyba pri mazaní platby');
     }
