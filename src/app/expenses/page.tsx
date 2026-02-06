@@ -1,131 +1,26 @@
 'use client';
 
-import { useState, useMemo, useRef } from 'react';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import * as z from 'zod';
+import { useState, useMemo, useRef, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
-import { formatCurrency } from '@/lib/utils';
-import {
-  Loader2,
-  Plus,
-  PieChart as PieChartIcon,
-  Trash2,
-  Settings2,
-  X,
-  Scan,
-  Edit2,
-  Check,
-  Calendar,
-  Sparkles,
-} from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { Plus, Loader2, Scan, Settings2 } from 'lucide-react';
+import { AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
 import { Skeleton } from '@/components/skeleton';
 import { useExpenseData } from '@/hooks/use-financial-data';
+import { compressImage } from '@/lib/image-utils';
+import { ExpenseForm } from '@/components/expenses/expense-form';
+import type { ExpenseFormValues } from '@/components/expenses/expense-form';
+import { CategoryManager } from '@/components/expenses/category-manager';
 import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  Tooltip,
-  ResponsiveContainer,
-  PieChart,
-  Pie,
-  Cell,
-  Legend,
-} from 'recharts';
-
-  const COLORS = [
-    '#2563eb', // blue
-    '#10b981', // emerald
-    '#f59e0b', // amber
-    '#ef4444', // red
-    '#8b5cf6', // violet
-    '#ec4899', // pink
-    '#06b6d4', // cyan
-    '#f97316', // orange
-    '#84cc16', // lime
-    '#a855f7', // purple
-    '#14b8a6', // teal
-    '#6366f1', // indigo
-    '#d946ef', // fuchsia
-  ];
-
-const expenseSchema = z.object({
-  description: z.string().min(1, 'Popis je povinný'),
-  category: z.string().min(1, 'Kategória je povinná'),
-  amount: z.string().refine((val) => !isNaN(Number(val)) && Number(val) > 0, {
-    message: 'Suma musí byť kladné číslo',
-  }),
-  record_date: z.string().min(1, 'Dátum je povinný'),
-});
-
-type ExpenseFormValues = z.infer<typeof expenseSchema>;
+  MonthlyExpenseGroup,
+  type ExpenseGroup,
+} from '@/components/expenses/monthly-expense-group';
+import { ExpenseCategorySidebar } from '@/components/expenses/expense-category-sidebar';
+import type { ExpenseRecord } from '@/types/financial';
 
 interface CategoryTotal {
   name: string;
   value: number;
-  [key: string]: string | number;
-}
-
-function MonthlyAISummary({ 
-  month, 
-  expenses, 
-  total 
-}: { 
-  month: string; 
-  expenses: any[]; 
-  total: number 
-}) {
-  const [summary, setSummary] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
-
-  const generateSummary = async () => {
-    setLoading(true);
-    try {
-      const response = await fetch('/api/expense-analysis', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ month, expenses, total }),
-      });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || 'Server error');
-      setSummary(data.summary);
-    } catch (error: any) {
-      toast.error(error.message || 'Nepodarilo sa vygenerovať AI zhrnutie');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return (
-    <div className="mt-4 pt-4 border-t border-slate-100 dark:border-slate-800">
-      {!summary ? (
-        <button
-          onClick={generateSummary}
-          disabled={loading}
-          className="text-[10px] font-black uppercase tracking-widest text-indigo-600 dark:text-indigo-400 flex items-center gap-1.5 hover:opacity-80 transition-opacity disabled:opacity-50"
-        >
-          {loading ? (
-            <Loader2 size={12} className="animate-spin" />
-          ) : (
-            <Sparkles size={12} />
-          )}
-          {loading ? 'Analyzujem...' : 'AI Analýza mesiaca'}
-        </button>
-      ) : (
-        <motion.div
-          initial={{ opacity: 0, y: 5 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="flex gap-2 text-xs text-slate-600 dark:text-slate-400 leading-relaxed"
-        >
-          <Sparkles size={14} className="text-indigo-500 shrink-0 mt-0.5" />
-          <p>{summary}</p>
-        </motion.div>
-      )}
-    </div>
-  );
 }
 
 export default function ExpensesPage() {
@@ -138,27 +33,18 @@ export default function ExpensesPage() {
   } = useExpenseData();
   const [isAdding, setIsAdding] = useState(false);
   const [isManagingCategories, setIsManagingCategories] = useState(false);
-  const [newCategoryName, setNewCategoryName] = useState('');
   const [isScanning, setIsScanning] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [editValues, setEditValues] = useState<any>({});
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
-  const {
-    register,
-    handleSubmit,
-    reset,
-    setValue,
-    formState: { errors },
-  } = useForm<ExpenseFormValues>({
-    resolver: zodResolver(expenseSchema),
-    defaultValues: {
-      description: '',
-      category: '',
-      amount: '',
-      record_date: new Date().toISOString().split('T')[0],
-    },
+  const [editValues, setEditValues] = useState({
+    description: '',
+    category: '',
+    amount: 0,
+    record_date: '',
   });
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const formSetValueRef = useRef<
+    ((name: keyof ExpenseFormValues, value: string) => void) | null
+  >(null);
 
   const groupedCategories = useMemo(() => {
     const main = categories.filter((c) => !c.parent_id);
@@ -168,9 +54,10 @@ export default function ExpensesPage() {
     }));
   }, [categories]);
 
+  // ---- CRUD handlers ----
+
   const onAddExpense = async (values: ExpenseFormValues) => {
     setIsAdding(false);
-    reset();
 
     try {
       const { error } = await supabase.from('expense_records').insert([
@@ -186,7 +73,6 @@ export default function ExpensesPage() {
 
       if (error) throw error;
 
-      // Automaticky pridať do rozpočtu bytu ak je kategória "Bývanie"
       if (values.category.startsWith('Bývanie:')) {
         await supabase.from('budget_expenses').insert([
           {
@@ -207,162 +93,7 @@ export default function ExpensesPage() {
     }
   };
 
-  const handleScanReceipt = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    setIsScanning(true);
-    setIsAdding(true);
-
-    try {
-      // 1. Create a promise to handle image compression
-      const compressImage = (file: File): Promise<string> => {
-        return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-          reader.onload = (event) => {
-            const img = new Image();
-            img.onload = () => {
-              const canvas = document.createElement('canvas');
-              const MAX_WIDTH = 1200;
-              const MAX_HEIGHT = 1200;
-              let width = img.width;
-              let height = img.height;
-
-              if (width > height) {
-                if (width > MAX_WIDTH) {
-                  height *= MAX_WIDTH / width;
-                  width = MAX_WIDTH;
-                }
-              } else {
-                if (height > MAX_HEIGHT) {
-                  width *= MAX_HEIGHT / height;
-                  height = MAX_HEIGHT;
-                }
-              }
-
-              canvas.width = width;
-              canvas.height = height;
-              const ctx = canvas.getContext('2d');
-              if (!ctx) {
-                reject(new Error('Nepodarilo sa vytvoriť canvas context'));
-                return;
-              }
-
-              ctx.drawImage(img, 0, 0, width, height);
-              // Use lower quality to reduce payload size
-              resolve(canvas.toDataURL('image/jpeg', 0.6));
-            };
-            img.onerror = () => reject(new Error('Nepodarilo sa načítať obrázok'));
-            img.src = event.target?.result as string;
-          };
-          reader.onerror = () => reject(new Error('Nepodarilo sa prečítať súbor'));
-        reader.readAsDataURL(file);
-      });
-      };
-
-      const compressedBase64 = await compressImage(file);
-
-      const response = await fetch('/api/ocr', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ image: compressedBase64 }),
-      });
-
-      const data = await response.json();
-
-      if (data.error) throw new Error(data.error);
-
-      if (data.description) setValue('description', data.description);
-      if (data.amount) setValue('amount', data.amount.toString());
-      if (data.category) {
-        const categoryToMatch = String(data.category).toLowerCase();
-        const exists = categories.some((c) => c.name.toLowerCase() === categoryToMatch);
-        if (exists) {
-          const matched = categories.find(c => c.name.toLowerCase() === categoryToMatch);
-          setValue('category', matched?.name || data.category);
-        } else {
-          // Try to find if it matches a subcategory name or main category
-          const foundCategory = categories.find(c => 
-            c.name.toLowerCase() === categoryToMatch ||
-            (c.parent_id && c.name.toLowerCase().includes(categoryToMatch))
-          );
-          
-          if (foundCategory) {
-            if (foundCategory.parent_id) {
-              const parent = categories.find(c => c.id === foundCategory.parent_id);
-              setValue('category', `${parent?.name}: ${foundCategory.name}`);
-            } else {
-              // It's a main category, try to find first subcategory or use default
-              const firstSub = categories.find(c => c.parent_id === foundCategory.id);
-              if (firstSub) {
-                setValue('category', `${foundCategory.name}: ${firstSub.name}`);
-              } else {
-                setValue('category', 'Ostatné: nezaradené');
-              }
-            }
-          } else {
-            setValue('category', 'Ostatné: nezaradené');
-          }
-        }
-      }
-
-      toast.success('Bloček úspešne naskenovaný!');
-    } catch (err: unknown) {
-      const errorMessage = err instanceof Error ? err.message : 'Neznáma chyba';
-      console.error('OCR Error:', err);
-      toast.error('Chyba pri skenovaní bločku: ' + errorMessage);
-    } finally {
-      setIsScanning(false);
-      if (fileInputRef.current) fileInputRef.current.value = '';
-    }
-  };
-
-  const handleAddCategory = async () => {
-    if (!newCategoryName.trim()) return;
-
-    try {
-      const { error } = await supabase
-        .from('expense_categories')
-        .insert([{ name: newCategoryName.trim() }]);
-
-      if (error) {
-        if (error.code === '23505') {
-          toast.error('Táto kategória už existuje');
-        } else {
-          throw error;
-        }
-        return;
-      }
-
-      setNewCategoryName('');
-      await refreshCategories();
-      toast.success('Kategória pridaná');
-    } catch (err: unknown) {
-      console.error('Error adding category:', err);
-      toast.error('Chyba pri pridávaní kategórie');
-    }
-  };
-
-  const handleDeleteCategory = async (id: string, name: string) => {
-    if (!confirm(`Naozaj chcete vymazať kategóriu "${name}"?`)) return;
-
-    try {
-      const { error } = await supabase
-        .from('expense_categories')
-        .delete()
-        .eq('id', id);
-
-      if (error) throw error;
-
-      await refreshCategories();
-      toast.success('Kategória vymazaná');
-    } catch (err: unknown) {
-      console.error('Error deleting category:', err);
-      toast.error('Chyba pri mazaní kategórie');
-    }
-  };
-
-  async function handleDelete(id: string) {
+  const handleDelete = async (id: string) => {
     if (!confirm('Naozaj chcete vymazať tento výdavok?')) return;
 
     try {
@@ -378,51 +109,9 @@ export default function ExpensesPage() {
       console.error('Error deleting expense:', err);
       toast.error('Chyba pri mazaní');
     }
-  }
+  };
 
-  const groupedExpenses = useMemo(() => {
-    const groups: Record<string, any[]> = {};
-    expenses.forEach((expense) => {
-      const date = new Date(expense.record_date);
-      const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-      if (!groups[monthKey]) {
-        groups[monthKey] = [];
-      }
-      groups[monthKey].push(expense);
-    });
-
-    return Object.keys(groups)
-      .sort((a, b) => b.localeCompare(a))
-      .map((key) => {
-        const records = groups[key].sort((a, b) =>
-          b.record_date.localeCompare(a.record_date)
-        );
-        const total = records.reduce((sum, r) => sum + Number(r.amount_eur), 0);
-
-        const catData = records.reduce((acc: CategoryTotal[], curr) => {
-          const categoryName = curr.category || 'Ostatné';
-          const existing = acc.find((item) => item.name === categoryName);
-          if (existing) {
-            existing.value += Number(curr.amount_eur);
-          } else {
-            acc.push({
-              name: categoryName,
-              value: Number(curr.amount_eur),
-            });
-          }
-          return acc;
-        }, []);
-
-        return {
-          month: key,
-          records,
-          total,
-          categoryData: catData.sort((a, b) => b.value - a.value),
-        };
-      });
-  }, [expenses]);
-
-  const handleEdit = (expense: any) => {
+  const handleEdit = (expense: ExpenseRecord) => {
     setEditingId(expense.id);
     setEditValues({
       description: expense.description,
@@ -450,35 +139,130 @@ export default function ExpensesPage() {
       setEditingId(null);
       await refresh();
       toast.success('Výdavok aktualizovaný');
-    } catch (err) {
+    } catch (err: unknown) {
       console.error('Error updating expense:', err);
       toast.error('Chyba pri aktualizácii');
     }
   };
 
-  const categoryData = useMemo(() => {
-    return expenses.reduce((acc: CategoryTotal[], curr) => {
-      const categoryName = curr.category || 'Ostatné';
-      const existing = acc.find((item) => item.name === categoryName);
-      if (existing) {
-        existing.value += Number(curr.amount_eur);
-      } else {
-        acc.push({
-          name: categoryName,
-          value: Number(curr.amount_eur),
-        });
+  const handleEditValueChange = useCallback(
+    (field: string, value: string) => {
+      setEditValues((prev) => ({ ...prev, [field]: value }));
+    },
+    []
+  );
+
+  // ---- OCR handler ----
+
+  const handleScanReceipt = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsScanning(true);
+    setIsAdding(true);
+
+    try {
+      const compressedBase64 = await compressImage(file);
+
+      const response = await fetch('/api/ocr', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ image: compressedBase64 }),
+      });
+
+      const data = await response.json();
+      if (data.error) throw new Error(data.error);
+
+      const setter = formSetValueRef.current;
+      if (setter) {
+        if (data.description) setter('description', data.description);
+        if (data.amount) setter('amount', data.amount.toString());
+        if (data.category) {
+          const categoryToMatch = String(data.category).toLowerCase();
+          const foundCategory = categories.find(
+            (c) =>
+              c.name.toLowerCase() === categoryToMatch ||
+              (c.parent_id && c.name.toLowerCase().includes(categoryToMatch))
+          );
+
+          if (foundCategory) {
+            if (foundCategory.parent_id) {
+              const parent = categories.find(
+                (c) => c.id === foundCategory.parent_id
+              );
+              setter('category', `${parent?.name}: ${foundCategory.name}`);
+            } else {
+              const firstSub = categories.find(
+                (c) => c.parent_id === foundCategory.id
+              );
+              setter(
+                'category',
+                firstSub
+                  ? `${foundCategory.name}: ${firstSub.name}`
+                  : 'Ostatné: nezaradené'
+              );
+            }
+          } else {
+            setter('category', 'Ostatné: nezaradené');
+          }
+        }
       }
-      return acc;
-    }, []);
+
+      toast.success('Bloček úspešne naskenovaný!');
+    } catch (err: unknown) {
+      const errorMessage =
+        err instanceof Error ? err.message : 'Neznáma chyba';
+      console.error('OCR Error:', err);
+      toast.error('Chyba pri skenovaní bločku: ' + errorMessage);
+    } finally {
+      setIsScanning(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
+  // ---- Grouped expense data ----
+
+  const groupedExpenses: ExpenseGroup[] = useMemo(() => {
+    const groups: Record<string, ExpenseRecord[]> = {};
+    expenses.forEach((expense) => {
+      const date = new Date(expense.record_date);
+      const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+      if (!groups[monthKey]) groups[monthKey] = [];
+      groups[monthKey].push(expense);
+    });
+
+    return Object.keys(groups)
+      .sort((a, b) => b.localeCompare(a))
+      .map((key) => {
+        const records = groups[key].sort((a, b) =>
+          b.record_date.localeCompare(a.record_date)
+        );
+        const total = records.reduce(
+          (sum, r) => sum + Number(r.amount_eur),
+          0
+        );
+
+        const catData = records.reduce<CategoryTotal[]>((acc, curr) => {
+          const categoryName = curr.category || 'Ostatné';
+          const existing = acc.find((item) => item.name === categoryName);
+          if (existing) {
+            existing.value += Number(curr.amount_eur);
+          } else {
+            acc.push({ name: categoryName, value: Number(curr.amount_eur) });
+          }
+          return acc;
+        }, []);
+
+        return {
+          month: key,
+          records,
+          total,
+          categoryData: catData.sort((a, b) => b.value - a.value),
+        };
+      });
   }, [expenses]);
 
-  const sortedCategoryData = useMemo(() => {
-    return [...categoryData].sort((a, b) => b.value - a.value);
-  }, [categoryData]);
-
-  const totalExpensesValue = useMemo(() => {
-    return categoryData.reduce((sum, cat) => sum + cat.value, 0);
-  }, [categoryData]);
+  // ---- Render ----
 
   return (
     <div className="space-y-8">
@@ -532,473 +316,59 @@ export default function ExpensesPage() {
 
       <AnimatePresence>
         {isManagingCategories && (
-          <motion.div
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-            className="bg-white dark:bg-slate-900 rounded-2xl p-6 border shadow-sm"
-          >
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="font-semibold">Spravovať kategórie</h3>
-              <button
-                onClick={() => setIsManagingCategories(false)}
-                className="text-slate-400 hover:text-slate-600"
-              >
-                <X size={20} />
-              </button>
-            </div>
-            <div className="flex gap-2 mb-6">
-              <input
-                type="text"
-                value={newCategoryName}
-                onChange={(e) => setNewCategoryName(e.target.value)}
-                placeholder="Nová kategória..."
-                className="flex-1 bg-slate-50 dark:bg-slate-800 border rounded-lg px-4 py-2 outline-none focus:ring-2 focus:ring-rose-500"
-              />
-              <button
-                onClick={handleAddCategory}
-                className="bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 px-4 py-2 rounded-lg font-medium hover:opacity-90 transition-opacity"
-              >
-                Pridať
-              </button>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {categories.map((cat) => (
-                <div
-                  key={cat.id}
-                  className="flex items-center gap-2 bg-slate-100 dark:bg-slate-800 px-3 py-1.5 rounded-full group"
-                >
-                  <span className="text-sm">{cat.name}</span>
-                  <button
-                    onClick={() => handleDeleteCategory(cat.id, cat.name)}
-                    className="text-slate-400 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-all"
-                  >
-                    <X size={14} />
-                  </button>
-                </div>
-              ))}
-            </div>
-          </motion.div>
+          <CategoryManager
+            categories={categories}
+            onClose={() => setIsManagingCategories(false)}
+            onRefresh={refreshCategories}
+          />
         )}
       </AnimatePresence>
 
       <AnimatePresence>
         {isAdding && (
-          <motion.div
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: 'auto' }}
-            exit={{ opacity: 0, height: 0 }}
-            className="bg-white dark:bg-slate-900 rounded-2xl p-6 border shadow-sm overflow-hidden"
-          >
-            <form
-              onSubmit={handleSubmit(onAddExpense)}
-              className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end"
-            >
-              <div className="space-y-2">
-                <label htmlFor="expense-description" className="text-sm font-medium">Popis</label>
-                <input
-                  id="expense-description"
-                  className={`w-full bg-slate-50 dark:bg-slate-800 border rounded-lg px-4 py-2 focus:ring-2 focus:ring-rose-500 outline-none ${errors.description ? 'border-rose-500' : ''}`}
-                  {...register('description')}
-                  placeholder="napr. Nákup potravín"
-                />
-                {errors.description && (
-                  <p className="text-xs text-rose-500">
-                    {errors.description.message}
-                  </p>
-                )}
-              </div>
-              <div className="space-y-2">
-                <label htmlFor="expense-category" className="text-sm font-medium">Kategória</label>
-                <select
-                  id="expense-category"
-                  data-testid="expense-category-select"
-                  className={`w-full bg-slate-50 dark:bg-slate-800 border rounded-lg px-4 py-2 focus:ring-2 focus:ring-rose-500 outline-none ${errors.category ? 'border-rose-500' : ''}`}
-                  {...register('category')}
-                >
-                  <option value="">Vybrať...</option>
-                  {groupedCategories.length === 0 && (
-                    <option value="Ostatné: nezaradené">Ostatné: nezaradené</option>
-                  )}
-                  {groupedCategories.map((group) => (
-                    <optgroup key={group.id} label={group.name}>
-                      {group.subcategories.map((sub) => (
-                        <option
-                          key={sub.id}
-                          value={`${group.name}: ${sub.name}`}
-                        >
-                          {sub.name}
-                    </option>
-                      ))}
-                    </optgroup>
-                  ))}
-                </select>
-                {errors.category && (
-                  <p className="text-xs text-rose-500">
-                    {errors.category.message}
-                  </p>
-                )}
-              </div>
-              <div className="space-y-2">
-                <label htmlFor="expense-amount" className="text-sm font-medium">Čiastka (€)</label>
-                <input
-                  id="expense-amount"
-                  type="number"
-                  step="0.01"
-                  className={`w-full bg-slate-50 dark:bg-slate-800 border rounded-lg px-4 py-2 focus:ring-2 focus:ring-rose-500 outline-none ${errors.amount ? 'border-rose-500' : ''}`}
-                  {...register('amount')}
-                  placeholder="0.00"
-                />
-                {errors.amount && (
-                  <p className="text-xs text-rose-500">
-                    {errors.amount.message}
-                  </p>
-                )}
-              </div>
-              <div className="flex gap-2">
-                <button
-                  type="submit"
-                  data-testid="expense-submit-button"
-                  className="flex-1 bg-rose-600 text-white rounded-lg py-2 font-medium hover:bg-rose-700 transition-colors"
-                >
-                  Uložiť
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setIsAdding(false)}
-                  className="px-4 py-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
-                >
-                  Zrušiť
-                </button>
-              </div>
-            </form>
-          </motion.div>
+          <ExpenseForm
+            groupedCategories={groupedCategories}
+            onSubmit={onAddExpense}
+            onCancel={() => setIsAdding(false)}
+            setValueRef={(setter) => {
+              formSetValueRef.current = setter;
+            }}
+          />
         )}
       </AnimatePresence>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
         <div className="md:col-span-2 space-y-6">
-            {loading ? (
+          {loading ? (
             <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border p-6 space-y-4">
-                <Skeleton className="h-10 w-full" />
-                <Skeleton className="h-10 w-full" />
-                <Skeleton className="h-10 w-full" />
-                <Skeleton className="h-10 w-full" />
-              </div>
+              <Skeleton className="h-10 w-full" />
+              <Skeleton className="h-10 w-full" />
+              <Skeleton className="h-10 w-full" />
+              <Skeleton className="h-10 w-full" />
+            </div>
           ) : groupedExpenses.length === 0 ? (
             <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border p-12 text-center text-slate-400">
               Žiadne výdavky nenájdené. Začni pridaním prvého.
             </div>
           ) : (
             groupedExpenses.map((group) => (
-              <div
+              <MonthlyExpenseGroup
                 key={group.month}
-                className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border overflow-hidden"
-              >
-                <div className="p-4 bg-slate-50 dark:bg-slate-800/50 border-b flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Calendar size={18} className="text-rose-500" />
-                    <h3 className="font-bold text-slate-900 dark:text-white capitalize">
-                      {new Date(group.month).toLocaleDateString('sk-SK', {
-                        month: 'long',
-                        year: 'numeric',
-                      })}
-                    </h3>
-                  </div>
-                  <div className="text-sm font-black text-rose-600 bg-rose-50 dark:bg-rose-950/30 px-3 py-1 rounded-full border border-rose-100 dark:border-rose-900/50">
-                    Spolu: {formatCurrency(group.total)}
-                  </div>
-                </div>
-
-                {/* Monthly Chart */}
-                <div className="px-6 py-4 bg-slate-50/30 dark:bg-slate-800/10 border-b">
-                  <div className="h-[120px] w-full">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <BarChart
-                        data={group.categoryData}
-                        layout="vertical"
-                        margin={{ left: -20, right: 20, top: 0, bottom: 0 }}
-                      >
-                        <XAxis type="number" hide />
-                        <YAxis
-                          dataKey="name"
-                          type="category"
-                          hide
-                          width={100}
-                        />
-                        <Tooltip
-                          cursor={{ fill: 'transparent' }}
-                          contentStyle={{
-                            borderRadius: '12px',
-                            border: 'none',
-                            boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)',
-                          }}
-                          formatter={(value: number | string) => formatCurrency(Number(value))}
-                        />
-                        <Bar
-                          dataKey="value"
-                          radius={[0, 4, 4, 0]}
-                          barSize={20}
-                        >
-                          {group.categoryData.map((_entry, index) => (
-                            <Cell
-                              key={`cell-${index}`}
-                              fill={COLORS[index % COLORS.length]}
-                            />
-                          ))}
-                        </Bar>
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </div>
-                  <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2">
-                    {group.categoryData.slice(0, 5).map((cat, idx) => (
-                      <div key={cat.name} className="flex items-center gap-1.5">
-                        <div
-                          className="w-2 h-2 rounded-full"
-                          style={{ backgroundColor: COLORS[idx % COLORS.length] }}
-                        />
-                        <span className="text-[10px] font-bold text-slate-500 uppercase tracking-tight">
-                          {cat.name}: {formatCurrency(cat.value)}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-
-                  <MonthlyAISummary
-                    month={group.month}
-                    expenses={group.records}
-                    total={group.total}
-                  />
-                </div>
-
-                <div className="overflow-x-auto">
-              <table className="w-full text-sm text-left">
-                    <thead className="text-slate-500 font-bold uppercase text-[10px] tracking-widest border-b bg-slate-50/30 dark:bg-slate-800/20">
-                      <tr>
-                        <th className="px-6 py-3">Dátum</th>
-                        <th className="px-6 py-3">Popis</th>
-                        <th className="px-6 py-3">Kategória</th>
-                        <th className="px-6 py-3 text-right">Suma</th>
-                        <th className="px-6 py-3"></th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y">
-                      {group.records.map((expense) => (
-                      <tr
-                        key={expense.id}
-                          className={`hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-colors group ${expense.isOptimistic ? 'opacity-50' : ''}`}
-                        >
-                          {editingId === expense.id ? (
-                            <>
-                              <td className="px-4 py-2">
-                                <input
-                                  type="date"
-                                  value={editValues.record_date}
-                                  onChange={(e) =>
-                                    setEditValues({
-                                      ...editValues,
-                                      record_date: e.target.value,
-                                    })
-                                  }
-                                  className="w-full bg-white dark:bg-slate-800 border rounded px-2 py-1 outline-none focus:ring-1 focus:ring-rose-500"
-                                />
-                              </td>
-                              <td className="px-4 py-2">
-                                <input
-                                  type="text"
-                                  value={editValues.description}
-                                  onChange={(e) =>
-                                    setEditValues({
-                                      ...editValues,
-                                      description: e.target.value,
-                                    })
-                                  }
-                                  className="w-full bg-white dark:bg-slate-800 border rounded px-2 py-1 outline-none focus:ring-1 focus:ring-rose-500"
-                                />
-                              </td>
-                              <td className="px-4 py-2">
-                                <select
-                                  value={editValues.category}
-                                  onChange={(e) =>
-                                    setEditValues({
-                                      ...editValues,
-                                      category: e.target.value,
-                                    })
-                                  }
-                                  className="w-full bg-white dark:bg-slate-800 border rounded px-2 py-1 outline-none focus:ring-1 focus:ring-rose-500"
-                                >
-                                  {groupedCategories.map((group) => (
-                                    <optgroup key={group.id} label={group.name}>
-                                      {group.subcategories.map((sub) => (
-                                        <option
-                                          key={sub.id}
-                                          value={`${group.name}: ${sub.name}`}
-                                        >
-                                          {sub.name}
-                                        </option>
-                                      ))}
-                                    </optgroup>
-                                  ))}
-                                </select>
-                              </td>
-                              <td className="px-4 py-2">
-                                <input
-                                  type="number"
-                                  step="0.01"
-                                  value={editValues.amount}
-                                  onChange={(e) =>
-                                    setEditValues({
-                                      ...editValues,
-                                      amount: e.target.value,
-                                    })
-                                  }
-                                  className="w-full bg-white dark:bg-slate-800 border rounded px-2 py-1 text-right outline-none focus:ring-1 focus:ring-rose-500 font-bold"
-                                />
-                              </td>
-                              <td className="px-4 py-2 text-right">
-                                <div className="flex gap-1 justify-end">
-                                  <button
-                                    onClick={() => handleUpdate(expense.id)}
-                                    className="p-1.5 bg-emerald-100 text-emerald-600 rounded-md hover:bg-emerald-200 transition-colors"
-                                  >
-                                    <Check size={14} />
-                                  </button>
-                                  <button
-                                    onClick={() => setEditingId(null)}
-                                    className="p-1.5 bg-slate-100 text-slate-600 rounded-md hover:bg-slate-200 transition-colors"
-                                  >
-                                    <X size={14} />
-                                  </button>
-                                </div>
-                              </td>
-                            </>
-                          ) : (
-                            <>
-                              <td className="px-6 py-4 text-slate-500 font-medium">
-                                {new Date(
-                                  expense.record_date
-                                ).toLocaleDateString('sk-SK', {
-                                  day: '2-digit',
-                                  month: '2-digit',
-                                })}
-                        </td>
-                              <td className="px-6 py-4 font-semibold text-slate-900 dark:text-slate-100">
-                          {expense.description}
-                        </td>
-                        <td className="px-6 py-4">
-                                <span className="px-2 py-0.5 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 rounded-full text-[10px] font-black uppercase tracking-tighter">
-                            {expense.category}
-                          </span>
-                        </td>
-                              <td className="px-6 py-4 text-right font-black text-rose-600">
-                          -{formatCurrency(expense.amount_eur)}
-                        </td>
-                        <td className="px-6 py-4 text-right">
-                                <div className="flex gap-1 justify-end opacity-0 group-hover:opacity-100 transition-opacity">
-                                  <button
-                                    disabled={expense.isOptimistic}
-                                    onClick={() => handleEdit(expense)}
-                                    className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/30 rounded-md transition-all"
-                                  >
-                                    <Edit2 size={14} />
-                                  </button>
-                          <button
-                            disabled={expense.isOptimistic}
-                            onClick={() => handleDelete(expense.id)}
-                                    className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30 rounded-md transition-all"
-                          >
-                                    <Trash2 size={14} />
-                          </button>
-                                </div>
-                        </td>
-                            </>
-                          )}
-                      </tr>
-                      ))}
-                </tbody>
-              </table>
-                </div>
-              </div>
+                group={group}
+                groupedCategories={groupedCategories}
+                editingId={editingId}
+                editValues={editValues}
+                onEdit={handleEdit}
+                onUpdate={handleUpdate}
+                onCancelEdit={() => setEditingId(null)}
+                onDelete={handleDelete}
+                onEditValueChange={handleEditValueChange}
+              />
             ))
-            )}
+          )}
         </div>
 
-        <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl shadow-sm border h-fit sticky top-8">
-          <h3 className="text-lg font-semibold mb-6 flex items-center gap-2">
-            <PieChartIcon size={20} className="text-rose-500" />
-            Rozdelenie výdavkov
-          </h3>
-          <div className="h-[200px] mb-8">
-            {loading ? (
-              <Skeleton className="w-full h-full rounded-full" />
-            ) : categoryData.length > 0 ? (
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={categoryData}
-                    innerRadius={60}
-                    outerRadius={80}
-                    paddingAngle={2}
-                    dataKey="value"
-                  >
-                    {categoryData.map((_entry, index) => (
-                      <Cell
-                        key={`cell-${index}`}
-                        fill={COLORS[index % COLORS.length]}
-                        stroke="none"
-                      />
-                    ))}
-                  </Pie>
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: '#fff',
-                      borderRadius: '12px',
-                      border: 'none',
-                      boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)',
-                      fontSize: '12px'
-                    }}
-                    formatter={(value: string | number | undefined) =>
-                      formatCurrency(Number(value) || 0)
-                    }
-                  />
-                </PieChart>
-              </ResponsiveContainer>
-            ) : (
-              <div className="h-full flex items-center justify-center text-slate-400 text-sm italic">
-                Pridaj výdavky pre zobrazenie grafu
-              </div>
-            )}
-          </div>
-
-          <div className="space-y-2 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
-            {sortedCategoryData.map((item, idx) => (
-                <div
-                  key={item.name}
-                  className="flex items-center justify-between group p-1 hover:bg-slate-50 dark:hover:bg-slate-800/50 rounded-lg transition-colors"
-                >
-                  <div className="flex items-center gap-2 min-w-0">
-                    <div
-                      className="w-2.5 h-2.5 rounded-full shrink-0"
-                      style={{ backgroundColor: COLORS[idx % COLORS.length] }}
-                    />
-                    <span className="text-[11px] font-medium text-slate-600 dark:text-slate-400 truncate" title={item.name}>
-                      {item.name}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2 shrink-0 ml-2">
-                    <span className="text-[11px] font-bold text-slate-900 dark:text-slate-100">
-                      {formatCurrency(item.value)}
-                    </span>
-                    <span className="text-[10px] text-slate-400 w-8 text-right">
-                      {totalExpensesValue > 0 
-                        ? `${Math.round((item.value / totalExpensesValue) * 100)}%` 
-                        : '0%'}
-                    </span>
-                  </div>
-                </div>
-              ))}
-          </div>
-        </div>
+        <ExpenseCategorySidebar expenses={expenses} loading={loading} />
       </div>
     </div>
   );
