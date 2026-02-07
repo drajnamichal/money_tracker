@@ -81,6 +81,7 @@ export function PortfolioClient({ initialInvestments }: PortfolioClientProps) {
           loading={loading}
           search={search}
           setSearch={setSearch}
+          cashBalance={7.05}
         />
       </section>
 

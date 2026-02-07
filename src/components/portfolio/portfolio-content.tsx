@@ -30,6 +30,8 @@ interface PortfolioContentProps {
   loading: boolean;
   search: string;
   setSearch: (val: string) => void;
+  /** Cash balance on the brokerage account (EUR) */
+  cashBalance?: number;
 }
 
 export function PortfolioContent({
@@ -38,12 +40,14 @@ export function PortfolioContent({
   loading,
   search,
   setSearch,
+  cashBalance = 0,
 }: PortfolioContentProps) {
   const stats = useMemo(() => {
-    const totalValue = investments.reduce(
+    const investedValue = investments.reduce(
       (sum, inv) => sum + inv.shares * inv.current_price,
       0
     );
+    const totalValue = investedValue + cashBalance;
     const totalCost = investments.reduce(
       (sum, inv) => sum + inv.shares * inv.avg_price,
       0
@@ -102,7 +106,7 @@ export function PortfolioContent({
               <p className="text-slate-500 text-[10px] uppercase font-black tracking-widest mb-1">
                 Voľné prostriedky
               </p>
-              <p className="text-lg font-bold">0.00 €</p>
+              <p className="text-lg font-bold">{formatCurrency(cashBalance)}</p>
             </div>
             <div>
               <p className="text-slate-500 text-[10px] uppercase font-black tracking-widest mb-1">
