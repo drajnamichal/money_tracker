@@ -46,18 +46,21 @@ export function PortfolioContent({
   const { prices: livePrices, usdToEur, fetchedAt, isRefreshing, refetch: refetchPrices } =
     useStockPrices(investments);
 
-  /** Get the best available price in EUR */
+  /**
+   * Get the best available price in EUR.
+   * Yahoo may return USD price for tickers like NVO, O — convert those to EUR.
+   * avg_price in DB is always EUR (from broker), so no conversion needed.
+   */
   const getPriceEur = (inv: Investment): number => {
-    let price = inv.current_price;
     if (inv.ticker && livePrices[inv.ticker]) {
-      price = livePrices[inv.ticker].price;
+      const live = livePrices[inv.ticker];
+      // Convert if Yahoo returns a different currency than EUR
+      if (live.currency === 'USD') return live.price * usdToEur;
+      if (live.currency === 'EUR') return live.price;
+      // Other currencies (DKK etc.) — use stored price as fallback
+      return inv.current_price;
     }
-    return inv.currency === 'USD' ? price * usdToEur : price;
-  };
-
-  /** Get avg_price in EUR */
-  const getAvgPriceEur = (inv: Investment): number => {
-    return inv.currency === 'USD' ? inv.avg_price * usdToEur : inv.avg_price;
+    return inv.current_price;
   };
 
   const stats = useMemo(() => {
@@ -66,7 +69,7 @@ export function PortfolioContent({
       0
     );
     const totalCost = investments.reduce(
-      (sum, inv) => sum + inv.shares * getAvgPriceEur(inv),
+      (sum, inv) => sum + inv.shares * inv.avg_price,
       0
     );
     const totalProfit = totalValue - totalCost;
@@ -205,7 +208,7 @@ export function PortfolioContent({
                 const currentPrice = getPriceEur(inv);
                 const isLive = !!(inv.ticker && livePrices[inv.ticker]);
                 const value = inv.shares * currentPrice;
-                const cost = inv.shares * getAvgPriceEur(inv);
+                const cost = inv.shares * inv.avg_price;
                 const profit = value - cost;
                 const profitPct = cost > 0 ? (profit / cost) * 100 : 0;
 
