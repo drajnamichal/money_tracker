@@ -86,7 +86,8 @@ export function ExpensesClient({
       ]);
       assertSuccess(error, 'Pridanie výdavku');
 
-      if (values.category.startsWith('Bývanie:')) {
+      // Only "Vybavenie bytu" expenses count towards the apartment budget
+      if (values.category === 'Bývanie: vybavenie bytu') {
         await supabase.from('budget_expenses').insert([
           {
             description: values.description,
