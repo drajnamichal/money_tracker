@@ -91,7 +91,7 @@ export function AddInstrumentModal({
         </button>
 
         <h3 className="text-2xl font-bold mb-6">
-          Pridať do {portfolioId === 'markusik' ? 'Markusik' : 'Moje obchody'}
+          Pridať do {portfolioId === 'markusik' ? 'Markusik' : 'Naše investície'}
         </h3>
 
         <form onSubmit={handleSubmit} className="space-y-4">

@@ -42,13 +42,13 @@ export function PortfolioClient({ initialInvestments }: PortfolioClientProps) {
 
   return (
     <div className="space-y-16 pb-24">
-      {/* Portfólio 1: Moje obchody */}
+      {/* Portfólio 1: Naše investície */}
       <section className="space-y-6">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 px-2">
           <div>
             <div className="flex items-center gap-3">
               <h2 className="text-3xl font-black text-slate-900 dark:text-white">
-                Moje obchody
+                Naše investície
               </h2>
               <div className="flex items-center gap-1.5 px-2.5 py-1 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 rounded-full border border-emerald-100 dark:border-emerald-800/50 shadow-sm">
                 <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
