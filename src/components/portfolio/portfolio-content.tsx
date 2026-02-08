@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { formatCurrency } from '@/lib/utils';
 import {
   TrendingUp,
@@ -9,6 +9,8 @@ import {
   Briefcase,
   PieChart as PieIcon,
   Search,
+  Pencil,
+  Check,
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { Skeleton } from '@/components/skeleton';
@@ -40,8 +42,28 @@ export function PortfolioContent({
   loading,
   search,
   setSearch,
-  cashBalance = 0,
+  cashBalance: initialCash = 0,
 }: PortfolioContentProps) {
+  // Editable cash balance persisted in localStorage
+  const storageKey = `cash-balance-${portfolioId}`;
+  const [cashBalance, setCashBalance] = useState(initialCash);
+  const [isEditingCash, setIsEditingCash] = useState(false);
+  const [cashInput, setCashInput] = useState('');
+
+  useEffect(() => {
+    const saved = localStorage.getItem(storageKey);
+    if (saved !== null) setCashBalance(parseFloat(saved));
+  }, [storageKey]);
+
+  const saveCashBalance = () => {
+    const val = parseFloat(cashInput);
+    if (!isNaN(val) && val >= 0) {
+      setCashBalance(val);
+      localStorage.setItem(storageKey, val.toString());
+    }
+    setIsEditingCash(false);
+  };
+
   const stats = useMemo(() => {
     const investedValue = investments.reduce(
       (sum, inv) => sum + inv.shares * inv.current_price,
@@ -56,7 +78,7 @@ export function PortfolioContent({
     const profitPercentage =
       totalCost > 0 ? (totalProfit / totalCost) * 100 : 0;
     return { totalValue, totalProfit, profitPercentage };
-  }, [investments]);
+  }, [investments, cashBalance]);
 
   const filteredInvestments = investments.filter(
     (inv) =>
@@ -106,7 +128,41 @@ export function PortfolioContent({
               <p className="text-slate-500 text-[10px] uppercase font-black tracking-widest mb-1">
                 Voľné prostriedky
               </p>
-              <p className="text-lg font-bold">{formatCurrency(cashBalance)}</p>
+              {isEditingCash ? (
+                <div className="flex items-center gap-1">
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={cashInput}
+                    onChange={(e) => setCashInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') saveCashBalance();
+                      if (e.key === 'Escape') setIsEditingCash(false);
+                    }}
+                    autoFocus
+                    className="w-20 bg-white/10 border border-white/20 rounded-md px-2 py-1 text-sm font-bold outline-none focus:ring-1 focus:ring-blue-400"
+                  />
+                  <button
+                    onClick={saveCashBalance}
+                    className="p-1 rounded-md hover:bg-white/10"
+                    aria-label="Uložiť"
+                  >
+                    <Check size={14} />
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={() => {
+                    setCashInput(cashBalance.toString());
+                    setIsEditingCash(true);
+                  }}
+                  className="text-lg font-bold flex items-center gap-1.5 hover:opacity-80 transition-opacity group"
+                  title="Klikni pre úpravu"
+                >
+                  {formatCurrency(cashBalance)}
+                  <Pencil size={10} className="opacity-0 group-hover:opacity-50 transition-opacity" />
+                </button>
+              )}
             </div>
             <div>
               <p className="text-slate-500 text-[10px] uppercase font-black tracking-widest mb-1">
