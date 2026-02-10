@@ -836,7 +836,7 @@ export function DashboardClient({
                 nodeWidth={8}
                 linkCurvature={0.5}
                 margin={{ top: 10, right: 10, bottom: 10, left: 10 }}
-                link={{ stroke: '#94a3b8', strokeOpacity: 0.3 }}
+                link={{ stroke: 'hsl(var(--foreground))', strokeOpacity: 0.15 }}
                 node={{
                   fill: '#2563eb',
                   stroke: 'none',
