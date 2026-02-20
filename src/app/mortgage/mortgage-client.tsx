@@ -20,6 +20,8 @@ import {
   Zap,
   TrendingUp,
   ExternalLink,
+  Bell,
+  FileSignature,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
@@ -211,6 +213,19 @@ export function MortgageClient({ initialMortgages, initialPayments }: MortgageCl
       100
     : 0;
 
+  const CONTRACT_SIGN_DATE = new Date('2025-07-14');
+  const rateReductionStart = new Date(CONTRACT_SIGN_DATE);
+  rateReductionStart.setMonth(rateReductionStart.getMonth() + 7);
+  const rateReductionEnd = new Date(CONTRACT_SIGN_DATE);
+  rateReductionEnd.setMonth(rateReductionEnd.getMonth() + 8);
+  const today = new Date();
+  const isRateReductionWindow =
+    today >= rateReductionStart && today <= rateReductionEnd;
+  const isRateReductionPast = today > rateReductionEnd;
+  const daysUntilWindow = Math.ceil(
+    (rateReductionStart.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)
+  );
+
   if (loading && !mortgage) {
     return (
       <div className="space-y-8">
@@ -289,6 +304,15 @@ export function MortgageClient({ initialMortgages, initialPayments }: MortgageCl
           </p>
         </div>
         <div className="flex items-center gap-3">
+          <div className="px-4 py-2 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-200 dark:border-slate-700">
+            <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider flex items-center gap-1">
+              <FileSignature size={10} />
+              Podpis zmluvy
+            </p>
+            <p className="text-lg font-bold">
+              {CONTRACT_SIGN_DATE.toLocaleDateString('sk-SK')}
+            </p>
+          </div>
           <div className="px-4 py-2 bg-blue-50 dark:bg-blue-950/30 rounded-xl border border-blue-100 dark:border-blue-900/50">
             <p className="text-[10px] text-blue-600 dark:text-blue-400 font-bold uppercase tracking-wider">
               Úrok
@@ -463,6 +487,76 @@ export function MortgageClient({ initialMortgages, initialPayments }: MortgageCl
           </button>
         </div>
       </div>
+
+      {/* Rate Reduction Reminder */}
+      <motion.div
+        initial={{ opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        className={`rounded-2xl border p-5 flex flex-col md:flex-row md:items-center gap-4 shadow-sm ${
+          isRateReductionWindow
+            ? 'bg-amber-50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-800/50'
+            : isRateReductionPast
+              ? 'bg-slate-50 dark:bg-slate-800/30 border-slate-200 dark:border-slate-700'
+              : 'bg-blue-50 dark:bg-blue-950/20 border-blue-100 dark:border-blue-900/30'
+        }`}
+      >
+        <div
+          className={`shrink-0 w-10 h-10 rounded-xl flex items-center justify-center ${
+            isRateReductionWindow
+              ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400'
+              : isRateReductionPast
+                ? 'bg-slate-200 dark:bg-slate-700 text-slate-500'
+                : 'bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400'
+          }`}
+        >
+          <Bell size={18} className={isRateReductionWindow ? 'animate-bounce' : ''} />
+        </div>
+
+        <div className="flex-1 min-w-0">
+          <p
+            className={`text-[10px] font-black uppercase tracking-widest mb-0.5 ${
+              isRateReductionWindow
+                ? 'text-amber-600 dark:text-amber-400'
+                : isRateReductionPast
+                  ? 'text-slate-500'
+                  : 'text-blue-600 dark:text-blue-400'
+            }`}
+          >
+            Pripomienka · Žiadosť o zníženie úroku
+          </p>
+          {isRateReductionWindow ? (
+            <p className="font-bold text-amber-900 dark:text-amber-100">
+              Teraz je ten správny čas! Môžeš požiadať banku o zníženie úrokovej sadzby.
+            </p>
+          ) : isRateReductionPast ? (
+            <p className="font-bold text-slate-600 dark:text-slate-300">
+              Okno na žiadosť o zníženie úroku uplynulo (bolo{' '}
+              {rateReductionStart.toLocaleDateString('sk-SK')} –{' '}
+              {rateReductionEnd.toLocaleDateString('sk-SK')}).
+            </p>
+          ) : (
+            <p className="font-bold text-blue-900 dark:text-blue-100">
+              Po 7–8 mesiacoch splácania môžeš požiadať o zníženie úrokovej sadzby — za{' '}
+              <span className="text-blue-600 dark:text-blue-400">{daysUntilWindow} dní</span>.
+            </p>
+          )}
+          <p className="text-xs text-slate-500 mt-0.5">
+            Okno na žiadosť:{' '}
+            <span className="font-semibold">
+              {rateReductionStart.toLocaleDateString('sk-SK')} –{' '}
+              {rateReductionEnd.toLocaleDateString('sk-SK')}
+            </span>{' '}
+            (7–8 mesiacov od podpisu zmluvy{' '}
+            {CONTRACT_SIGN_DATE.toLocaleDateString('sk-SK')})
+          </p>
+        </div>
+
+        {isRateReductionWindow && (
+          <div className="shrink-0 px-4 py-2 bg-amber-500 text-white text-xs font-black rounded-xl uppercase tracking-wider shadow-md shadow-amber-200 dark:shadow-none">
+            Konaj teraz!
+          </div>
+        )}
+      </motion.div>
 
       {/* History / Chart */}
       <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border shadow-sm">
