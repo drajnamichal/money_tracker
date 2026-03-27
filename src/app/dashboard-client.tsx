@@ -12,6 +12,9 @@ import {
   Zap,
   Plus,
   Receipt,
+  AlertTriangle,
+  House,
+  PiggyBank,
 } from 'lucide-react';
 import {
   AreaChart,
@@ -123,10 +126,14 @@ export function DashboardClient({
     let prevMonthIncome = 0;
     let prevMonthExpenses = 0;
     let prevMonthName = '';
+    let previousAssetsTotal = 0;
 
     const investmentValue = investments
       .filter((inv) => !inv.portfolio_id || inv.portfolio_id === 'default')
       .reduce((sum, inv) => sum + inv.shares * inv.current_price, 0);
+    const investmentCostBasis = investments
+      .filter((inv) => !inv.portfolio_id || inv.portfolio_id === 'default')
+      .reduce((sum, inv) => sum + inv.shares * inv.avg_price, 0);
 
     if (wealthData && wealthData.length > 0) {
       // Get the single latest date from all wealth records
@@ -146,8 +153,7 @@ export function DashboardClient({
 
       const sortedDates = Object.keys(totalsByDate).sort();
       const previousDate = sortedDates[sortedDates.length - 2];
-      const previousAssetsTotal =
-        totalsByDate[previousDate] || latestAssetsTotal;
+      previousAssetsTotal = totalsByDate[previousDate] || latestAssetsTotal;
 
       totalAssets = latestAssetsTotal;
       growth =
@@ -157,6 +163,7 @@ export function DashboardClient({
           : 0;
     } else {
       totalAssets = investmentValue;
+      previousAssetsTotal = investmentValue;
     }
 
     // The user specifically wants "Čistý majetok" to match the Assets page total (snapshot)
@@ -227,6 +234,10 @@ export function DashboardClient({
       prevMonthlySaving !== 0
         ? ((monthlySaving - prevMonthlySaving) / Math.abs(prevMonthlySaving)) * 100
         : 0;
+    const investmentChange =
+      investmentCostBasis > 0
+        ? ((investmentValue - investmentCostBasis) / investmentCostBasis) * 100
+        : 0;
 
     return {
       totalAssets,
@@ -241,59 +252,57 @@ export function DashboardClient({
       incomeChange,
       expenseChange,
       savingChange,
+      investmentValue,
+      investmentCostBasis,
+      investmentChange,
+      monthlySaving,
+      previousAssetsTotal,
+      netWorthDeltaAmount: totalAssets - previousAssetsTotal,
+      monthlySeries: combinedSorted,
     };
   }, [wealthData, incomeData, expenseData, investments, mortgage]);
 
-  const aiInsights = useMemo(() => {
+  const whatToNoticeInsights = useMemo(() => {
     if (loading) return [];
 
-    const insights = [];
+    const insights: Array<{
+      icon: ReactNode;
+      title: string;
+      text: ReactNode;
+      color: keyof typeof insightCardStyles;
+      priority: number;
+    }> = [];
 
-    // Action 1: Investable Amount (Prioritized)
-    const monthlySaving = stats.monthlyIncome - stats.monthlyExpenses;
-    if (monthlySaving > 0) {
+    if (stats.monthlySaving < 0) {
       insights.push({
-        icon: <TrendingUp className="text-emerald-500" size={18} />,
+        icon: <AlertTriangle className="text-rose-500" size={18} />,
+        title: 'Cashflow je tento mesiac záporný',
         text: (
           <span>
-            Tento mesiac môžeš investovať{' '}
-            <span className="font-bold text-emerald-600 dark:text-emerald-400">
-              +{formatCurrency(monthlySaving)}
+            Výdavky sú vyššie než príjmy o{' '}
+            <span className="font-bold text-rose-600 dark:text-rose-400">
+              {formatCurrency(Math.abs(stats.monthlySaving))}
             </span>{' '}
-            bez rizika pre tvoj cashflow.
+            a rozpočet je pod tlakom.
           </span>
         ),
-        color: 'emerald',
+        color: 'rose',
         priority: 1,
       });
     }
 
-    // Action 2: Subscriptions Analysis
-    const subs = recurringPayments.filter(
-      (p) =>
-        p.frequency === 'monthly' &&
-        (p.name.toLowerCase().includes('netflix') ||
-          p.name.toLowerCase().includes('spotify') ||
-          p.name.toLowerCase().includes('hbo') ||
-          p.name.toLowerCase().includes('disney') ||
-          p.name.toLowerCase().includes('youtube') ||
-          p.amount < 20)
-    );
-
-    if (subs.length >= 2) {
-      const totalSubsAmount = subs.reduce(
-        (sum, p) => sum + Number(p.amount),
-        0
-      );
+    const expenseIncreaseStreak = getExpenseIncreaseStreak(stats.monthlySeries);
+    if (expenseIncreaseStreak >= 2) {
       insights.push({
-        icon: <TrendingDown className="text-rose-500" size={18} />,
+        icon: <Receipt className="text-rose-500" size={18} />,
+        title: `Výdavky rastú už ${expenseIncreaseStreak} mesiace po sebe`,
         text: (
           <span>
-            Zváž zrušenie týchto {subs.length} predplatných – ušetríš{' '}
+            Aktuálny mesiac je na úrovni{' '}
             <span className="font-bold text-rose-600 dark:text-rose-400">
-              {formatCurrency(totalSubsAmount)}
+              {formatCurrency(stats.monthlyExpenses)}
             </span>{' '}
-            mesačne.
+            a trend je stále rastúci.
           </span>
         ),
         color: 'rose',
@@ -301,27 +310,104 @@ export function DashboardClient({
       });
     }
 
-    // Action 3: Emergency Fund check (if not enough)
-    const emergencyFundGoal = stats.monthlyExpenses * 6;
-    if (stats.totalAssets < emergencyFundGoal) {
-      const missing = emergencyFundGoal - stats.totalAssets;
+    const mortgageProgress = mortgage
+      ? getMortgageProgressInsight(mortgage)
+      : null;
+    if (mortgageProgress) {
       insights.push({
-        icon: <BrainCircuit className="text-indigo-500" size={18} />,
+        icon:
+          mortgageProgress.status === 'ahead' ? (
+            <House className="text-emerald-500" size={18} />
+          ) : mortgageProgress.status === 'behind' ? (
+            <House className="text-rose-500" size={18} />
+          ) : (
+            <House className="text-indigo-500" size={18} />
+          ),
+        title:
+          mortgageProgress.status === 'ahead'
+            ? 'Hypotéka je rýchlejšie splácaná než plán'
+            : mortgageProgress.status === 'behind'
+              ? 'Hypotéka zaostáva za plánom'
+              : 'Hypotéka ide podľa plánu',
         text: (
           <span>
-            Doplnenie rezervy: Potrebuješ ešte{' '}
-            <span className="font-bold">{formatCurrency(missing)}</span> na
-            dosiahnutie bezpečného vankúša (6 mesiacov).
+            {mortgageProgress.message}
           </span>
         ),
-        color: 'indigo',
+        color:
+          mortgageProgress.status === 'ahead'
+            ? 'emerald'
+            : mortgageProgress.status === 'behind'
+              ? 'rose'
+              : 'indigo',
         priority: 3,
       });
     }
 
-    // Sort by priority and take only top 2
-    return insights.sort((a, b) => a.priority - b.priority).slice(0, 2);
-  }, [stats, loading, recurringPayments]);
+    const recurringPriceIncreases = recurringPayments.filter(
+      (payment) =>
+        payment.last_amount !== null &&
+        payment.last_amount !== undefined &&
+        Number(payment.amount) > Number(payment.last_amount)
+    );
+    if (recurringPriceIncreases.length > 0) {
+      const totalMonthlyIncrease = recurringPriceIncreases.reduce((sum, payment) => {
+        const diff = Number(payment.amount) - Number(payment.last_amount ?? 0);
+        return sum + (payment.frequency === 'yearly' ? diff / 12 : diff);
+      }, 0);
+
+      insights.push({
+        icon: <Zap className="text-indigo-500" size={18} />,
+        title: 'Niektoré pravidelné platby zdraželi',
+        text: (
+          <span>
+            {recurringPriceIncreases.length} platieb pridáva asi{' '}
+            <span className="font-bold text-indigo-600 dark:text-indigo-400">
+              {formatCurrency(totalMonthlyIncrease)}
+            </span>{' '}
+            k mesačnému zaťaženiu.
+          </span>
+        ),
+        color: 'indigo',
+        priority: 4,
+      });
+    }
+
+    if (stats.monthlySaving > 0) {
+      insights.push({
+        icon: <PiggyBank className="text-emerald-500" size={18} />,
+        title: 'Tento mesiac vytváraš pozitívny priestor',
+        text: (
+          <span>
+            Po odpočítaní výdavkov ti zostáva{' '}
+            <span className="font-bold text-emerald-600 dark:text-emerald-400">
+              {formatCurrency(stats.monthlySaving)}
+            </span>{' '}
+            na rezervu alebo investície.
+          </span>
+        ),
+        color: 'emerald',
+        priority: 5,
+      });
+    }
+
+    if (insights.length === 0) {
+      insights.push({
+        icon: <BrainCircuit className="text-indigo-500" size={18} />,
+        title: 'Zatiaľ zbierame dáta',
+        text: (
+          <span>
+            Keď pribudne viac mesačných záznamov, zobrazia sa tu najdôležitejšie
+            finančné signály a odchýlky.
+          </span>
+        ),
+        color: 'indigo',
+        priority: 99,
+      });
+    }
+
+    return insights.sort((a, b) => a.priority - b.priority).slice(0, 3);
+  }, [stats, loading, recurringPayments, mortgage]);
 
   const assetsHistory = useMemo(() => {
     if (!wealthData || wealthData.length === 0) return [];
@@ -472,7 +558,7 @@ export function DashboardClient({
           </p>
         </div>
         {loading ? (
-          <Skeleton className="h-16 w-48 rounded-2xl" />
+          <Skeleton className="h-20 w-60 rounded-2xl" />
         ) : (
           <div className="bg-slate-900 text-white px-6 py-3 rounded-2xl shadow-lg flex items-center gap-4 border border-slate-800">
             <Wallet size={24} className="text-slate-400" />
@@ -480,19 +566,28 @@ export function DashboardClient({
               <p className="text-xs opacity-60 uppercase font-bold tracking-wider">
                 Čistý Majetok
               </p>
-              <AnimatedNumber
-                value={stats.netWorth}
-                format={formatCurrency}
-                className="text-xl font-bold"
-              />
+              <div className="flex items-center gap-3 mt-1">
+                <AnimatedNumber
+                  value={stats.netWorth}
+                  format={formatCurrency}
+                  className="text-xl font-bold"
+                />
+                <ChangeBadge
+                  change={stats.growth}
+                  label="vs posledný snapshot"
+                  positiveDirection="up"
+                  compact
+                />
+              </div>
             </div>
           </div>
         )}
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-4 gap-6">
         {loading ? (
           <>
+            <Skeleton className="h-32 rounded-2xl" />
             <Skeleton className="h-32 rounded-2xl" />
             <Skeleton className="h-32 rounded-2xl" />
             <Skeleton className="h-32 rounded-2xl" />
@@ -505,6 +600,8 @@ export function DashboardClient({
               change={stats.incomeChange}
               icon={<TrendingUp className="text-emerald-500" />}
               color="emerald"
+              changeLabel="vs minulý mesiac"
+              positiveDirection="up"
             />
             <StatCard
               title="Mesačné Výdavky"
@@ -512,13 +609,26 @@ export function DashboardClient({
               change={stats.expenseChange}
               icon={<TrendingDown className="text-rose-500" />}
               color="rose"
+              changeLabel="vs minulý mesiac"
+              positiveDirection="down"
             />
             <StatCard
-              title="Mesačná Úspora"
-              rawValue={stats.monthlyIncome - stats.monthlyExpenses}
-              change={stats.savingChange}
+              title="Investície"
+              rawValue={stats.investmentValue}
+              change={stats.investmentChange}
               icon={<TrendingUp className="text-blue-500" />}
               color="blue"
+              changeLabel="vs nákupná cena"
+              positiveDirection="up"
+            />
+            <StatCard
+              title="Čistý Majetok"
+              rawValue={stats.netWorth}
+              change={stats.growth}
+              icon={<Wallet className="text-indigo-500" />}
+              color="blue"
+              changeLabel="vs posledný snapshot"
+              positiveDirection="up"
             />
           </>
         )}
@@ -657,7 +767,7 @@ export function DashboardClient({
         </motion.div>
       )}
 
-      {/* AI Financial Coach Section */}
+      {/* What To Notice Section */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -669,22 +779,23 @@ export function DashboardClient({
               <Zap size={22} />
             </div>
             <div>
-              <h2 className="text-lg font-bold">AI Finančný kouč</h2>
+              <h2 className="text-lg font-bold">Čo si všimnúť</h2>
               <p className="text-[10px] text-slate-500 uppercase font-black tracking-widest">
-                Akcie na tento mesiac
+                3 najdôležitejšie signály
               </p>
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
             {loading ? (
               <>
+                <Skeleton className="h-20 w-full rounded-2xl" />
                 <Skeleton className="h-20 w-full rounded-2xl" />
                 <Skeleton className="h-20 w-full rounded-2xl" />
               </>
             ) : (
               <>
-                {aiInsights.map((insight, idx) => (
+                {whatToNoticeInsights.map((insight, idx) => (
                   <motion.div
                     key={idx}
                     initial={{ opacity: 0, x: -10 }}
@@ -703,32 +814,19 @@ export function DashboardClient({
                     >
                       {insight.icon}
                     </div>
-                    <div className="text-sm font-medium text-slate-700 dark:text-slate-300 leading-relaxed">
-                      {insight.text}
+                    <div className="space-y-1">
+                      <p className="text-sm font-bold text-slate-900 dark:text-white">
+                        {insight.title}
+                      </p>
+                      <div className="text-sm font-medium text-slate-700 dark:text-slate-300 leading-relaxed">
+                        {insight.text}
+                      </div>
                     </div>
                   </motion.div>
                 ))}
-                {aiInsights.length === 0 && (
-                  <p className="text-sm text-slate-500 italic p-4">
-                    Zatiaľ nemám dostatok dát na analýzu. Pridaj viac záznamov o
-                    majetku a výdavkoch.
-                  </p>
-                )}
               </>
             )}
           </div>
-
-          {!loading && (
-            <div className="mt-6 pt-6 border-t border-slate-100 dark:border-slate-800 flex justify-end">
-              <button className="text-xs font-bold text-indigo-600 hover:text-indigo-700 flex items-center gap-1.5 transition-colors group">
-                Detailná analýza{' '}
-                <ArrowRight
-                  size={14}
-                  className="group-hover:translate-x-1 transition-transform"
-                />
-              </button>
-            </div>
-          )}
         </div>
       </motion.div>
 
@@ -861,9 +959,19 @@ interface StatCardProps {
   change: number;
   icon: ReactNode;
   color: string;
+  changeLabel: string;
+  positiveDirection: 'up' | 'down';
 }
 
-function StatCard({ title, rawValue, change, icon, color }: StatCardProps) {
+function StatCard({
+  title,
+  rawValue,
+  change,
+  icon,
+  color,
+  changeLabel,
+  positiveDirection,
+}: StatCardProps) {
   return (
     <motion.div
       whileHover={{ y: -4 }}
@@ -880,16 +988,106 @@ function StatCard({ title, rawValue, change, icon, color }: StatCardProps) {
             format={formatCurrency}
             className="text-2xl font-bold"
           />
-          {change !== 0 && (
-            <span
-              className={`text-xs font-bold ${change > 0 ? 'text-emerald-500' : 'text-rose-500'}`}
-            >
-              {change > 0 ? '+' : ''}
-              {change.toFixed(1)}%
-            </span>
-          )}
+        </div>
+        <div className="mt-2">
+          <ChangeBadge
+            change={change}
+            label={changeLabel}
+            positiveDirection={positiveDirection}
+          />
         </div>
       </div>
     </motion.div>
   );
+}
+
+interface ChangeBadgeProps {
+  change: number;
+  label: string;
+  positiveDirection: 'up' | 'down';
+  compact?: boolean;
+}
+
+function ChangeBadge({
+  change,
+  label,
+  positiveDirection,
+  compact = false,
+}: ChangeBadgeProps) {
+  const isPositive =
+    positiveDirection === 'up' ? change > 0 : change < 0;
+  const isNeutral = Math.abs(change) < 0.1;
+
+  return (
+    <span
+      className={cn(
+        'inline-flex items-center rounded-full font-bold',
+        compact ? 'px-2.5 py-1 text-[10px]' : 'px-2.5 py-1 text-xs',
+        isNeutral
+          ? 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300'
+          : isPositive
+            ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300'
+            : 'bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-300'
+      )}
+    >
+      {isNeutral ? '0.0%' : `${change > 0 ? '+' : ''}${change.toFixed(1)}%`} {label}
+    </span>
+  );
+}
+
+function getExpenseIncreaseStreak(
+  monthlySeries: Array<{ month: string; income: number; expenses: number }>
+) {
+  if (monthlySeries.length < 2) return 0;
+
+  let streak = 0;
+  for (let index = monthlySeries.length - 1; index > 0; index -= 1) {
+    if (monthlySeries[index].expenses > monthlySeries[index - 1].expenses) {
+      streak += 1;
+    } else {
+      break;
+    }
+  }
+
+  return streak;
+}
+
+function getMortgageProgressInsight(mortgage: Mortgage) {
+  const now = new Date();
+  const start = new Date(mortgage.start_date);
+  const maturity = new Date(mortgage.maturity_date);
+  const totalDuration = maturity.getTime() - start.getTime();
+
+  if (Number.isNaN(totalDuration) || totalDuration <= 0) {
+    return null;
+  }
+
+  const elapsed = Math.min(
+    Math.max(now.getTime() - start.getTime(), 0),
+    totalDuration
+  );
+  const elapsedRatio = elapsed / totalDuration;
+  const expectedRemainingPrincipal =
+    mortgage.original_amount * (1 - elapsedRatio);
+  const delta = expectedRemainingPrincipal - mortgage.current_principal;
+  const threshold = mortgage.monthly_payment;
+
+  if (Math.abs(delta) < threshold * 0.5) {
+    return {
+      status: 'on-track' as const,
+      message: 'Aktuálny zostatok zodpovedá približne očakávanému priebehu splácania.',
+    };
+  }
+
+  if (delta > 0) {
+    return {
+      status: 'ahead' as const,
+      message: `Zostatok istiny je približne o ${formatCurrency(delta)} nižší než lineárny plán.`,
+    };
+  }
+
+  return {
+    status: 'behind' as const,
+    message: `Zostatok istiny je približne o ${formatCurrency(Math.abs(delta))} vyšší než lineárny plán.`,
+  };
 }

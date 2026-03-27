@@ -13,6 +13,8 @@ import {
   CalendarDays,
   CalendarRange,
   Wallet,
+  TrendingUp,
+  AlertTriangle,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
@@ -161,6 +163,16 @@ export function RecurringPaymentsClient({ initialPayments }: RecurringPaymentsCl
     0
   );
   const totalMonthlyEquivalent = totalMonthly + totalYearly / 12;
+  const priceIncreasePayments = payments.filter(
+    (payment) =>
+      payment.last_amount !== undefined &&
+      payment.last_amount !== null &&
+      Number(payment.amount) > Number(payment.last_amount)
+  );
+  const totalMonthlyIncreaseImpact = priceIncreasePayments.reduce((sum, payment) => {
+    const difference = Number(payment.amount) - Number(payment.last_amount ?? 0);
+    return sum + (payment.frequency === 'yearly' ? difference / 12 : difference);
+  }, 0);
 
   return (
     <div className="space-y-8 pb-12">
@@ -237,6 +249,41 @@ export function RecurringPaymentsClient({ initialPayments }: RecurringPaymentsCl
           </>
         )}
       </div>
+
+      {!loading && priceIncreasePayments.length > 0 && (
+        <div className="bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/40 rounded-2xl p-5">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+            <div className="flex items-start gap-3">
+              <div className="p-2 bg-amber-100 dark:bg-amber-900/30 rounded-xl text-amber-600 dark:text-amber-300">
+                <AlertTriangle size={20} />
+              </div>
+              <div>
+                <h3 className="font-bold text-slate-900 dark:text-white">
+                  Detegované zdraženie pravidelných platieb
+                </h3>
+                <p className="text-sm text-slate-600 dark:text-slate-300">
+                  {priceIncreasePayments.length} platieb je drahších než predtým a
+                  zvyšujú zaťaženie asi o{' '}
+                  <span className="font-bold text-amber-700 dark:text-amber-300">
+                    {formatCurrency(totalMonthlyIncreaseImpact)}
+                  </span>{' '}
+                  mesačne.
+                </p>
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {priceIncreasePayments.slice(0, 4).map((payment) => (
+                <span
+                  key={payment.id}
+                  className="inline-flex items-center rounded-full bg-white/80 dark:bg-slate-900/70 px-3 py-1.5 text-xs font-bold text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-900/40"
+                >
+                  {payment.name}
+                </span>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       <AnimatePresence>
         {isAdding && (
@@ -417,6 +464,13 @@ function PaymentRow({
   const [editName, setEditName] = useState(payment.name);
   const [editAmount, setEditAmount] = useState(payment.amount.toString());
   const [editFrequency, setEditFrequency] = useState(payment.frequency);
+  const hasPriceIncrease =
+    payment.last_amount !== undefined &&
+    payment.last_amount !== null &&
+    payment.amount > payment.last_amount;
+  const priceDifference = hasPriceIncrease
+    ? payment.amount - Number(payment.last_amount ?? 0)
+    : 0;
 
   if (isEditing) {
     return (
@@ -465,9 +519,23 @@ function PaymentRow({
   }
 
   return (
-    <div className="p-4 flex items-center justify-between hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors group">
+    <div
+      className={`p-4 flex items-center justify-between transition-colors group ${
+        hasPriceIncrease
+          ? 'bg-amber-50/70 dark:bg-amber-950/10 border-l-4 border-amber-400 hover:bg-amber-50 dark:hover:bg-amber-950/20'
+          : 'hover:bg-slate-50 dark:hover:bg-slate-800/50'
+      }`}
+    >
       <div className="space-y-0.5">
-        <p className="font-medium">{payment.name}</p>
+        <div className="flex flex-wrap items-center gap-2">
+          <p className="font-medium">{payment.name}</p>
+          {hasPriceIncrease && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 dark:bg-amber-900/30 px-2 py-0.5 text-[10px] font-black uppercase tracking-wide text-amber-700 dark:text-amber-300">
+              <TrendingUp size={12} />
+              Zdražené
+            </span>
+          )}
+        </div>
         <div className="flex flex-col">
           <p className="text-2xl font-bold text-slate-900 dark:text-white leading-tight">
             {formatCurrency(payment.amount)}
@@ -475,8 +543,15 @@ function PaymentRow({
           {payment.last_amount !== undefined &&
             payment.last_amount !== null &&
             payment.last_amount !== payment.amount && (
-              <p className="text-[10px] font-medium text-slate-400 italic">
+              <p
+                className={`text-[10px] font-medium italic ${
+                  hasPriceIncrease
+                    ? 'text-amber-700 dark:text-amber-300'
+                    : 'text-slate-400'
+                }`}
+              >
                 predtým {formatCurrency(payment.last_amount)}
+                {hasPriceIncrease && ` · +${formatCurrency(priceDifference)}`}
               </p>
             )}
         </div>
