@@ -2,6 +2,7 @@
 
 import { useState, useMemo, useRef, useCallback, useEffect } from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { useWindowVirtualizer } from '@tanstack/react-virtual';
 import { supabase } from '@/lib/supabase';
 import {
   Plus,
@@ -108,6 +109,7 @@ export function ExpensesClient({
     record_date: '',
   });
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const monthListRef = useRef<HTMLDivElement>(null);
   const monthSectionRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const highlightTimeoutRef = useRef<number | null>(null);
   const hasInitializedFromUrlRef = useRef(false);
@@ -586,6 +588,20 @@ export function ExpensesClient({
       ? `V ${monthComparison.current.fullLabel} míňaš o ${formattedPercent} viac než minulý mesiac.`
       : `V ${monthComparison.current.fullLabel} míňaš o ${formattedPercent} menej než minulý mesiac.`;
   }, [monthComparison]);
+
+  const shouldVirtualizeMonthList =
+    overviewMode === 'all' && visibleGroupedExpenses.length > 6;
+
+  const monthListVirtualizer = useWindowVirtualizer({
+    count: shouldVirtualizeMonthList ? visibleGroupedExpenses.length : 0,
+    estimateSize: () => 520,
+    overscan: 3,
+    scrollMargin: monthListRef.current?.offsetTop ?? 0,
+  });
+
+  const virtualMonthRows = shouldVirtualizeMonthList
+    ? monthListVirtualizer.getVirtualItems()
+    : [];
 
   useEffect(() => {
     return () => {
@@ -1331,7 +1347,7 @@ export function ExpensesClient({
           )}
         </div>
 
-        <div className="space-y-6">
+        <div ref={monthListRef} className="space-y-6">
           {loading ? (
             <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border p-6 space-y-4">
               <Skeleton className="h-10 w-full" />
@@ -1344,6 +1360,66 @@ export function ExpensesClient({
               {hasActiveFilters
                 ? 'Žiadne výdavky nezodpovedajú filtrom.'
                 : 'Žiadne výdavky nenájdené. Začni pridaním prvého.'}
+            </div>
+          ) : shouldVirtualizeMonthList ? (
+            <div
+              className="relative"
+              style={{ height: `${monthListVirtualizer.getTotalSize()}px` }}
+            >
+              {virtualMonthRows.map((virtualRow) => {
+                const group = visibleGroupedExpenses[virtualRow.index];
+
+                if (!group) {
+                  return null;
+                }
+
+                return (
+                  <div
+                    key={group.month}
+                    className="absolute left-0 top-0 w-full pb-6"
+                    style={{
+                      transform: `translateY(${virtualRow.start}px)`,
+                    }}
+                  >
+                    <motion.div
+                      ref={(element) => {
+                        monthSectionRefs.current[group.month] = element;
+                        monthListVirtualizer.measureElement(element);
+                      }}
+                      id={`expense-month-${group.month}`}
+                      initial={false}
+                      animate={{
+                        scale: highlightedMonth === group.month ? 1.01 : 1,
+                      }}
+                      transition={{ duration: 0.25, ease: 'easeOut' }}
+                      className={`scroll-mt-24 rounded-3xl transition-all duration-500 ${
+                        highlightedMonth === group.month
+                          ? 'ring-2 ring-rose-400 ring-offset-4 ring-offset-background bg-rose-50/20 dark:bg-rose-950/10'
+                          : ''
+                      }`}
+                    >
+                      <MonthlyExpenseGroup
+                        group={group}
+                        groupedCategories={groupedCategories}
+                        editingId={editingId}
+                        isCollapsed={collapsedMonths.includes(group.month)}
+                        isSummaryFocused={
+                          overviewMode === 'month' && activeSelectedMonth === group.month
+                        }
+                        trend={monthTrendMap[group.month] ?? null}
+                        editValues={editValues}
+                        onToggleCollapse={() => toggleMonthCollapse(group.month)}
+                        onEdit={handleEdit}
+                        onUpdate={handleUpdate}
+                        onCancelEdit={() => setEditingId(null)}
+                        onDelete={handleDelete}
+                        onEditValueChange={handleEditValueChange}
+                        onEditKeyDown={handleEditKeyDown}
+                      />
+                    </motion.div>
+                  </div>
+                );
+              })}
             </div>
           ) : (
             visibleGroupedExpenses.map((group) => (
