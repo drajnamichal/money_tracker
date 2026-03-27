@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useMemo, useRef, useCallback, useEffect } from 'react';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import {
   Plus,
@@ -69,6 +70,7 @@ interface MonthTrend {
   percentChange: number | null;
   tone: TrendTone;
   label: string;
+  summary: string;
   helper: string;
 }
 
@@ -76,6 +78,9 @@ export function ExpensesClient({
   initialExpenses,
   initialCategories,
 }: ExpensesClientProps) {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const {
     records: expenses,
     categories,
@@ -105,6 +110,7 @@ export function ExpensesClient({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const monthSectionRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const highlightTimeoutRef = useRef<number | null>(null);
+  const hasInitializedFromUrlRef = useRef(false);
   const formSetValueRef = useRef<
     ((name: keyof ExpenseFormValues, value: string) => void) | null
   >(null);
@@ -484,6 +490,7 @@ export function ExpensesClient({
           percentChange: null,
           tone: 'neutral',
           label: 'Bez porovnania',
+          summary: 'Bez porovnania s minulým mesiacom',
           helper: 'Toto je prvý dostupný mesiac v prehľade.',
         };
         return acc;
@@ -509,12 +516,21 @@ export function ExpensesClient({
         percentChange === null
           ? 'Bez % zmeny'
           : `${difference > 0 ? '+' : difference < 0 ? '' : ''}${percentChange.toFixed(1)} %`;
+      const summary =
+        percentChange === null
+          ? `Zmena ${difference > 0 ? 'nahor' : 'nadol'} bez percenta`
+          : tone === 'increase'
+            ? `O ${Math.abs(percentChange).toFixed(1)} % viac než minulý mesiac`
+            : tone === 'decrease'
+              ? `O ${Math.abs(percentChange).toFixed(1)} % menej než minulý mesiac`
+              : 'Takmer rovnako ako minulý mesiac';
 
       acc[current.month] = {
         difference,
         percentChange,
         tone,
         label,
+        summary,
         helper: `${current.fullLabel}: ${direction}`,
       };
 
@@ -580,12 +596,74 @@ export function ExpensesClient({
   }, []);
 
   useEffect(() => {
+    if (monthlyOverview.length === 0) {
+      return;
+    }
+
+    const monthParam = searchParams.get('month');
+    const viewParam = searchParams.get('view');
+    const validMonth = monthlyOverview.some((item) => item.month === monthParam)
+      ? monthParam
+      : null;
+
+    if (validMonth && selectedMonth !== validMonth) {
+      setSelectedMonth(validMonth);
+    }
+
+    if (!validMonth && !hasInitializedFromUrlRef.current && newestTrackedMonth) {
+      setSelectedMonth(newestTrackedMonth);
+    }
+
+    if (viewParam === 'month' && validMonth && overviewMode !== 'month') {
+      setOverviewMode('month');
+    }
+
+    if (viewParam === 'all' && overviewMode !== 'all') {
+      setOverviewMode('all');
+    }
+
+    hasInitializedFromUrlRef.current = true;
+  }, [
+    monthlyOverview,
+    newestTrackedMonth,
+    overviewMode,
+    searchParams,
+    selectedMonth,
+  ]);
+
+  useEffect(() => {
     if (activeSelectedMonth) {
       setCollapsedMonths((current) =>
         current.filter((month) => month !== activeSelectedMonth)
       );
     }
   }, [activeSelectedMonth]);
+
+  useEffect(() => {
+    if (!hasInitializedFromUrlRef.current) {
+      return;
+    }
+
+    const params = new URLSearchParams(searchParams.toString());
+
+    if (activeSelectedMonth) {
+      params.set('month', activeSelectedMonth);
+    } else {
+      params.delete('month');
+    }
+
+    params.set('view', overviewMode);
+
+    const nextQuery = params.toString();
+    const currentQuery = searchParams.toString();
+
+    if (nextQuery !== currentQuery) {
+      router.replace(
+        nextQuery ? `${pathname}?${nextQuery}` : pathname,
+        { scroll: false }
+      );
+    }
+  }, [activeSelectedMonth, overviewMode, pathname, router, searchParams]);
 
   const handleOverviewModeChange = useCallback(
     (mode: OverviewMode) => {

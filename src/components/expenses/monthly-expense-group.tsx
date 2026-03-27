@@ -51,6 +51,7 @@ interface MonthlyExpenseGroupProps {
   trend: {
     tone: 'increase' | 'decrease' | 'neutral';
     label: string;
+    summary: string;
     helper: string;
   } | null;
   editValues: {
@@ -118,6 +119,19 @@ export function MonthlyExpenseGroup({
               <p className="text-xs text-slate-500">
                 {group.records.length} položiek
               </p>
+              {trend && (
+                <p
+                  className={`text-xs font-medium ${
+                    trend.tone === 'increase'
+                      ? 'text-rose-600 dark:text-rose-300'
+                      : trend.tone === 'decrease'
+                        ? 'text-emerald-600 dark:text-emerald-300'
+                        : 'text-slate-500 dark:text-slate-400'
+                  }`}
+                >
+                  {trend.summary}
+                </p>
+              )}
             </div>
           </div>
         </div>
