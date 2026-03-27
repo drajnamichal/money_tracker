@@ -1,14 +1,29 @@
 'use client';
 
-import { useState, useMemo, useRef, useCallback } from 'react';
+import { useState, useMemo, useRef, useCallback, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
-import { Plus, Loader2, Scan, Settings2, Filter, Search } from 'lucide-react';
-import { AnimatePresence } from 'framer-motion';
+import {
+  Plus,
+  Loader2,
+  Scan,
+  Settings2,
+  Filter,
+  Search,
+  CalendarDays,
+  ReceiptText,
+  TrendingUp,
+  TrendingDown,
+  ChevronLeft,
+  ChevronRight,
+} from 'lucide-react';
+import { AnimatePresence, motion } from 'framer-motion';
 import { toast } from 'sonner';
 import { assertSuccess, showError } from '@/lib/error-handling';
 import { Skeleton } from '@/components/skeleton';
 import { useExpenseData } from '@/hooks/use-financial-data';
 import { compressImage } from '@/lib/image-utils';
+import { formatCurrency } from '@/lib/utils';
+import { TOOLTIP_STYLE } from '@/lib/constants';
 import { ExpenseForm } from '@/components/expenses/expense-form';
 import type { ExpenseFormValues } from '@/components/expenses/expense-form';
 import { CategoryManager } from '@/components/expenses/category-manager';
@@ -18,6 +33,15 @@ import {
 } from '@/components/expenses/monthly-expense-group';
 import { ExpenseCategorySidebar } from '@/components/expenses/expense-category-sidebar';
 import type { ExpenseRecord, ExpenseCategory } from '@/types/financial';
+import {
+  AreaChart,
+  Area,
+  CartesianGrid,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from 'recharts';
 
 export interface ExpensesClientProps {
   initialExpenses: ExpenseRecord[];
@@ -28,6 +52,16 @@ interface CategoryTotal {
   name: string;
   value: number;
 }
+
+interface MonthlyOverviewPoint {
+  month: string;
+  label: string;
+  fullLabel: string;
+  total: number;
+  count: number;
+}
+
+type OverviewMode = 'all' | 'month';
 
 export function ExpensesClient({
   initialExpenses,
@@ -48,6 +82,9 @@ export function ExpensesClient({
   const [isScanning, setIsScanning] = useState(false);
   const [filterCategory, setFilterCategory] = useState('');
   const [filterSearch, setFilterSearch] = useState('');
+  const [overviewMode, setOverviewMode] = useState<OverviewMode>('all');
+  const [selectedMonth, setSelectedMonth] = useState<string | null>(null);
+  const [highlightedMonth, setHighlightedMonth] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editValues, setEditValues] = useState({
     description: '',
@@ -56,6 +93,8 @@ export function ExpensesClient({
     record_date: '',
   });
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const monthSectionRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const highlightTimeoutRef = useRef<number | null>(null);
   const formSetValueRef = useRef<
     ((name: keyof ExpenseFormValues, value: string) => void) | null
   >(null);
@@ -308,6 +347,194 @@ export function ExpensesClient({
       });
   }, [filteredExpenses]);
 
+  const monthlyOverview = useMemo<MonthlyOverviewPoint[]>(() => {
+    return [...groupedExpenses].reverse().map((group) => {
+      const monthDate = new Date(`${group.month}-01`);
+
+      return {
+        month: group.month,
+        label: monthDate.toLocaleDateString('sk-SK', {
+          month: 'short',
+          year: '2-digit',
+        }),
+        fullLabel: monthDate.toLocaleDateString('sk-SK', {
+          month: 'long',
+          year: 'numeric',
+        }),
+        total: group.total,
+        count: group.records.length,
+      };
+    });
+  }, [groupedExpenses]);
+
+  const newestTrackedMonth = groupedExpenses[0]?.month ?? null;
+  const activeSelectedMonth =
+    selectedMonth && groupedExpenses.some((group) => group.month === selectedMonth)
+      ? selectedMonth
+      : newestTrackedMonth;
+
+  const visibleGroupedExpenses = useMemo(() => {
+    if (overviewMode !== 'month' || !activeSelectedMonth) {
+      return groupedExpenses;
+    }
+
+    return groupedExpenses.filter((group) => group.month === activeSelectedMonth);
+  }, [groupedExpenses, overviewMode, activeSelectedMonth]);
+
+  const visibleExpenses = useMemo(() => {
+    if (overviewMode !== 'month' || !activeSelectedMonth) {
+      return filteredExpenses;
+    }
+
+    return filteredExpenses.filter((expense) => {
+      const date = new Date(expense.record_date);
+      const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+      return monthKey === activeSelectedMonth;
+    });
+  }, [filteredExpenses, overviewMode, activeSelectedMonth]);
+
+  const overviewStats = useMemo(() => {
+    const source =
+      overviewMode === 'month' && activeSelectedMonth
+        ? monthlyOverview.filter((item) => item.month === activeSelectedMonth)
+        : monthlyOverview;
+    const trackedMonths = source.length;
+    const totalSpent = source.reduce((sum, item) => sum + item.total, 0);
+    const totalRecords = source.reduce((sum, item) => sum + item.count, 0);
+    const averagePerMonth = trackedMonths > 0 ? totalSpent / trackedMonths : 0;
+    const topMonth = source.reduce<MonthlyOverviewPoint | null>(
+      (highest, item) => {
+        if (!highest || item.total > highest.total) {
+          return item;
+        }
+        return highest;
+      },
+      null
+    );
+
+    return {
+      trackedMonths,
+      totalSpent,
+      totalRecords,
+      averagePerMonth,
+      topMonth,
+    };
+  }, [monthlyOverview, overviewMode, activeSelectedMonth]);
+
+  const monthComparison = useMemo(() => {
+    if (!activeSelectedMonth) {
+      return null;
+    }
+
+    const selectedIndex = monthlyOverview.findIndex(
+      (item) => item.month === activeSelectedMonth
+    );
+
+    if (selectedIndex === -1) {
+      return null;
+    }
+
+    const current = monthlyOverview[selectedIndex];
+    const previous = selectedIndex > 0 ? monthlyOverview[selectedIndex - 1] : null;
+    const difference = current.total - (previous?.total ?? 0);
+    const percentChange =
+      previous && previous.total > 0 ? (difference / previous.total) * 100 : null;
+
+    return {
+      current,
+      previous,
+      difference,
+      percentChange,
+      isIncrease: difference > 0,
+    };
+  }, [monthlyOverview, activeSelectedMonth]);
+
+  const selectedMonthIndex = useMemo(() => {
+    if (!activeSelectedMonth) {
+      return -1;
+    }
+
+    return monthlyOverview.findIndex((item) => item.month === activeSelectedMonth);
+  }, [monthlyOverview, activeSelectedMonth]);
+
+  const previousSelectableMonth =
+    selectedMonthIndex > 0 ? monthlyOverview[selectedMonthIndex - 1] : null;
+  const nextSelectableMonth =
+    selectedMonthIndex >= 0 && selectedMonthIndex < monthlyOverview.length - 1
+      ? monthlyOverview[selectedMonthIndex + 1]
+      : null;
+
+  const comparisonComment = useMemo(() => {
+    if (!monthComparison?.current) {
+      return null;
+    }
+
+    if (!monthComparison.previous) {
+      return `Pre ${monthComparison.current.fullLabel} ešte nemáš starší mesiac na porovnanie.`;
+    }
+
+    if (monthComparison.difference === 0) {
+      return `Výdavky sú presne rovnaké ako v ${monthComparison.previous.fullLabel}.`;
+    }
+
+    if (monthComparison.percentChange === null) {
+      return monthComparison.difference > 0
+        ? `V ${monthComparison.current.fullLabel} máš vyššie výdavky než v ${monthComparison.previous.fullLabel}.`
+        : `V ${monthComparison.current.fullLabel} máš nižšie výdavky než v ${monthComparison.previous.fullLabel}.`;
+    }
+
+    const formattedPercent = `${Math.abs(monthComparison.percentChange).toFixed(1)} %`;
+
+    return monthComparison.difference > 0
+      ? `V ${monthComparison.current.fullLabel} míňaš o ${formattedPercent} viac než minulý mesiac.`
+      : `V ${monthComparison.current.fullLabel} míňaš o ${formattedPercent} menej než minulý mesiac.`;
+  }, [monthComparison]);
+
+  useEffect(() => {
+    return () => {
+      if (highlightTimeoutRef.current) {
+        window.clearTimeout(highlightTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  const handleOverviewModeChange = useCallback(
+    (mode: OverviewMode) => {
+      if (mode === 'month') {
+        setSelectedMonth((current) => current ?? newestTrackedMonth);
+      }
+
+      setOverviewMode(mode);
+    },
+    [newestTrackedMonth]
+  );
+
+  const handleMonthSelect = useCallback(
+    (month: string, shouldScroll = false) => {
+      setSelectedMonth(month);
+      setOverviewMode('month');
+
+      if (shouldScroll) {
+        if (highlightTimeoutRef.current) {
+          window.clearTimeout(highlightTimeoutRef.current);
+        }
+
+        setHighlightedMonth(month);
+        window.setTimeout(() => {
+          monthSectionRefs.current[month]?.scrollIntoView({
+            behavior: 'smooth',
+            block: 'start',
+          });
+        }, 120);
+
+        highlightTimeoutRef.current = window.setTimeout(() => {
+          setHighlightedMonth((current) => (current === month ? null : current));
+        }, 2200);
+      }
+    },
+    []
+  );
+
   // ---- Render ----
 
   return (
@@ -368,19 +595,6 @@ export function ExpensesClient({
         )}
       </AnimatePresence>
 
-      <AnimatePresence>
-        {isAdding && (
-          <ExpenseForm
-            groupedCategories={groupedCategories}
-            onSubmit={onAddExpense}
-            onCancel={() => setIsAdding(false)}
-            setValueRef={(setter) => {
-              formSetValueRef.current = setter;
-            }}
-          />
-        )}
-      </AnimatePresence>
-
       {/* Filter Bar */}
       {!loading && expenses.length > 0 && (
         <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center">
@@ -428,8 +642,472 @@ export function ExpensesClient({
         </div>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-        <div className="md:col-span-2 space-y-6">
+      <section className="space-y-6">
+        <div className="flex flex-col gap-2">
+          <h2 className="text-xl font-bold text-slate-900 dark:text-white">
+            Prehľad výdavkov za všetky mesiace
+          </h2>
+          <p className="text-sm text-slate-500">
+            Najprv vidíš vývoj výdavkov naprieč všetkými zaznamenanými mesiacmi
+            a až nižšie detailné pridávanie a zoznam položiek.
+          </p>
+        </div>
+
+        {!loading && monthlyOverview.length > 0 && (
+          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
+            <div className="inline-flex w-fit rounded-2xl border bg-white dark:bg-slate-900 p-1 shadow-sm">
+              <button
+                type="button"
+                onClick={() => handleOverviewModeChange('all')}
+                className={`rounded-xl px-4 py-2 text-sm font-semibold transition-colors ${
+                  overviewMode === 'all'
+                    ? 'bg-rose-600 text-white'
+                    : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800'
+                }`}
+              >
+                Všetky mesiace
+              </button>
+              <button
+                type="button"
+                onClick={() => handleOverviewModeChange('month')}
+                disabled={!activeSelectedMonth}
+                className={`rounded-xl px-4 py-2 text-sm font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
+                  overviewMode === 'month'
+                    ? 'bg-rose-600 text-white'
+                    : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800'
+                }`}
+              >
+                Vybraný mesiac
+              </button>
+            </div>
+
+            <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+              <label className="text-sm font-medium text-slate-500">
+                Mesiac
+              </label>
+              <select
+                value={activeSelectedMonth ?? ''}
+                onChange={(e) => handleMonthSelect(e.target.value)}
+                disabled={monthlyOverview.length === 0}
+                className="bg-white dark:bg-slate-900 border rounded-xl px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-rose-500 min-w-[220px]"
+              >
+                {monthlyOverview
+                  .slice()
+                  .reverse()
+                  .map((item) => (
+                    <option key={item.month} value={item.month}>
+                      {item.fullLabel}
+                    </option>
+                  ))}
+              </select>
+              <div className="inline-flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() =>
+                    previousSelectableMonth &&
+                    handleMonthSelect(previousSelectableMonth.month, true)
+                  }
+                  disabled={!previousSelectableMonth}
+                  className="inline-flex items-center gap-1 rounded-xl border px-3 py-2 text-sm font-semibold text-slate-600 transition-colors hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50 dark:text-slate-300 dark:hover:bg-slate-800"
+                >
+                  <ChevronLeft size={16} />
+                  Predchádzajúci
+                </button>
+                <button
+                  type="button"
+                  onClick={() =>
+                    nextSelectableMonth &&
+                    handleMonthSelect(nextSelectableMonth.month, true)
+                  }
+                  disabled={!nextSelectableMonth}
+                  className="inline-flex items-center gap-1 rounded-xl border px-3 py-2 text-sm font-semibold text-slate-600 transition-colors hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50 dark:text-slate-300 dark:hover:bg-slate-800"
+                >
+                  Ďalší
+                  <ChevronRight size={16} />
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {loading ? (
+          <div className="space-y-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+              <Skeleton className="h-28 rounded-2xl" />
+              <Skeleton className="h-28 rounded-2xl" />
+              <Skeleton className="h-28 rounded-2xl" />
+              <Skeleton className="h-28 rounded-2xl" />
+            </div>
+            <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
+              <Skeleton className="h-[360px] rounded-2xl xl:col-span-2" />
+              <Skeleton className="h-[360px] rounded-2xl" />
+            </div>
+          </div>
+        ) : monthlyOverview.length === 0 ? (
+          <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border p-12 text-center text-slate-400">
+            {hasActiveFilters
+              ? 'Žiadne výdavky nezodpovedajú filtrom.'
+              : 'Zatiaľ nemáš žiadne výdavky na zobrazenie prehľadu.'}
+          </div>
+        ) : (
+          <>
+            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+              <div className="bg-white dark:bg-slate-900 rounded-2xl border shadow-sm p-5">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-medium text-slate-500">
+                      {overviewMode === 'month'
+                        ? 'Vybraný mesiac'
+                        : 'Zatrackované mesiace'}
+                    </p>
+                    <p className="mt-3 text-3xl font-black text-slate-900 dark:text-white">
+                      {overviewMode === 'month'
+                        ? monthComparison?.current?.fullLabel ?? '-'
+                        : overviewStats.trackedMonths}
+                    </p>
+                    <p className="mt-2 text-xs text-slate-500">
+                      {overviewStats.totalRecords} zaevidovaných výdavkov
+                    </p>
+                  </div>
+                  <div className="rounded-xl bg-blue-50 p-3 text-blue-600 dark:bg-blue-950/40 dark:text-blue-300">
+                    <CalendarDays size={18} />
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-white dark:bg-slate-900 rounded-2xl border shadow-sm p-5">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-medium text-slate-500">
+                      Celkové výdavky
+                    </p>
+                    <p className="mt-3 text-3xl font-black text-slate-900 dark:text-white">
+                      {formatCurrency(overviewStats.totalSpent)}
+                    </p>
+                    <p className="mt-2 text-xs text-slate-500">
+                      súčet za všetky zobrazené mesiace
+                    </p>
+                  </div>
+                  <div className="rounded-xl bg-rose-50 p-3 text-rose-600 dark:bg-rose-950/40 dark:text-rose-300">
+                    <ReceiptText size={18} />
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-white dark:bg-slate-900 rounded-2xl border shadow-sm p-5">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-medium text-slate-500">
+                      Priemer na mesiac
+                    </p>
+                    <p className="mt-3 text-3xl font-black text-slate-900 dark:text-white">
+                      {formatCurrency(overviewStats.averagePerMonth)}
+                    </p>
+                    <p className="mt-2 text-xs text-slate-500">
+                      pri aktuálnom výbere dát
+                    </p>
+                  </div>
+                  <div className="rounded-xl bg-emerald-50 p-3 text-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-300">
+                    <TrendingUp size={18} />
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-white dark:bg-slate-900 rounded-2xl border shadow-sm p-5">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-medium text-slate-500">
+                      Najsilnejší mesiac
+                    </p>
+                    <p className="mt-3 text-3xl font-black text-slate-900 dark:text-white">
+                      {overviewStats.topMonth
+                        ? formatCurrency(overviewStats.topMonth.total)
+                        : formatCurrency(0)}
+                    </p>
+                    <p className="mt-2 text-xs text-slate-500 capitalize">
+                      {overviewStats.topMonth?.fullLabel ?? 'Zatiaľ bez dát'}
+                    </p>
+                  </div>
+                  <div className="rounded-xl bg-amber-50 p-3 text-amber-600 dark:bg-amber-950/40 dark:text-amber-300">
+                    <Filter size={18} />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {overviewMode === 'month' && monthComparison?.current && (
+              <div className="bg-white dark:bg-slate-900 rounded-2xl border shadow-sm p-5">
+                <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+                  <div>
+                    <h3 className="text-lg font-semibold text-slate-900 dark:text-white">
+                      Porovnanie s predchádzajúcim mesiacom
+                    </h3>
+                    <p className="text-sm text-slate-500">
+                      {monthComparison.current.fullLabel}
+                      {monthComparison.previous
+                        ? ` vs. ${monthComparison.previous.fullLabel}`
+                        : ' je prvý dostupný mesiac v prehľade'}
+                    </p>
+                  </div>
+
+                  {monthComparison.previous ? (
+                    <div
+                      className={`inline-flex w-fit items-center gap-2 rounded-full px-4 py-2 text-sm font-bold ${
+                        monthComparison.isIncrease
+                          ? 'bg-rose-50 text-rose-600 dark:bg-rose-950/40 dark:text-rose-300'
+                          : monthComparison.difference < 0
+                            ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-300'
+                            : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300'
+                      }`}
+                    >
+                      {monthComparison.isIncrease ? (
+                        <TrendingUp size={16} />
+                      ) : (
+                        <TrendingDown size={16} />
+                      )}
+                      {monthComparison.difference === 0
+                        ? 'Bez zmeny'
+                        : `${monthComparison.difference > 0 ? '+' : ''}${formatCurrency(
+                            monthComparison.difference
+                          )}`}
+                      {monthComparison.percentChange !== null &&
+                        ` (${monthComparison.percentChange > 0 ? '+' : ''}${monthComparison.percentChange.toFixed(1)} %)`}
+                    </div>
+                  ) : (
+                    <div className="inline-flex w-fit items-center rounded-full bg-slate-100 px-4 py-2 text-sm font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                      Nie je k dispozícii predchádzajúci mesiac
+                    </div>
+                  )}
+                </div>
+
+                <div className="mt-5 grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="rounded-2xl bg-slate-50 dark:bg-slate-800/50 p-4">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                      Aktuálny mesiac
+                    </p>
+                    <p className="mt-2 text-2xl font-black text-slate-900 dark:text-white">
+                      {formatCurrency(monthComparison.current.total)}
+                    </p>
+                    <p className="mt-1 text-sm text-slate-500">
+                      {monthComparison.current.count} položiek
+                    </p>
+                  </div>
+                  <div className="rounded-2xl bg-slate-50 dark:bg-slate-800/50 p-4">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                      Predchádzajúci mesiac
+                    </p>
+                    <p className="mt-2 text-2xl font-black text-slate-900 dark:text-white">
+                      {formatCurrency(monthComparison.previous?.total ?? 0)}
+                    </p>
+                    <p className="mt-1 text-sm text-slate-500">
+                      {monthComparison.previous?.count ?? 0} položiek
+                    </p>
+                  </div>
+                  <div className="rounded-2xl bg-slate-50 dark:bg-slate-800/50 p-4">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                      Rozdiel
+                    </p>
+                    <p
+                      className={`mt-2 text-2xl font-black ${
+                        monthComparison.difference > 0
+                          ? 'text-rose-600'
+                          : monthComparison.difference < 0
+                            ? 'text-emerald-600'
+                            : 'text-slate-900 dark:text-white'
+                      }`}
+                    >
+                      {monthComparison.difference > 0 ? '+' : ''}
+                      {formatCurrency(monthComparison.difference)}
+                    </p>
+                    <p className="mt-1 text-sm text-slate-500">
+                      {monthComparison.percentChange !== null
+                        ? `${monthComparison.percentChange > 0 ? '+' : ''}${monthComparison.percentChange.toFixed(1)} %`
+                        : 'Percento nie je dostupné'}
+                    </p>
+                  </div>
+                </div>
+
+                {comparisonComment && (
+                  <AnimatePresence mode="wait">
+                    <motion.div
+                      key={monthComparison.current.month}
+                      initial={{ opacity: 0, y: 8 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -8 }}
+                      transition={{ duration: 0.22 }}
+                      className="mt-4 rounded-2xl border border-rose-100 bg-rose-50/70 px-4 py-3 text-sm font-medium text-slate-700 dark:border-rose-900/40 dark:bg-rose-950/20 dark:text-slate-200"
+                    >
+                      {comparisonComment}
+                    </motion.div>
+                  </AnimatePresence>
+                )}
+              </div>
+            )}
+
+            <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
+              <div className="xl:col-span-2 bg-white dark:bg-slate-900 rounded-2xl shadow-sm border p-6">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-6">
+                  <div>
+                    <h3 className="text-lg font-semibold text-slate-900 dark:text-white">
+                      Vývoj výdavkov podľa mesiacov
+                    </h3>
+                    <p className="text-sm text-slate-500">
+                      Porovnaj si celkové mesačné výdavky a počet položiek.
+                    </p>
+                  </div>
+                  {hasActiveFilters && (
+                    <span className="inline-flex w-fit items-center rounded-full bg-rose-50 px-3 py-1 text-xs font-bold text-rose-600 dark:bg-rose-950/40 dark:text-rose-300">
+                      Filtrovaný prehľad
+                    </span>
+                  )}
+                </div>
+
+                <div className="h-[320px]">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart
+                      data={monthlyOverview}
+                      margin={{ top: 10, right: 12, left: 0, bottom: 0 }}
+                      onClick={(state) => {
+                        const month = state?.activePayload?.[0]?.payload?.month;
+                        if (month) {
+                          handleMonthSelect(month, true);
+                        }
+                      }}
+                    >
+                      <defs>
+                        <linearGradient
+                          id="expenses-overview-fill"
+                          x1="0"
+                          y1="0"
+                          x2="0"
+                          y2="1"
+                        >
+                          <stop offset="5%" stopColor="#e11d48" stopOpacity={0.35} />
+                          <stop offset="95%" stopColor="#e11d48" stopOpacity={0.04} />
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid
+                        vertical={false}
+                        strokeDasharray="3 3"
+                        stroke="rgba(148, 163, 184, 0.2)"
+                      />
+                      <XAxis
+                        dataKey="label"
+                        tickLine={false}
+                        axisLine={false}
+                        tick={{ fontSize: 12, fill: '#64748b' }}
+                      />
+                      <YAxis
+                        tickLine={false}
+                        axisLine={false}
+                        width={80}
+                        tick={{ fontSize: 12, fill: '#64748b' }}
+                        tickFormatter={(value) => formatCurrency(Number(value)).replace(',00', '')}
+                      />
+                      <Tooltip
+                        contentStyle={TOOLTIP_STYLE}
+                        labelFormatter={(_label, payload) =>
+                          payload?.[0]?.payload?.fullLabel ?? ''
+                        }
+                        formatter={(value, name, item) => {
+                          if (name === 'count') {
+                            const count = Number(value ?? 0);
+                            return [
+                              `${count} ${count === 1 ? 'položka' : count < 5 ? 'položky' : 'položiek'}`,
+                              'Počet',
+                            ];
+                          }
+
+                          return [
+                            formatCurrency(Number(value ?? 0)),
+                            item?.payload?.count
+                              ? `Spolu (${item.payload.count} položiek)`
+                              : 'Spolu',
+                          ];
+                        }}
+                      />
+                      <Area
+                        type="monotone"
+                        dataKey="total"
+                        name="total"
+                        stroke="#e11d48"
+                        strokeWidth={3}
+                        fill="url(#expenses-overview-fill)"
+                        dot={(props) => {
+                          const { cx, cy, payload } = props;
+                          const isSelected = payload?.month === activeSelectedMonth;
+
+                          return (
+                            <circle
+                              cx={cx}
+                              cy={cy}
+                              r={isSelected ? 6 : 4}
+                              fill={isSelected ? '#be123c' : '#e11d48'}
+                              stroke="white"
+                              strokeWidth={isSelected ? 3 : 2}
+                              className="cursor-pointer"
+                            />
+                          );
+                        }}
+                        activeDot={{ r: 6 }}
+                      />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </div>
+
+                <div className="mt-4 flex flex-wrap gap-2">
+                  {monthlyOverview
+                    .slice()
+                    .reverse()
+                    .map((item) => (
+                      <button
+                        key={item.month}
+                        type="button"
+                        onClick={() => handleMonthSelect(item.month, true)}
+                        className={`rounded-full px-3 py-1.5 text-xs font-bold transition-colors ${
+                          item.month === activeSelectedMonth
+                            ? 'bg-rose-600 text-white'
+                            : 'bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700'
+                        }`}
+                      >
+                        {item.fullLabel}
+                      </button>
+                    ))}
+                </div>
+              </div>
+
+              <ExpenseCategorySidebar expenses={visibleExpenses} loading={loading} />
+            </div>
+          </>
+        )}
+      </section>
+
+      <AnimatePresence>
+        {isAdding && (
+          <ExpenseForm
+            groupedCategories={groupedCategories}
+            onSubmit={onAddExpense}
+            onCancel={() => setIsAdding(false)}
+            setValueRef={(setter) => {
+              formSetValueRef.current = setter;
+            }}
+          />
+        )}
+      </AnimatePresence>
+
+      <section className="space-y-6">
+        <div className="flex flex-col gap-2">
+          <h2 className="text-xl font-bold text-slate-900 dark:text-white">
+            Zoznam pridaných výdavkov podľa mesiacov
+          </h2>
+          <p className="text-sm text-slate-500">
+            {overviewMode === 'month' && activeSelectedMonth
+              ? 'Zobrazený je detail vybraného mesiaca vrátane úprav, mazania a AI sumarizácie.'
+              : 'Tu nájdeš detailné položky pre každý mesiac vrátane úprav, mazania a AI sumarizácie.'}
+          </p>
+        </div>
+
+        <div className="space-y-6">
           {loading ? (
             <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border p-6 space-y-4">
               <Skeleton className="h-10 w-full" />
@@ -444,25 +1122,40 @@ export function ExpensesClient({
                 : 'Žiadne výdavky nenájdené. Začni pridaním prvého.'}
             </div>
           ) : (
-            groupedExpenses.map((group) => (
-              <MonthlyExpenseGroup
+            visibleGroupedExpenses.map((group) => (
+              <motion.div
                 key={group.month}
-                group={group}
-                groupedCategories={groupedCategories}
-                editingId={editingId}
-                editValues={editValues}
-                onEdit={handleEdit}
-                onUpdate={handleUpdate}
-                onCancelEdit={() => setEditingId(null)}
-                onDelete={handleDelete}
-                onEditValueChange={handleEditValueChange}
-              />
+                ref={(element) => {
+                  monthSectionRefs.current[group.month] = element;
+                }}
+                id={`expense-month-${group.month}`}
+                initial={false}
+                animate={{
+                  scale: highlightedMonth === group.month ? 1.01 : 1,
+                }}
+                transition={{ duration: 0.25, ease: 'easeOut' }}
+                className={`scroll-mt-24 rounded-3xl transition-all duration-500 ${
+                  highlightedMonth === group.month
+                    ? 'ring-2 ring-rose-400 ring-offset-4 ring-offset-background bg-rose-50/20 dark:bg-rose-950/10'
+                    : ''
+                }`}
+              >
+                <MonthlyExpenseGroup
+                  group={group}
+                  groupedCategories={groupedCategories}
+                  editingId={editingId}
+                  editValues={editValues}
+                  onEdit={handleEdit}
+                  onUpdate={handleUpdate}
+                  onCancelEdit={() => setEditingId(null)}
+                  onDelete={handleDelete}
+                  onEditValueChange={handleEditValueChange}
+                />
+              </motion.div>
             ))
           )}
         </div>
-
-        <ExpenseCategorySidebar expenses={filteredExpenses} loading={loading} />
-      </div>
+      </section>
     </div>
   );
 }
