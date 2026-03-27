@@ -62,6 +62,15 @@ interface MonthlyOverviewPoint {
 }
 
 type OverviewMode = 'all' | 'month';
+type TrendTone = 'increase' | 'decrease' | 'neutral';
+
+interface MonthTrend {
+  difference: number;
+  percentChange: number | null;
+  tone: TrendTone;
+  label: string;
+  helper: string;
+}
 
 export function ExpensesClient({
   initialExpenses,
@@ -85,6 +94,7 @@ export function ExpensesClient({
   const [overviewMode, setOverviewMode] = useState<OverviewMode>('all');
   const [selectedMonth, setSelectedMonth] = useState<string | null>(null);
   const [highlightedMonth, setHighlightedMonth] = useState<string | null>(null);
+  const [collapsedMonths, setCollapsedMonths] = useState<string[]>([]);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editValues, setEditValues] = useState({
     description: '',
@@ -464,6 +474,70 @@ export function ExpensesClient({
       ? monthlyOverview[selectedMonthIndex + 1]
       : null;
 
+  const monthTrendMap = useMemo<Record<string, MonthTrend>>(() => {
+    return monthlyOverview.reduce<Record<string, MonthTrend>>((acc, current, index) => {
+      const previous = index > 0 ? monthlyOverview[index - 1] : null;
+
+      if (!previous) {
+        acc[current.month] = {
+          difference: 0,
+          percentChange: null,
+          tone: 'neutral',
+          label: 'Bez porovnania',
+          helper: 'Toto je prvý dostupný mesiac v prehľade.',
+        };
+        return acc;
+      }
+
+      const difference = current.total - previous.total;
+      const percentChange =
+        previous.total > 0 ? (difference / previous.total) * 100 : null;
+      const isNeutral =
+        difference === 0 || (percentChange !== null && Math.abs(percentChange) < 5);
+      const tone: TrendTone = isNeutral
+        ? 'neutral'
+        : difference > 0
+          ? 'increase'
+          : 'decrease';
+      const direction =
+        tone === 'increase'
+          ? 'viac než minulý mesiac'
+          : tone === 'decrease'
+            ? 'menej než minulý mesiac'
+            : 'takmer rovnako ako minulý mesiac';
+      const label =
+        percentChange === null
+          ? 'Bez % zmeny'
+          : `${difference > 0 ? '+' : difference < 0 ? '' : ''}${percentChange.toFixed(1)} %`;
+
+      acc[current.month] = {
+        difference,
+        percentChange,
+        tone,
+        label,
+        helper: `${current.fullLabel}: ${direction}`,
+      };
+
+      return acc;
+    }, {});
+  }, [monthlyOverview]);
+
+  const comparisonTone: TrendTone = useMemo(() => {
+    if (!monthComparison?.previous) {
+      return 'neutral';
+    }
+
+    if (
+      monthComparison.difference === 0 ||
+      (monthComparison.percentChange !== null &&
+        Math.abs(monthComparison.percentChange) < 5)
+    ) {
+      return 'neutral';
+    }
+
+    return monthComparison.difference > 0 ? 'increase' : 'decrease';
+  }, [monthComparison]);
+
   const comparisonComment = useMemo(() => {
     if (!monthComparison?.current) {
       return null;
@@ -475,6 +549,13 @@ export function ExpensesClient({
 
     if (monthComparison.difference === 0) {
       return `Výdavky sú presne rovnaké ako v ${monthComparison.previous.fullLabel}.`;
+    }
+
+    if (
+      monthComparison.percentChange !== null &&
+      Math.abs(monthComparison.percentChange) < 5
+    ) {
+      return `V ${monthComparison.current.fullLabel} míňaš takmer rovnako ako v minulom mesiaci.`;
     }
 
     if (monthComparison.percentChange === null) {
@@ -498,6 +579,14 @@ export function ExpensesClient({
     };
   }, []);
 
+  useEffect(() => {
+    if (activeSelectedMonth) {
+      setCollapsedMonths((current) =>
+        current.filter((month) => month !== activeSelectedMonth)
+      );
+    }
+  }, [activeSelectedMonth]);
+
   const handleOverviewModeChange = useCallback(
     (mode: OverviewMode) => {
       if (mode === 'month') {
@@ -513,6 +602,7 @@ export function ExpensesClient({
     (month: string, shouldScroll = false) => {
       setSelectedMonth(month);
       setOverviewMode('month');
+      setCollapsedMonths((current) => current.filter((value) => value !== month));
 
       if (shouldScroll) {
         if (highlightTimeoutRef.current) {
@@ -533,6 +623,33 @@ export function ExpensesClient({
       }
     },
     []
+  );
+
+  const toggleMonthCollapse = useCallback((month: string) => {
+    setCollapsedMonths((current) =>
+      current.includes(month)
+        ? current.filter((value) => value !== month)
+        : [...current, month]
+    );
+  }, []);
+
+  const handleEditKeyDown = useCallback(
+    (
+      event: React.KeyboardEvent<HTMLInputElement | HTMLSelectElement>,
+      id: string
+    ) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        setEditingId(null);
+        return;
+      }
+
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        void handleUpdate(id);
+      }
+    },
+    [handleUpdate]
   );
 
   // ---- Render ----
@@ -853,17 +970,19 @@ export function ExpensesClient({
                   {monthComparison.previous ? (
                     <div
                       className={`inline-flex w-fit items-center gap-2 rounded-full px-4 py-2 text-sm font-bold ${
-                        monthComparison.isIncrease
+                        comparisonTone === 'increase'
                           ? 'bg-rose-50 text-rose-600 dark:bg-rose-950/40 dark:text-rose-300'
-                          : monthComparison.difference < 0
+                          : comparisonTone === 'decrease'
                             ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-300'
                             : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300'
                       }`}
                     >
-                      {monthComparison.isIncrease ? (
+                      {comparisonTone === 'increase' ? (
                         <TrendingUp size={16} />
-                      ) : (
+                      ) : comparisonTone === 'decrease' ? (
                         <TrendingDown size={16} />
+                      ) : (
+                        <Filter size={16} />
                       )}
                       {monthComparison.difference === 0
                         ? 'Bez zmeny'
@@ -909,9 +1028,9 @@ export function ExpensesClient({
                     </p>
                     <p
                       className={`mt-2 text-2xl font-black ${
-                        monthComparison.difference > 0
+                        comparisonTone === 'increase'
                           ? 'text-rose-600'
-                          : monthComparison.difference < 0
+                          : comparisonTone === 'decrease'
                             ? 'text-emerald-600'
                             : 'text-slate-900 dark:text-white'
                       }`}
@@ -935,7 +1054,13 @@ export function ExpensesClient({
                       animate={{ opacity: 1, y: 0 }}
                       exit={{ opacity: 0, y: -8 }}
                       transition={{ duration: 0.22 }}
-                      className="mt-4 rounded-2xl border border-rose-100 bg-rose-50/70 px-4 py-3 text-sm font-medium text-slate-700 dark:border-rose-900/40 dark:bg-rose-950/20 dark:text-slate-200"
+                      className={`mt-4 rounded-2xl border px-4 py-3 text-sm font-medium text-slate-700 dark:text-slate-200 ${
+                        comparisonTone === 'increase'
+                          ? 'border-rose-100 bg-rose-50/70 dark:border-rose-900/40 dark:bg-rose-950/20'
+                          : comparisonTone === 'decrease'
+                            ? 'border-emerald-100 bg-emerald-50/70 dark:border-emerald-900/40 dark:bg-emerald-950/20'
+                            : 'border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-800/40'
+                      }`}
                     >
                       {comparisonComment}
                     </motion.div>
@@ -1096,15 +1221,36 @@ export function ExpensesClient({
       </AnimatePresence>
 
       <section className="space-y-6">
-        <div className="flex flex-col gap-2">
-          <h2 className="text-xl font-bold text-slate-900 dark:text-white">
-            Zoznam pridaných výdavkov podľa mesiacov
-          </h2>
-          <p className="text-sm text-slate-500">
-            {overviewMode === 'month' && activeSelectedMonth
-              ? 'Zobrazený je detail vybraného mesiaca vrátane úprav, mazania a AI sumarizácie.'
-              : 'Tu nájdeš detailné položky pre každý mesiac vrátane úprav, mazania a AI sumarizácie.'}
-          </p>
+        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+          <div className="flex flex-col gap-2">
+            <h2 className="text-xl font-bold text-slate-900 dark:text-white">
+              Zoznam pridaných výdavkov podľa mesiacov
+            </h2>
+            <p className="text-sm text-slate-500">
+              {overviewMode === 'month' && activeSelectedMonth
+                ? 'Zobrazený je detail vybraného mesiaca vrátane úprav, mazania a AI sumarizácie.'
+                : 'Tu nájdeš detailné položky pre každý mesiac vrátane úprav, mazania a AI sumarizácie.'}
+            </p>
+          </div>
+
+          {!loading && visibleGroupedExpenses.length > 1 && (
+            <div className="inline-flex w-fit rounded-2xl border bg-white dark:bg-slate-900 p-1 shadow-sm">
+              <button
+                type="button"
+                onClick={() => setCollapsedMonths(visibleGroupedExpenses.map((group) => group.month))}
+                className="rounded-xl px-4 py-2 text-sm font-semibold text-slate-600 transition-colors hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
+              >
+                Zbaliť všetko
+              </button>
+              <button
+                type="button"
+                onClick={() => setCollapsedMonths([])}
+                className="rounded-xl px-4 py-2 text-sm font-semibold text-slate-600 transition-colors hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
+              >
+                Rozbaliť všetko
+              </button>
+            </div>
+          )}
         </div>
 
         <div className="space-y-6">
@@ -1144,12 +1290,19 @@ export function ExpensesClient({
                   group={group}
                   groupedCategories={groupedCategories}
                   editingId={editingId}
+                  isCollapsed={collapsedMonths.includes(group.month)}
+                  isSummaryFocused={
+                    overviewMode === 'month' && activeSelectedMonth === group.month
+                  }
+                  trend={monthTrendMap[group.month] ?? null}
                   editValues={editValues}
+                  onToggleCollapse={() => toggleMonthCollapse(group.month)}
                   onEdit={handleEdit}
                   onUpdate={handleUpdate}
                   onCancelEdit={() => setEditingId(null)}
                   onDelete={handleDelete}
                   onEditValueChange={handleEditValueChange}
+                  onEditKeyDown={handleEditKeyDown}
                 />
               </motion.div>
             ))

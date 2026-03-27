@@ -11,9 +11,15 @@ interface MonthlyAISummaryProps {
   month: string;
   expenses: ExpenseRecord[];
   total: number;
+  isFocused?: boolean;
 }
 
-export function MonthlyAISummary({ month, expenses, total }: MonthlyAISummaryProps) {
+export function MonthlyAISummary({
+  month,
+  expenses,
+  total,
+  isFocused = false,
+}: MonthlyAISummaryProps) {
   const [summary, setSummary] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -36,7 +42,18 @@ export function MonthlyAISummary({ month, expenses, total }: MonthlyAISummaryPro
   };
 
   return (
-    <div className="mt-4 pt-4 border-t border-slate-100 dark:border-slate-800">
+    <motion.div
+      initial={false}
+      animate={{
+        scale: isFocused ? 1.01 : 1,
+      }}
+      transition={{ duration: 0.2 }}
+      className={`mt-4 rounded-2xl border-t pt-4 transition-all duration-300 ${
+        isFocused
+          ? 'border-rose-200 bg-rose-50/60 px-3 pb-3 dark:border-rose-900/40 dark:bg-rose-950/20'
+          : 'border-slate-100 dark:border-slate-800'
+      }`}
+    >
       {!summary ? (
         <button
           onClick={generateSummary}
@@ -60,6 +77,6 @@ export function MonthlyAISummary({ month, expenses, total }: MonthlyAISummaryPro
           <p>{summary}</p>
         </motion.div>
       )}
-    </div>
+    </motion.div>
   );
 }
