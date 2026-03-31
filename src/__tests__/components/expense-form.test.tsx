@@ -57,6 +57,7 @@ describe('ExpenseForm', () => {
     expect(screen.getByLabelText('Popis')).toBeInTheDocument();
     expect(screen.getByLabelText('Kategória')).toBeInTheDocument();
     expect(screen.getByLabelText('Čiastka (€)')).toBeInTheDocument();
+    expect(screen.getByLabelText('Dátum')).toBeInTheDocument();
     expect(screen.getByText('Uložiť')).toBeInTheDocument();
     expect(screen.getByText('Zrušiť')).toBeInTheDocument();
   });

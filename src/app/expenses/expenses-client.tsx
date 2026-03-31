@@ -109,6 +109,7 @@ export function ExpensesClient({
     record_date: '',
   });
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const formSectionRef = useRef<HTMLDivElement>(null);
   const monthListRef = useRef<HTMLDivElement>(null);
   const monthSectionRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const highlightTimeoutRef = useRef<number | null>(null);
@@ -610,6 +611,17 @@ export function ExpensesClient({
       }
     };
   }, []);
+
+  useEffect(() => {
+    if (isAdding) {
+      window.setTimeout(() => {
+        formSectionRef.current?.scrollIntoView({
+          behavior: 'smooth',
+          block: 'start',
+        });
+      }, 80);
+    }
+  }, [isAdding]);
 
   useEffect(() => {
     if (monthlyOverview.length === 0) {
@@ -1301,18 +1313,20 @@ export function ExpensesClient({
         )}
       </section>
 
-      <AnimatePresence>
-        {isAdding && (
-          <ExpenseForm
-            groupedCategories={groupedCategories}
-            onSubmit={onAddExpense}
-            onCancel={() => setIsAdding(false)}
-            setValueRef={(setter) => {
-              formSetValueRef.current = setter;
-            }}
-          />
-        )}
-      </AnimatePresence>
+      <div ref={formSectionRef} className="scroll-mt-24">
+        <AnimatePresence>
+          {isAdding && (
+            <ExpenseForm
+              groupedCategories={groupedCategories}
+              onSubmit={onAddExpense}
+              onCancel={() => setIsAdding(false)}
+              setValueRef={(setter) => {
+                formSetValueRef.current = setter;
+              }}
+            />
+          )}
+        </AnimatePresence>
+      </div>
 
       <section className="space-y-6">
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">

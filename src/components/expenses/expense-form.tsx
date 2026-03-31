@@ -66,7 +66,7 @@ export function ExpenseForm({
     >
       <form
         onSubmit={handleSubmit(onSubmit)}
-        className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end"
+        className="grid grid-cols-1 md:grid-cols-5 gap-4 items-end"
       >
         <div className="space-y-2">
           <label htmlFor="expense-description" className="text-sm font-medium">
@@ -124,6 +124,20 @@ export function ExpenseForm({
           />
           {errors.amount && (
             <p className="text-xs text-rose-500">{errors.amount.message}</p>
+          )}
+        </div>
+        <div className="space-y-2">
+          <label htmlFor="expense-date" className="text-sm font-medium">
+            Dátum
+          </label>
+          <input
+            id="expense-date"
+            type="date"
+            className={`w-full bg-slate-50 dark:bg-slate-800 border rounded-lg px-4 py-2 focus:ring-2 focus:ring-rose-500 outline-none ${errors.record_date ? 'border-rose-500' : ''}`}
+            {...register('record_date')}
+          />
+          {errors.record_date && (
+            <p className="text-xs text-rose-500">{errors.record_date.message}</p>
           )}
         </div>
         <div className="flex gap-2">
