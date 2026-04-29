@@ -65,11 +65,18 @@ export function RecurringPaymentsClient({ initialPayments }: RecurringPaymentsCl
     if (!newName || !newAmount) return;
 
     try {
+      const { data: userData, error: userError } = await supabase.auth.getUser();
+      assertSuccess(userError, 'Načítanie používateľa');
+      if (!userData.user) {
+        throw new Error('Pre pridanie platby musíš byť prihlásený');
+      }
+
       const { error } = await supabase.from('recurring_payments').insert([
         {
           name: newName,
           amount: Number(newAmount),
           frequency: newFrequency,
+          user_id: userData.user.id,
         },
       ]);
       assertSuccess(error, 'Pridanie platby');
@@ -102,7 +109,10 @@ export function RecurringPaymentsClient({ initialPayments }: RecurringPaymentsCl
           onClick: async () => {
             try {
               const { id: _id, ...rest } = deletedPayment;
-              await supabase.from('recurring_payments').insert([rest]);
+              const { data: userData } = await supabase.auth.getUser();
+              await supabase.from('recurring_payments').insert([
+                { ...rest, user_id: userData.user?.id ?? null },
+              ]);
               fetchPayments();
               toast.success('Platba bola obnovená');
             } catch {
