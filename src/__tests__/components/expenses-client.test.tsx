@@ -5,17 +5,12 @@ import { ExpensesClient } from '@/app/expenses/expenses-client';
 
 const mockReplace = jest.fn();
 const mockUseExpenseData = jest.fn();
-const mockUseWindowVirtualizer = jest.fn();
 let mockSearchParams = new URLSearchParams();
 
 jest.mock('next/navigation', () => ({
   useRouter: () => ({ replace: mockReplace }),
   usePathname: () => '/expenses',
   useSearchParams: () => mockSearchParams,
-}));
-
-jest.mock('@tanstack/react-virtual', () => ({
-  useWindowVirtualizer: (options: unknown) => mockUseWindowVirtualizer(options),
 }));
 
 jest.mock('framer-motion', () => {
@@ -155,23 +150,9 @@ describe('ExpensesClient', () => {
   beforeEach(() => {
     mockReplace.mockClear();
     mockUseExpenseData.mockReset();
-    mockUseWindowVirtualizer.mockReset();
     mockSearchParams = new URLSearchParams();
     jest.clearAllMocks();
     (Element.prototype.scrollIntoView as jest.Mock).mockClear();
-    mockUseWindowVirtualizer.mockImplementation(
-      ({ count }: { count: number }) => ({
-        getVirtualItems: () =>
-          Array.from({ length: count }, (_, index) => ({
-            index,
-            key: index,
-            start: index * 520,
-            size: 520,
-          })),
-        getTotalSize: () => count * 520,
-        measureElement: jest.fn(),
-      })
-    );
   });
 
   afterEach(() => {
@@ -253,7 +234,7 @@ describe('ExpensesClient', () => {
     ).toBeInTheDocument();
   });
 
-  it('enables virtualization for longer month histories', () => {
+  it('renders every tracked month even for long expense histories', () => {
     setupExpenseData([
       ['2023-08', 120],
       ['2023-09', 130],
@@ -265,15 +246,25 @@ describe('ExpensesClient', () => {
       ['2024-03', 190],
     ]);
 
-    render(
+    const { container } = render(
       <ExpensesClient initialExpenses={[]} initialCategories={baseCategories as any} />
     );
 
-    expect(mockUseWindowVirtualizer).toHaveBeenCalledWith(
-      expect.objectContaining({
-        count: 8,
-        overscan: 3,
-      })
-    );
+    const months = [
+      '2023-08',
+      '2023-09',
+      '2023-10',
+      '2023-11',
+      '2023-12',
+      '2024-01',
+      '2024-02',
+      '2024-03',
+    ];
+
+    months.forEach((month) => {
+      expect(
+        container.querySelector(`#expense-month-${month}`)
+      ).not.toBeNull();
+    });
   });
 });
