@@ -1,5 +1,6 @@
 'use client';
 
+import { useCallback, useMemo, useState } from 'react';
 import { formatCurrency } from '@/lib/utils';
 import {
   Trash2,
@@ -9,6 +10,7 @@ import {
   Calendar,
   ChevronDown,
   ChevronUp,
+  RotateCcw,
 } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
@@ -95,6 +97,56 @@ export function MonthlyExpenseGroup({
         ? 'bg-emerald-50 text-emerald-600 border-emerald-100 dark:bg-emerald-950/30 dark:text-emerald-300 dark:border-emerald-900/50'
         : 'bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700';
 
+  // Per-month "include in total" toggles. Held only in component state so a
+  // page refresh restores the default (everything counted) — exactly the
+  // behaviour requested by the user.
+  const [excludedIds, setExcludedIds] = useState<Set<string>>(() => new Set());
+
+  const toggleIncluded = useCallback((id: string) => {
+    setExcludedIds((current) => {
+      const next = new Set(current);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  }, []);
+
+  const resetIncluded = useCallback(() => {
+    setExcludedIds(new Set());
+  }, []);
+
+  const includedRecords = useMemo(
+    () => group.records.filter((record) => !excludedIds.has(record.id)),
+    [group.records, excludedIds]
+  );
+
+  const displayedTotal = useMemo(
+    () =>
+      includedRecords.reduce((sum, record) => sum + Number(record.amount_eur), 0),
+    [includedRecords]
+  );
+
+  const displayedCategoryData = useMemo<CategoryTotal[]>(() => {
+    const buckets = includedRecords.reduce<CategoryTotal[]>((acc, record) => {
+      const categoryName = record.category || 'Ostatné';
+      const existing = acc.find((item) => item.name === categoryName);
+      if (existing) {
+        existing.value += Number(record.amount_eur);
+      } else {
+        acc.push({ name: categoryName, value: Number(record.amount_eur) });
+      }
+      return acc;
+    }, []);
+    return buckets.sort((a, b) => b.value - a.value);
+  }, [includedRecords]);
+
+  const totalRecords = group.records.length;
+  const includedCount = includedRecords.length;
+  const hasExclusions = includedCount !== totalRecords;
+
   return (
     <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border overflow-hidden">
       <div className="p-4 bg-slate-50 dark:bg-slate-800/50 border-b flex items-center justify-between">
@@ -117,7 +169,9 @@ export function MonthlyExpenseGroup({
                 })}
               </h3>
               <p className="text-xs text-slate-500">
-                {group.records.length} položiek
+                {hasExclusions
+                  ? `${includedCount} / ${totalRecords} započítaných položiek`
+                  : `${totalRecords} položiek`}
               </p>
               {trend && (
                 <p
@@ -144,8 +198,31 @@ export function MonthlyExpenseGroup({
               {trend.label}
             </div>
           )}
-          <div className="text-sm font-black text-rose-600 bg-rose-50 dark:bg-rose-950/30 px-3 py-1 rounded-full border border-rose-100 dark:border-rose-900/50">
-            Spolu: {formatCurrency(group.total)}
+          {hasExclusions && (
+            <button
+              type="button"
+              onClick={resetIncluded}
+              className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-3 py-1 text-[10px] font-bold uppercase tracking-wide text-slate-500 transition-colors hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
+              title="Znova zaškrtnúť všetky výdavky"
+            >
+              <RotateCcw size={12} />
+              Resetovať
+            </button>
+          )}
+          <div
+            className="text-sm font-black text-rose-600 bg-rose-50 dark:bg-rose-950/30 px-3 py-1 rounded-full border border-rose-100 dark:border-rose-900/50"
+            title={
+              hasExclusions
+                ? `Pôvodne: ${formatCurrency(group.total)} (${totalRecords} položiek)`
+                : undefined
+            }
+          >
+            Spolu: {formatCurrency(displayedTotal)}
+            {hasExclusions && (
+              <span className="ml-1 text-[10px] font-bold text-slate-500">
+                ({includedCount}/{totalRecords})
+              </span>
+            )}
           </div>
         </div>
       </div>
@@ -164,7 +241,7 @@ export function MonthlyExpenseGroup({
               <div className="h-[120px] w-full">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart
-                    data={group.categoryData}
+                    data={displayedCategoryData}
                     layout="vertical"
                     margin={{ left: -20, right: 20, top: 0, bottom: 0 }}
                   >
@@ -176,7 +253,7 @@ export function MonthlyExpenseGroup({
                       formatter={(value) => formatCurrency(Number(value ?? 0))}
                     />
                     <Bar dataKey="value" radius={[0, 4, 4, 0]} barSize={20}>
-                      {group.categoryData.map((_entry, index) => (
+                      {displayedCategoryData.map((_entry, index) => (
                         <Cell
                           key={`cell-${index}`}
                           fill={CHART_COLORS[index % CHART_COLORS.length]}
@@ -187,7 +264,7 @@ export function MonthlyExpenseGroup({
                 </ResponsiveContainer>
               </div>
               <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2">
-                {group.categoryData.slice(0, 5).map((cat, idx) => (
+                {displayedCategoryData.slice(0, 5).map((cat, idx) => (
                   <div key={cat.name} className="flex items-center gap-1.5">
                     <div
                       className="w-2 h-2 rounded-full"
@@ -204,8 +281,8 @@ export function MonthlyExpenseGroup({
 
               <MonthlyAISummary
                 month={group.month}
-                expenses={group.records}
-                total={group.total}
+                expenses={includedRecords}
+                total={displayedTotal}
                 isFocused={isSummaryFocused}
               />
             </div>
@@ -218,16 +295,31 @@ export function MonthlyExpenseGroup({
                     <th className="px-6 py-3">Popis</th>
                     <th className="px-6 py-3">Kategória</th>
                     <th className="px-6 py-3 text-right">Suma</th>
+                    <th
+                      className="px-3 py-3 text-center"
+                      title="Započítať do mesačného súčtu"
+                    >
+                      ✓
+                    </th>
                     <th className="px-6 py-3"></th>
                   </tr>
                 </thead>
                 <tbody className="divide-y">
-                  {group.records.map((expense) => (
+                  {group.records.map((expense) => {
+                    const isIncluded = !excludedIds.has(expense.id);
+                    const isCurrentlyEditing = editingId === expense.id;
+                    return (
                     <tr
                       key={expense.id}
-                      className={`hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-colors group ${expense.isOptimistic ? 'opacity-50' : ''}`}
+                      className={`hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-colors group ${
+                        expense.isOptimistic ? 'opacity-50' : ''
+                      } ${
+                        !isIncluded && !isCurrentlyEditing
+                          ? 'opacity-50 bg-slate-50/40 dark:bg-slate-800/20'
+                          : ''
+                      }`}
                     >
-                      {editingId === expense.id ? (
+                      {isCurrentlyEditing ? (
                         <>
                           <td className="px-4 py-2">
                             <input
@@ -286,6 +378,7 @@ export function MonthlyExpenseGroup({
                               className="w-full bg-white dark:bg-slate-800 border rounded px-2 py-1 text-right outline-none focus:ring-1 focus:ring-rose-500 font-bold"
                             />
                           </td>
+                          <td className="px-3 py-2"></td>
                           <td className="px-4 py-2 text-right">
                             <div className="flex gap-1 justify-end">
                               <button
@@ -319,8 +412,29 @@ export function MonthlyExpenseGroup({
                               {expense.category}
                             </span>
                           </td>
-                          <td className="px-6 py-4 text-right font-black text-rose-600">
+                          <td
+                            className={`px-6 py-4 text-right font-black ${
+                              isIncluded
+                                ? 'text-rose-600'
+                                : 'text-slate-400 line-through'
+                            }`}
+                          >
                             -{formatCurrency(expense.amount_eur)}
+                          </td>
+                          <td className="px-3 py-4 text-center">
+                            <label className="inline-flex items-center justify-center cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={isIncluded}
+                                onChange={() => toggleIncluded(expense.id)}
+                                aria-label={
+                                  isIncluded
+                                    ? 'Vyradiť z mesačného súčtu'
+                                    : 'Pridať do mesačného súčtu'
+                                }
+                                className="h-4 w-4 rounded border-slate-300 text-rose-600 focus:ring-2 focus:ring-rose-500 focus:ring-offset-0 cursor-pointer accent-rose-600"
+                              />
+                            </label>
                           </td>
                           <td className="px-6 py-4 text-right">
                             <div className="flex gap-1 justify-end opacity-0 group-hover:opacity-100 transition-opacity">
@@ -343,7 +457,8 @@ export function MonthlyExpenseGroup({
                         </>
                       )}
                     </tr>
-                  ))}
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
