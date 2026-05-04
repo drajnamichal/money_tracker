@@ -109,6 +109,16 @@ export interface RecurringPayment {
   last_amount: number | null;
 }
 
+export interface RecurringPaymentHistoryEntry {
+  id: string;
+  payment_id: string;
+  user_id: string | null;
+  amount: number;
+  effective_from: string;
+  note: string | null;
+  created_at: string;
+}
+
 export interface Investment {
   id: string;
   user_id: string;

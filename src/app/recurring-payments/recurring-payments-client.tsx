@@ -1,10 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { formatCurrency } from '@/lib/utils';
 import {
-  Loader2,
   Plus,
   Trash2,
   Edit2,
@@ -14,51 +13,121 @@ import {
   CalendarRange,
   Wallet,
   TrendingUp,
+  TrendingDown,
   AlertTriangle,
+  History,
+  ChevronDown,
+  ChevronRight,
+  Minus,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
 import { Skeleton } from '@/components/skeleton';
 import { assertSuccess, showError } from '@/lib/error-handling';
+import type {
+  RecurringPayment,
+  RecurringPaymentHistoryEntry,
+} from '@/types/financial';
 
-interface RecurringPayment {
-  id: string;
-  name: string;
-  amount: number;
-  last_amount?: number;
-  frequency: 'monthly' | 'yearly';
-}
+type Frequency = 'monthly' | 'yearly';
 
 export interface RecurringPaymentsClientProps {
   initialPayments: RecurringPayment[];
+  initialHistory: RecurringPaymentHistoryEntry[];
 }
 
-export function RecurringPaymentsClient({ initialPayments }: RecurringPaymentsClientProps) {
+const todayISO = () => new Date().toISOString().split('T')[0];
+
+export function RecurringPaymentsClient({
+  initialPayments,
+  initialHistory,
+}: RecurringPaymentsClientProps) {
   const [loading, setLoading] = useState(false);
   const [payments, setPayments] = useState<RecurringPayment[]>(initialPayments);
+  const [history, setHistory] = useState<RecurringPaymentHistoryEntry[]>(
+    initialHistory
+  );
   const [isAdding, setIsAdding] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [expandedHistoryIds, setExpandedHistoryIds] = useState<string[]>([]);
 
-  // Form states
   const [newName, setNewName] = useState('');
   const [newAmount, setNewAmount] = useState('');
-  const [newFrequency, setNewFrequency] = useState<'monthly' | 'yearly'>(
-    'monthly'
-  );
+  const [newFrequency, setNewFrequency] = useState<Frequency>('monthly');
 
-  async function fetchPayments() {
+  const historyByPayment = useMemo(() => {
+    const map = new Map<string, RecurringPaymentHistoryEntry[]>();
+    history.forEach((entry) => {
+      const list = map.get(entry.payment_id) ?? [];
+      list.push(entry);
+      map.set(entry.payment_id, list);
+    });
+    map.forEach((list) =>
+      list.sort((a, b) => b.effective_from.localeCompare(a.effective_from))
+    );
+    return map;
+  }, [history]);
+
+  const refreshAll = useCallback(async () => {
     setLoading(true);
-    const { data, error } = await supabase
-      .from('recurring_payments')
-      .select('*')
-      .order('frequency', { ascending: false })
-      .order('name');
+    try {
+      const [paymentsRes, historyRes] = await Promise.all([
+        supabase
+          .from('recurring_payments')
+          .select('*')
+          .order('frequency', { ascending: false })
+          .order('name'),
+        supabase
+          .from('recurring_payment_history')
+          .select('*')
+          .order('payment_id')
+          .order('effective_from', { ascending: false }),
+      ]);
 
-    if (!error && data) {
-      setPayments(data);
+      if (!paymentsRes.error && paymentsRes.data) {
+        setPayments(paymentsRes.data as RecurringPayment[]);
+      }
+      if (!historyRes.error && historyRes.data) {
+        setHistory(historyRes.data as RecurringPaymentHistoryEntry[]);
+      } else if (
+        historyRes.error &&
+        historyRes.error.code !== '42P01' &&
+        historyRes.error.code !== 'PGRST205'
+      ) {
+        showError(historyRes.error, 'Načítanie histórie platieb');
+      }
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
-  }
+  }, []);
+
+  const insertHistoryEntry = useCallback(
+    async (
+      paymentId: string,
+      userId: string,
+      amount: number,
+      effectiveFrom: string,
+      note?: string | null
+    ) => {
+      const { error } = await supabase
+        .from('recurring_payment_history')
+        .insert([
+          {
+            payment_id: paymentId,
+            user_id: userId,
+            amount,
+            effective_from: effectiveFrom,
+            note: note ?? null,
+          },
+        ]);
+      if (error && error.code !== '42P01' && error.code !== 'PGRST205') {
+        // Surface only real failures; missing-table just means the migration
+        // hasn't been applied yet and the history feature is dormant.
+        showError(error, 'Zápis do histórie platby');
+      }
+    },
+    []
+  );
 
   async function handleAdd(e: React.FormEvent) {
     e.preventDefault();
@@ -71,20 +140,35 @@ export function RecurringPaymentsClient({ initialPayments }: RecurringPaymentsCl
         throw new Error('Pre pridanie platby musíš byť prihlásený');
       }
 
-      const { error } = await supabase.from('recurring_payments').insert([
-        {
-          name: newName,
-          amount: Number(newAmount),
-          frequency: newFrequency,
-          user_id: userData.user.id,
-        },
-      ]);
+      const amount = Number(newAmount);
+      const { data: inserted, error } = await supabase
+        .from('recurring_payments')
+        .insert([
+          {
+            name: newName,
+            amount,
+            frequency: newFrequency,
+            user_id: userData.user.id,
+          },
+        ])
+        .select()
+        .single();
       assertSuccess(error, 'Pridanie platby');
+
+      if (inserted) {
+        await insertHistoryEntry(
+          inserted.id,
+          userData.user.id,
+          amount,
+          todayISO(),
+          'Počiatočná suma'
+        );
+      }
 
       setIsAdding(false);
       setNewName('');
       setNewAmount('');
-      fetchPayments();
+      await refreshAll();
       toast.success('Platba bola pridaná');
     } catch (err) {
       showError(err, 'Chyba pri pridávaní platby');
@@ -102,18 +186,19 @@ export function RecurringPaymentsClient({ initialPayments }: RecurringPaymentsCl
         .eq('id', id);
       assertSuccess(error, 'Mazanie platby');
 
-      fetchPayments();
+      await refreshAll();
       toast.success('Platba bola odstránená', {
         action: {
           label: 'Vrátiť späť',
           onClick: async () => {
             try {
+              // eslint-disable-next-line @typescript-eslint/no-unused-vars
               const { id: _id, ...rest } = deletedPayment;
               const { data: userData } = await supabase.auth.getUser();
               await supabase.from('recurring_payments').insert([
                 { ...rest, user_id: userData.user?.id ?? null },
               ]);
-              fetchPayments();
+              await refreshAll();
               toast.success('Platba bola obnovená');
             } catch {
               toast.error('Nepodarilo sa obnoviť platbu');
@@ -130,19 +215,19 @@ export function RecurringPaymentsClient({ initialPayments }: RecurringPaymentsCl
     id: string,
     name: string,
     amount: number,
-    frequency: 'monthly' | 'yearly'
+    frequency: Frequency
   ) {
-    // Find the current payment to get its current amount
     const currentPayment = payments.find((p) => p.id === id);
     const updateData: {
       name: string;
       amount: number;
-      frequency: 'monthly' | 'yearly';
+      frequency: Frequency;
       last_amount?: number;
     } = { name, amount, frequency };
 
-    // If amount is changing, store the current amount as last_amount
-    if (currentPayment && currentPayment.amount !== amount) {
+    const amountChanged =
+      !!currentPayment && Number(currentPayment.amount) !== amount;
+    if (currentPayment && amountChanged) {
       updateData.last_amount = currentPayment.amount;
     }
 
@@ -153,13 +238,115 @@ export function RecurringPaymentsClient({ initialPayments }: RecurringPaymentsCl
         .eq('id', id);
       assertSuccess(error, 'Úprava platby');
 
+      if (amountChanged && currentPayment) {
+        const { data: userData } = await supabase.auth.getUser();
+        const userId = userData.user?.id ?? currentPayment.user_id ?? null;
+        if (userId) {
+          await insertHistoryEntry(
+            id,
+            userId,
+            amount,
+            todayISO(),
+            'Zmena cez úpravu platby'
+          );
+        }
+      }
+
       setEditingId(null);
-      fetchPayments();
+      await refreshAll();
       toast.success('Platba bola upravená');
     } catch (err) {
       showError(err, 'Chyba pri úprave platby');
     }
   }
+
+  async function handleAddHistoryEntry(
+    paymentId: string,
+    amount: number,
+    effectiveFrom: string,
+    note: string | null
+  ) {
+    try {
+      const payment = payments.find((p) => p.id === paymentId);
+      const { data: userData } = await supabase.auth.getUser();
+      const userId = userData.user?.id ?? payment?.user_id ?? null;
+      if (!userId) {
+        throw new Error('Pre úpravu histórie musíš byť prihlásený');
+      }
+
+      const { error } = await supabase
+        .from('recurring_payment_history')
+        .insert([
+          {
+            payment_id: paymentId,
+            user_id: userId,
+            amount,
+            effective_from: effectiveFrom,
+            note,
+          },
+        ]);
+      assertSuccess(error, 'Pridanie záznamu do histórie');
+
+      // If this new entry is the most recent, also bump the parent payment
+      // so the dashboard cards stay in sync.
+      const existing = historyByPayment.get(paymentId) ?? [];
+      const isMostRecent = existing.every(
+        (entry) => entry.effective_from <= effectiveFrom
+      );
+      if (payment && isMostRecent && Number(payment.amount) !== amount) {
+        await supabase
+          .from('recurring_payments')
+          .update({ amount, last_amount: payment.amount })
+          .eq('id', paymentId);
+      }
+
+      await refreshAll();
+      toast.success('Záznam pridaný do histórie');
+    } catch (err) {
+      showError(err, 'Chyba pri zapisovaní histórie');
+    }
+  }
+
+  async function handleUpdateHistoryEntry(
+    entryId: string,
+    amount: number,
+    effectiveFrom: string,
+    note: string | null
+  ) {
+    try {
+      const { error } = await supabase
+        .from('recurring_payment_history')
+        .update({ amount, effective_from: effectiveFrom, note })
+        .eq('id', entryId);
+      assertSuccess(error, 'Úprava záznamu histórie');
+      await refreshAll();
+      toast.success('Záznam aktualizovaný');
+    } catch (err) {
+      showError(err, 'Chyba pri úprave záznamu histórie');
+    }
+  }
+
+  async function handleDeleteHistoryEntry(entryId: string) {
+    try {
+      const { error } = await supabase
+        .from('recurring_payment_history')
+        .delete()
+        .eq('id', entryId);
+      assertSuccess(error, 'Mazanie záznamu histórie');
+      await refreshAll();
+      toast.success('Záznam vymazaný');
+    } catch (err) {
+      showError(err, 'Chyba pri mazaní záznamu histórie');
+    }
+  }
+
+  const toggleHistory = useCallback((paymentId: string) => {
+    setExpandedHistoryIds((current) =>
+      current.includes(paymentId)
+        ? current.filter((id) => id !== paymentId)
+        : [...current, paymentId]
+    );
+  }, []);
 
   const monthlyPayments = payments.filter((p) => p.frequency === 'monthly');
   const yearlyPayments = payments.filter((p) => p.frequency === 'yearly');
@@ -190,7 +377,8 @@ export function RecurringPaymentsClient({ initialPayments }: RecurringPaymentsCl
         <div>
           <h1 className="text-3xl font-bold">Pravidelné platby</h1>
           <p className="text-slate-500">
-            Správa tvojich fixných mesačných a ročných nákladov.
+            Správa tvojich fixných mesačných a ročných nákladov vrátane
+            kompletnej histórie zdražení.
           </p>
         </div>
         {!loading && (
@@ -340,7 +528,7 @@ export function RecurringPaymentsClient({ initialPayments }: RecurringPaymentsCl
                   className="w-full bg-slate-50 dark:bg-slate-800 border rounded-xl px-4 py-2.5 outline-none focus:ring-2 focus:ring-blue-500"
                   value={newFrequency}
                   onChange={(e) =>
-                    setNewFrequency(e.target.value as 'monthly' | 'yearly')
+                    setNewFrequency(e.target.value as Frequency)
                   }
                 >
                   <option value="monthly">Mesačne</option>
@@ -368,112 +556,194 @@ export function RecurringPaymentsClient({ initialPayments }: RecurringPaymentsCl
       </AnimatePresence>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        {/* Monthly Section */}
-        <div className="space-y-4">
-          <div className="flex items-center gap-2 px-2">
-            <h2 className="text-xl font-bold">Mesačné platby</h2>
-            {!loading && (
-              <span className="bg-blue-100 text-blue-700 text-xs font-bold px-2 py-0.5 rounded-full">
-                {monthlyPayments.length}
-              </span>
-            )}
-          </div>
-          <div className="bg-white dark:bg-slate-900 rounded-2xl border shadow-sm divide-y">
-            {loading ? (
-              <div className="p-4 space-y-4">
-                <Skeleton className="h-16 w-full" />
-                <Skeleton className="h-16 w-full" />
-                <Skeleton className="h-16 w-full" />
-              </div>
-            ) : (
-              <>
-                {monthlyPayments.map((payment) => (
-                  <PaymentRow
-                    key={payment.id}
-                    payment={payment}
-                    onDelete={() => handleDelete(payment.id)}
-                    onUpdate={(n, a, f) => handleUpdate(payment.id, n, a, f)}
-                    isEditing={editingId === payment.id}
-                    onEdit={() => setEditingId(payment.id)}
-                    onCancel={() => setEditingId(null)}
-                  />
-                ))}
-                {monthlyPayments.length === 0 && (
-                  <p className="p-8 text-center text-slate-400 italic">
-                    Žiadne mesačné platby
-                  </p>
-                )}
-              </>
-            )}
-          </div>
-        </div>
-
-        {/* Yearly Section */}
-        <div className="space-y-4">
-          <div className="flex items-center gap-2 px-2">
-            <h2 className="text-xl font-bold">Ročné platby</h2>
-            {!loading && (
-              <span className="bg-emerald-100 text-emerald-700 text-xs font-bold px-2 py-0.5 rounded-full">
-                {yearlyPayments.length}
-              </span>
-            )}
-          </div>
-          <div className="bg-white dark:bg-slate-900 rounded-2xl border shadow-sm divide-y">
-            {loading ? (
-              <div className="p-4 space-y-4">
-                <Skeleton className="h-16 w-full" />
-                <Skeleton className="h-16 w-full" />
-                <Skeleton className="h-16 w-full" />
-              </div>
-            ) : (
-              <>
-                {yearlyPayments.map((payment) => (
-                  <PaymentRow
-                    key={payment.id}
-                    payment={payment}
-                    onDelete={() => handleDelete(payment.id)}
-                    onUpdate={(n, a, f) => handleUpdate(payment.id, n, a, f)}
-                    isEditing={editingId === payment.id}
-                    onEdit={() => setEditingId(payment.id)}
-                    onCancel={() => setEditingId(null)}
-                  />
-                ))}
-                {yearlyPayments.length === 0 && (
-                  <p className="p-8 text-center text-slate-400 italic">
-                    Žiadne ročné platby
-                  </p>
-                )}
-              </>
-            )}
-          </div>
-        </div>
+        <PaymentSection
+          title="Mesačné platby"
+          badgeClasses="bg-blue-100 text-blue-700"
+          loading={loading}
+          payments={monthlyPayments}
+          emptyMessage="Žiadne mesačné platby"
+          historyByPayment={historyByPayment}
+          editingId={editingId}
+          expandedHistoryIds={expandedHistoryIds}
+          onEdit={(id) => setEditingId(id)}
+          onCancel={() => setEditingId(null)}
+          onDelete={handleDelete}
+          onUpdate={handleUpdate}
+          onToggleHistory={toggleHistory}
+          onAddHistory={handleAddHistoryEntry}
+          onUpdateHistory={handleUpdateHistoryEntry}
+          onDeleteHistory={handleDeleteHistoryEntry}
+        />
+        <PaymentSection
+          title="Ročné platby"
+          badgeClasses="bg-emerald-100 text-emerald-700"
+          loading={loading}
+          payments={yearlyPayments}
+          emptyMessage="Žiadne ročné platby"
+          historyByPayment={historyByPayment}
+          editingId={editingId}
+          expandedHistoryIds={expandedHistoryIds}
+          onEdit={(id) => setEditingId(id)}
+          onCancel={() => setEditingId(null)}
+          onDelete={handleDelete}
+          onUpdate={handleUpdate}
+          onToggleHistory={toggleHistory}
+          onAddHistory={handleAddHistoryEntry}
+          onUpdateHistory={handleUpdateHistoryEntry}
+          onDeleteHistory={handleDeleteHistoryEntry}
+        />
       </div>
     </div>
   );
 }
 
-function PaymentRow({
-  payment,
-  onDelete,
-  onUpdate,
-  isEditing,
-  onEdit,
-  onCancel,
-}: {
-  payment: RecurringPayment;
-  onDelete: () => void;
+interface PaymentSectionProps {
+  title: string;
+  badgeClasses: string;
+  loading: boolean;
+  payments: RecurringPayment[];
+  emptyMessage: string;
+  historyByPayment: Map<string, RecurringPaymentHistoryEntry[]>;
+  editingId: string | null;
+  expandedHistoryIds: string[];
+  onEdit: (id: string) => void;
+  onCancel: () => void;
+  onDelete: (id: string) => void;
   onUpdate: (
+    id: string,
     name: string,
     amount: number,
-    frequency: 'monthly' | 'yearly'
+    frequency: Frequency
   ) => void;
+  onToggleHistory: (id: string) => void;
+  onAddHistory: (
+    paymentId: string,
+    amount: number,
+    effectiveFrom: string,
+    note: string | null
+  ) => Promise<void>;
+  onUpdateHistory: (
+    entryId: string,
+    amount: number,
+    effectiveFrom: string,
+    note: string | null
+  ) => Promise<void>;
+  onDeleteHistory: (entryId: string) => Promise<void>;
+}
+
+function PaymentSection({
+  title,
+  badgeClasses,
+  loading,
+  payments,
+  emptyMessage,
+  historyByPayment,
+  editingId,
+  expandedHistoryIds,
+  onEdit,
+  onCancel,
+  onDelete,
+  onUpdate,
+  onToggleHistory,
+  onAddHistory,
+  onUpdateHistory,
+  onDeleteHistory,
+}: PaymentSectionProps) {
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center gap-2 px-2">
+        <h2 className="text-xl font-bold">{title}</h2>
+        {!loading && (
+          <span
+            className={`text-xs font-bold px-2 py-0.5 rounded-full ${badgeClasses}`}
+          >
+            {payments.length}
+          </span>
+        )}
+      </div>
+      <div className="bg-white dark:bg-slate-900 rounded-2xl border shadow-sm divide-y">
+        {loading ? (
+          <div className="p-4 space-y-4">
+            <Skeleton className="h-16 w-full" />
+            <Skeleton className="h-16 w-full" />
+            <Skeleton className="h-16 w-full" />
+          </div>
+        ) : (
+          <>
+            {payments.map((payment) => (
+              <PaymentRow
+                key={payment.id}
+                payment={payment}
+                history={historyByPayment.get(payment.id) ?? []}
+                isHistoryOpen={expandedHistoryIds.includes(payment.id)}
+                isEditing={editingId === payment.id}
+                onDelete={() => onDelete(payment.id)}
+                onUpdate={(n, a, f) => onUpdate(payment.id, n, a, f)}
+                onEdit={() => onEdit(payment.id)}
+                onCancel={onCancel}
+                onToggleHistory={() => onToggleHistory(payment.id)}
+                onAddHistory={(amount, effectiveFrom, note) =>
+                  onAddHistory(payment.id, amount, effectiveFrom, note)
+                }
+                onUpdateHistory={onUpdateHistory}
+                onDeleteHistory={onDeleteHistory}
+              />
+            ))}
+            {payments.length === 0 && (
+              <p className="p-8 text-center text-slate-400 italic">
+                {emptyMessage}
+              </p>
+            )}
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+interface PaymentRowProps {
+  payment: RecurringPayment;
+  history: RecurringPaymentHistoryEntry[];
+  isHistoryOpen: boolean;
   isEditing: boolean;
+  onDelete: () => void;
+  onUpdate: (name: string, amount: number, frequency: Frequency) => void;
   onEdit: () => void;
   onCancel: () => void;
-}) {
+  onToggleHistory: () => void;
+  onAddHistory: (
+    amount: number,
+    effectiveFrom: string,
+    note: string | null
+  ) => Promise<void>;
+  onUpdateHistory: (
+    entryId: string,
+    amount: number,
+    effectiveFrom: string,
+    note: string | null
+  ) => Promise<void>;
+  onDeleteHistory: (entryId: string) => Promise<void>;
+}
+
+function PaymentRow({
+  payment,
+  history,
+  isHistoryOpen,
+  isEditing,
+  onDelete,
+  onUpdate,
+  onEdit,
+  onCancel,
+  onToggleHistory,
+  onAddHistory,
+  onUpdateHistory,
+  onDeleteHistory,
+}: PaymentRowProps) {
   const [editName, setEditName] = useState(payment.name);
   const [editAmount, setEditAmount] = useState(payment.amount.toString());
-  const [editFrequency, setEditFrequency] = useState(payment.frequency);
+  const [editFrequency, setEditFrequency] = useState<Frequency>(
+    payment.frequency
+  );
   const hasPriceIncrease =
     payment.last_amount !== undefined &&
     payment.last_amount !== null &&
@@ -481,6 +751,7 @@ function PaymentRow({
   const priceDifference = hasPriceIncrease
     ? payment.amount - Number(payment.last_amount ?? 0)
     : 0;
+  const historyCount = history.length;
 
   if (isEditing) {
     return (
@@ -501,7 +772,7 @@ function PaymentRow({
             className="w-32 bg-white dark:bg-slate-800 border rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-blue-500"
             value={editFrequency}
             onChange={(e) =>
-              setEditFrequency(e.target.value as 'monthly' | 'yearly')
+              setEditFrequency(e.target.value as Frequency)
             }
           >
             <option value="monthly">Mesačne</option>
@@ -530,56 +801,379 @@ function PaymentRow({
 
   return (
     <div
-      className={`p-4 flex items-center justify-between transition-colors group ${
+      className={`transition-colors ${
         hasPriceIncrease
-          ? 'bg-amber-50/70 dark:bg-amber-950/10 border-l-4 border-amber-400 hover:bg-amber-50 dark:hover:bg-amber-950/20'
-          : 'hover:bg-slate-50 dark:hover:bg-slate-800/50'
+          ? 'bg-amber-50/70 dark:bg-amber-950/10 border-l-4 border-amber-400'
+          : ''
       }`}
     >
-      <div className="space-y-0.5">
-        <div className="flex flex-wrap items-center gap-2">
-          <p className="font-medium">{payment.name}</p>
-          {hasPriceIncrease && (
-            <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 dark:bg-amber-900/30 px-2 py-0.5 text-[10px] font-black uppercase tracking-wide text-amber-700 dark:text-amber-300">
-              <TrendingUp size={12} />
-              Zdražené
-            </span>
-          )}
-        </div>
-        <div className="flex flex-col">
-          <p className="text-2xl font-bold text-slate-900 dark:text-white leading-tight">
-            {formatCurrency(payment.amount)}
-          </p>
-          {payment.last_amount !== undefined &&
-            payment.last_amount !== null &&
-            payment.last_amount !== payment.amount && (
-              <p
-                className={`text-[10px] font-medium italic ${
-                  hasPriceIncrease
-                    ? 'text-amber-700 dark:text-amber-300'
-                    : 'text-slate-400'
-                }`}
-              >
-                predtým {formatCurrency(payment.last_amount)}
-                {hasPriceIncrease && ` · +${formatCurrency(priceDifference)}`}
-              </p>
+      <div
+        className={`p-4 flex items-center justify-between group ${
+          hasPriceIncrease
+            ? 'hover:bg-amber-50 dark:hover:bg-amber-950/20'
+            : 'hover:bg-slate-50 dark:hover:bg-slate-800/50'
+        }`}
+      >
+        <div className="space-y-0.5">
+          <div className="flex flex-wrap items-center gap-2">
+            <p className="font-medium">{payment.name}</p>
+            {hasPriceIncrease && (
+              <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 dark:bg-amber-900/30 px-2 py-0.5 text-[10px] font-black uppercase tracking-wide text-amber-700 dark:text-amber-300">
+                <TrendingUp size={12} />
+                Zdražené
+              </span>
             )}
+            <button
+              onClick={onToggleHistory}
+              className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide transition-colors ${
+                isHistoryOpen
+                  ? 'border-blue-300 bg-blue-50 text-blue-700 dark:border-blue-800 dark:bg-blue-900/30 dark:text-blue-200'
+                  : 'border-slate-200 text-slate-500 hover:bg-slate-100 dark:border-slate-700 dark:text-slate-400 dark:hover:bg-slate-800'
+              }`}
+              title="Zobraziť históriu zmien sumy"
+            >
+              {isHistoryOpen ? (
+                <ChevronDown size={12} />
+              ) : (
+                <ChevronRight size={12} />
+              )}
+              <History size={12} />
+              {historyCount > 0
+                ? `${historyCount} ${historyCount === 1 ? 'záznam' : historyCount < 5 ? 'záznamy' : 'záznamov'}`
+                : 'História'}
+            </button>
+          </div>
+          <div className="flex flex-col">
+            <p className="text-2xl font-bold text-slate-900 dark:text-white leading-tight">
+              {formatCurrency(payment.amount)}
+            </p>
+            {payment.last_amount !== undefined &&
+              payment.last_amount !== null &&
+              payment.last_amount !== payment.amount && (
+                <p
+                  className={`text-[10px] font-medium italic ${
+                    hasPriceIncrease
+                      ? 'text-amber-700 dark:text-amber-300'
+                      : 'text-slate-400'
+                  }`}
+                >
+                  predtým {formatCurrency(payment.last_amount)}
+                  {hasPriceIncrease && ` · +${formatCurrency(priceDifference)}`}
+                </p>
+              )}
+          </div>
+        </div>
+        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 md:opacity-100">
+          <button
+            onClick={onEdit}
+            className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors"
+          >
+            <Edit2 size={18} />
+          </button>
+          <button
+            onClick={onDelete}
+            className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-900/20 rounded-lg transition-colors"
+          >
+            <Trash2 size={18} />
+          </button>
         </div>
       </div>
-      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 md:opacity-100">
-        <button
-          onClick={onEdit}
-          className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors"
-        >
-          <Edit2 size={18} />
-        </button>
-        <button
-          onClick={onDelete}
-          className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-900/20 rounded-lg transition-colors"
-        >
-          <Trash2 size={18} />
-        </button>
+
+      <AnimatePresence initial={false}>
+        {isHistoryOpen && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="overflow-hidden border-t bg-slate-50/60 dark:bg-slate-900/40"
+          >
+            <PaymentHistoryPanel
+              paymentName={payment.name}
+              history={history}
+              onAddHistory={onAddHistory}
+              onUpdateHistory={onUpdateHistory}
+              onDeleteHistory={onDeleteHistory}
+            />
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+interface PaymentHistoryPanelProps {
+  paymentName: string;
+  history: RecurringPaymentHistoryEntry[];
+  onAddHistory: (
+    amount: number,
+    effectiveFrom: string,
+    note: string | null
+  ) => Promise<void>;
+  onUpdateHistory: (
+    entryId: string,
+    amount: number,
+    effectiveFrom: string,
+    note: string | null
+  ) => Promise<void>;
+  onDeleteHistory: (entryId: string) => Promise<void>;
+}
+
+function PaymentHistoryPanel({
+  paymentName,
+  history,
+  onAddHistory,
+  onUpdateHistory,
+  onDeleteHistory,
+}: PaymentHistoryPanelProps) {
+  const [isAddingEntry, setIsAddingEntry] = useState(false);
+  const [editingEntryId, setEditingEntryId] = useState<string | null>(null);
+  const [draftAmount, setDraftAmount] = useState('');
+  const [draftDate, setDraftDate] = useState(todayISO());
+  const [draftNote, setDraftNote] = useState('');
+
+  const sortedHistory = useMemo(
+    () =>
+      [...history].sort((a, b) =>
+        b.effective_from.localeCompare(a.effective_from)
+      ),
+    [history]
+  );
+
+  const resetDraft = () => {
+    setDraftAmount('');
+    setDraftDate(todayISO());
+    setDraftNote('');
+  };
+
+  const handleStartAdd = () => {
+    setEditingEntryId(null);
+    resetDraft();
+    setIsAddingEntry(true);
+  };
+
+  const handleStartEdit = (entry: RecurringPaymentHistoryEntry) => {
+    setIsAddingEntry(false);
+    setEditingEntryId(entry.id);
+    setDraftAmount(entry.amount.toString());
+    setDraftDate(entry.effective_from);
+    setDraftNote(entry.note ?? '');
+  };
+
+  const handleCancelDraft = () => {
+    setIsAddingEntry(false);
+    setEditingEntryId(null);
+    resetDraft();
+  };
+
+  const handleSubmitDraft = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const amountValue = Number(draftAmount);
+    if (!Number.isFinite(amountValue) || amountValue < 0 || !draftDate) {
+      toast.error('Vyplň platnú sumu a dátum');
+      return;
+    }
+    const note = draftNote.trim() ? draftNote.trim() : null;
+
+    if (editingEntryId) {
+      await onUpdateHistory(editingEntryId, amountValue, draftDate, note);
+    } else {
+      await onAddHistory(amountValue, draftDate, note);
+    }
+    handleCancelDraft();
+  };
+
+  return (
+    <div className="px-4 py-4 space-y-3">
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-xs font-bold uppercase tracking-widest text-slate-500">
+          História sumy · {paymentName}
+        </p>
+        {!isAddingEntry && !editingEntryId && (
+          <button
+            type="button"
+            onClick={handleStartAdd}
+            className="inline-flex items-center gap-1 rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-blue-700 transition-colors"
+          >
+            <Plus size={14} />
+            Pridať záznam
+          </button>
+        )}
       </div>
+
+      {(isAddingEntry || editingEntryId) && (
+        <form
+          onSubmit={handleSubmitDraft}
+          className="rounded-xl border border-blue-200 bg-white p-3 shadow-sm dark:border-blue-900/40 dark:bg-slate-900"
+        >
+          <div className="grid grid-cols-1 sm:grid-cols-[140px_140px_1fr_auto] gap-2">
+            <div className="space-y-1">
+              <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                Dátum
+              </label>
+              <input
+                type="date"
+                value={draftDate}
+                onChange={(e) => setDraftDate(e.target.value)}
+                className="w-full bg-slate-50 dark:bg-slate-800 border rounded-lg px-2 py-1.5 text-sm outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                Suma (€)
+              </label>
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                value={draftAmount}
+                onChange={(e) => setDraftAmount(e.target.value)}
+                placeholder="0.00"
+                className="w-full bg-slate-50 dark:bg-slate-800 border rounded-lg px-2 py-1.5 text-sm outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                Poznámka (voliteľná)
+              </label>
+              <input
+                type="text"
+                value={draftNote}
+                onChange={(e) => setDraftNote(e.target.value)}
+                placeholder="Napr. inflácia, zmena tarify..."
+                className="w-full bg-slate-50 dark:bg-slate-800 border rounded-lg px-2 py-1.5 text-sm outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <div className="flex items-end gap-1">
+              <button
+                type="submit"
+                className="inline-flex items-center gap-1 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-emerald-700 transition-colors"
+              >
+                <Save size={14} />
+                Uložiť
+              </button>
+              <button
+                type="button"
+                onClick={handleCancelDraft}
+                className="p-1.5 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg"
+              >
+                <X size={16} />
+              </button>
+            </div>
+          </div>
+        </form>
+      )}
+
+      {sortedHistory.length === 0 ? (
+        <p className="text-sm italic text-slate-400">
+          Zatiaľ tu nie je žiadny záznam. Použi tlačidlo „Pridať záznam“
+          a doplň staršie sumy aj s dátumom, aby si mal kompletnú históriu.
+        </p>
+      ) : (
+        <ol className="relative ml-2 border-l border-slate-200 dark:border-slate-700 space-y-3 pl-4">
+          {sortedHistory.map((entry, index) => {
+            const previousEntry = sortedHistory[index + 1];
+            const previousAmount = previousEntry
+              ? Number(previousEntry.amount)
+              : null;
+            const currentAmount = Number(entry.amount);
+            const diff =
+              previousAmount === null ? null : currentAmount - previousAmount;
+            const percent =
+              previousAmount && previousAmount !== 0 && diff !== null
+                ? (diff / previousAmount) * 100
+                : null;
+            const tone =
+              diff === null || diff === 0
+                ? 'neutral'
+                : diff > 0
+                  ? 'increase'
+                  : 'decrease';
+            const dotClasses =
+              tone === 'increase'
+                ? 'bg-amber-500'
+                : tone === 'decrease'
+                  ? 'bg-emerald-500'
+                  : 'bg-slate-400';
+
+            return (
+              <li key={entry.id} className="relative">
+                <span
+                  className={`absolute -left-[19px] top-2 h-2.5 w-2.5 rounded-full ring-4 ring-slate-50 dark:ring-slate-900/40 ${dotClasses}`}
+                />
+                {editingEntryId === entry.id ? (
+                  <p className="text-xs italic text-slate-400">Upravuje sa…</p>
+                ) : (
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="space-y-0.5">
+                      <p className="text-xs font-medium text-slate-500">
+                        {new Date(entry.effective_from).toLocaleDateString(
+                          'sk-SK',
+                          { day: '2-digit', month: 'long', year: 'numeric' }
+                        )}
+                      </p>
+                      <p className="text-base font-bold text-slate-900 dark:text-white">
+                        {formatCurrency(currentAmount)}
+                      </p>
+                      {diff !== null && (
+                        <p
+                          className={`inline-flex items-center gap-1 text-[11px] font-bold ${
+                            tone === 'increase'
+                              ? 'text-amber-700 dark:text-amber-300'
+                              : tone === 'decrease'
+                                ? 'text-emerald-700 dark:text-emerald-300'
+                                : 'text-slate-500'
+                          }`}
+                        >
+                          {tone === 'increase' ? (
+                            <TrendingUp size={12} />
+                          ) : tone === 'decrease' ? (
+                            <TrendingDown size={12} />
+                          ) : (
+                            <Minus size={12} />
+                          )}
+                          {diff > 0 ? '+' : ''}
+                          {formatCurrency(diff)}
+                          {percent !== null && (
+                            <span className="font-medium">
+                              {' '}
+                              ({percent > 0 ? '+' : ''}
+                              {percent.toFixed(1)} %)
+                            </span>
+                          )}
+                        </p>
+                      )}
+                      {entry.note && (
+                        <p className="text-xs text-slate-500 dark:text-slate-400">
+                          {entry.note}
+                        </p>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={() => handleStartEdit(entry)}
+                        className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-md transition-colors"
+                        title="Upraviť záznam"
+                      >
+                        <Edit2 size={14} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => onDeleteHistory(entry.id)}
+                        className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-900/20 rounded-md transition-colors"
+                        title="Vymazať záznam"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </li>
+            );
+          })}
+        </ol>
+      )}
     </div>
   );
 }

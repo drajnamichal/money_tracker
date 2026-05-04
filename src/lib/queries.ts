@@ -12,6 +12,7 @@ import {
   Mortgage,
   MortgagePayment,
   RecurringPayment,
+  RecurringPaymentHistoryEntry,
   RetirementRecord,
   Investment,
 } from '@/types/financial';
@@ -42,6 +43,7 @@ export const queryKeys = {
     payments: ['mortgage', 'payments'] as const,
   },
   recurringPayments: ['recurring-payments'] as const,
+  recurringPaymentHistory: ['recurring-payments', 'history'] as const,
   retirement: ['retirement'] as const,
   investments: ['investments'] as const,
   exchangeRate: ['exchange-rate'] as const,
@@ -160,6 +162,25 @@ export async function fetchRecurringPayments(client?: SB): Promise<RecurringPaym
     .order('name');
   if (error) throw error;
   return (data ?? []) as RecurringPayment[];
+}
+
+export async function fetchRecurringPaymentHistory(
+  client?: SB
+): Promise<RecurringPaymentHistoryEntry[]> {
+  const { data, error } = await sb(client)
+    .from('recurring_payment_history')
+    .select('*')
+    .order('payment_id')
+    .order('effective_from', { ascending: false });
+  // History table is optional infra (the SQL migration may not be applied yet).
+  // Treat a missing table as "no history yet" instead of crashing the page.
+  if (error) {
+    if (error.code === '42P01' || error.code === 'PGRST205') {
+      return [];
+    }
+    throw error;
+  }
+  return (data ?? []) as RecurringPaymentHistoryEntry[];
 }
 
 export async function fetchRetirementRecords(client?: SB): Promise<RetirementRecord[]> {
