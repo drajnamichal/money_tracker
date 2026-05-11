@@ -6,7 +6,17 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { supabase } from '@/lib/supabase';
 import { formatCurrency } from '@/lib/utils';
-import { Loader2, Plus, ArrowRight, Save, X, RotateCcw, Trash2 } from 'lucide-react';
+import {
+  Loader2,
+  Plus,
+  ArrowRight,
+  Save,
+  X,
+  RotateCcw,
+  Trash2,
+  Archive,
+  ArchiveRestore,
+} from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
 import { Skeleton } from '@/components/skeleton';
@@ -100,6 +110,24 @@ export function AssetsClient({
     () => new Set()
   );
 
+  // Count how many wealth_records reference each account. Used to decide
+  // whether we offer "delete permanently" (only safe when count = 0).
+  const recordCountByAccount = useMemo(() => {
+    const counts: Record<string, number> = {};
+    wealthData.forEach((r) => {
+      counts[r.account_id] = (counts[r.account_id] ?? 0) + 1;
+    });
+    return counts;
+  }, [wealthData]);
+
+  // Active = not archived. Form inputs only render for active accounts so
+  // archived ones don't clutter the "new wealth record" UI, but the main
+  // table still shows them (greyed out) for historical context.
+  const activeAccounts = useMemo(
+    () => accounts.filter((a) => !a.archived_at),
+    [accounts]
+  );
+
   const addNewAccountDraft = useCallback(() => {
     setNewAccountDrafts((current) => [...current, createEmptyDraft()]);
   }, []);
@@ -141,6 +169,97 @@ export function AssetsClient({
     setExcludedAccountIds(new Set());
   }, []);
 
+  const archiveAccount = useCallback(
+    async (account: AssetAccount) => {
+      const confirmed = window.confirm(
+        `Archivovať účet „${account.name}"?\n\n` +
+          'Historické záznamy zostanú zachované, len sa účet prestane ' +
+          'zobrazovať vo formulári pre nový záznam majetku. ' +
+          'Kedykoľvek ho môžeš obnoviť späť.'
+      );
+      if (!confirmed) return;
+
+      try {
+        const { error } = await supabase
+          .from('asset_accounts')
+          .update({ archived_at: new Date().toISOString() })
+          .eq('id', account.id);
+        assertSuccess(error, `Archivácia účtu „${account.name}"`);
+        await refresh();
+        toast.success(`Účet „${account.name}" bol archivovaný`, {
+          action: {
+            label: 'Vrátiť späť',
+            onClick: async () => {
+              try {
+                const { error: undoError } = await supabase
+                  .from('asset_accounts')
+                  .update({ archived_at: null })
+                  .eq('id', account.id);
+                assertSuccess(undoError, 'Obnovenie účtu');
+                await refresh();
+                toast.success(`Účet „${account.name}" bol obnovený`);
+              } catch (err) {
+                showError(err, 'Chyba pri obnovení účtu');
+              }
+            },
+          },
+        });
+      } catch (err) {
+        showError(err, 'Chyba pri archivácii účtu');
+      }
+    },
+    [refresh]
+  );
+
+  const unarchiveAccount = useCallback(
+    async (account: AssetAccount) => {
+      try {
+        const { error } = await supabase
+          .from('asset_accounts')
+          .update({ archived_at: null })
+          .eq('id', account.id);
+        assertSuccess(error, `Obnovenie účtu „${account.name}"`);
+        await refresh();
+        toast.success(`Účet „${account.name}" bol obnovený`);
+      } catch (err) {
+        showError(err, 'Chyba pri obnovení účtu');
+      }
+    },
+    [refresh]
+  );
+
+  const purgeAccount = useCallback(
+    async (account: AssetAccount) => {
+      // Defence in depth — UI only offers this for accounts with no
+      // historical records, but double-check before the destructive call.
+      if ((recordCountByAccount[account.id] ?? 0) > 0) {
+        toast.error(
+          `Účet „${account.name}" má historické záznamy, najprv ich treba archivovať`
+        );
+        return;
+      }
+      const confirmed = window.confirm(
+        `Zmazať účet „${account.name}" natrvalo?\n\n` +
+          'Účet nemá žiadne historické záznamy, takže táto akcia je ' +
+          'bezpečná — ale je nezvratná.'
+      );
+      if (!confirmed) return;
+
+      try {
+        const { error } = await supabase
+          .from('asset_accounts')
+          .delete()
+          .eq('id', account.id);
+        assertSuccess(error, `Zmazanie účtu „${account.name}"`);
+        await refresh();
+        toast.success(`Účet „${account.name}" bol zmazaný`);
+      } catch (err) {
+        showError(err, 'Chyba pri mazaní účtu');
+      }
+    },
+    [recordCountByAccount, refresh]
+  );
+
   const {
     register,
     handleSubmit,
@@ -171,10 +290,10 @@ export function AssetsClient({
   }, [wealthData]);
 
   useEffect(() => {
-    if (dates.length > 0 && accounts.length > 0) {
-      const latest = recordMap[dates[0]];
+    if (dates.length > 0 && activeAccounts.length > 0) {
+      const latest = recordMap[dates[0]] ?? {};
       const initialAmounts: Record<string, string> = {};
-      accounts.forEach((acc) => {
+      activeAccounts.forEach((acc) => {
         initialAmounts[acc.id] = latest[acc.id]?.toString() || '0';
       });
       reset({
@@ -182,7 +301,7 @@ export function AssetsClient({
         amounts: initialAmounts,
       });
     }
-  }, [dates, accounts, recordMap, reset]);
+  }, [dates, activeAccounts, recordMap, reset]);
 
   const onSave = async (data: AssetFormValues) => {
     setSaving(true);
@@ -204,14 +323,30 @@ export function AssetsClient({
         return;
       }
 
-      const existingNamesLower = new Set(
-        accounts.map((acc) => acc.name.toLowerCase())
-      );
+      const accountByLowerName = new Map<string, AssetAccount>();
+      accounts.forEach((acc) => {
+        accountByLowerName.set(acc.name.toLowerCase(), acc);
+      });
       const seenDraftNamesLower = new Set<string>();
       for (const draft of draftsWithContent) {
         const lower = draft.name.toLowerCase();
-        if (existingNamesLower.has(lower)) {
-          toast.error(`Účet „${draft.name}" už existuje`);
+        const existing = accountByLowerName.get(lower);
+        if (existing) {
+          if (existing.archived_at) {
+            // Name clash with an archived account — offer to unarchive
+            // instead of failing with the UNIQUE constraint.
+            toast.error(
+              `Účet „${existing.name}" existuje archivovaný`,
+              {
+                action: {
+                  label: 'Obnoviť účet',
+                  onClick: () => unarchiveAccount(existing),
+                },
+              }
+            );
+          } else {
+            toast.error(`Účet „${existing.name}" už existuje`);
+          }
           return;
         }
         if (seenDraftNamesLower.has(lower)) {
@@ -373,7 +508,7 @@ export function AssetsClient({
 
             <form onSubmit={handleSubmit(onSave)} className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {accounts.map((account) => (
+                {activeAccounts.map((account) => (
                   <div key={account.id} className="space-y-1.5">
                     <label className="text-xs font-bold text-slate-500 uppercase">
                       {account.name}
@@ -559,6 +694,7 @@ export function AssetsClient({
                     </th>
                   ))}
                   <th className="px-6 py-4 font-semibold text-right">Trend</th>
+                  <th className="px-3 py-4"></th>
                 </tr>
               </thead>
               <tbody className="divide-y">
@@ -567,16 +703,21 @@ export function AssetsClient({
                   const prevAmount = recordMap[dates[1]]?.[account.id] || 0;
                   const diff = latestAmount - prevAmount;
                   const isIncluded = !excludedAccountIds.has(account.id);
+                  const isArchived = !!account.archived_at;
+                  const recordCount = recordCountByAccount[account.id] ?? 0;
+                  const canPurge = recordCount === 0;
 
                   return (
                     <motion.tr
                       key={account.id}
                       initial={{ opacity: 0 }}
                       animate={{ opacity: 1 }}
-                      className={`hover:bg-blue-50/50 dark:hover:bg-blue-900/10 transition-colors ${
-                        !isIncluded
-                          ? 'opacity-60 bg-slate-50/40 dark:bg-slate-800/20'
-                          : ''
+                      className={`group hover:bg-blue-50/50 dark:hover:bg-blue-900/10 transition-colors ${
+                        isArchived
+                          ? 'opacity-60 italic bg-slate-50/30 dark:bg-slate-800/10'
+                          : !isIncluded
+                            ? 'opacity-60 bg-slate-50/40 dark:bg-slate-800/20'
+                            : ''
                       }`}
                     >
                       <td className="px-3 py-4 text-center sticky left-0 bg-white dark:bg-slate-900">
@@ -596,9 +737,19 @@ export function AssetsClient({
                       </td>
                       <td className="px-6 py-4 sticky left-12 bg-white dark:bg-slate-900 font-medium border-r">
                         <div className="flex flex-col">
-                          <span>{account.name}</span>
+                          <span className="flex items-center gap-1.5">
+                            {isArchived && (
+                              <Archive
+                                size={12}
+                                className="text-slate-400"
+                                aria-label="Archivovaný účet"
+                              />
+                            )}
+                            {account.name}
+                          </span>
                           <span className="text-xs text-slate-400 capitalize">
                             {account.type}
+                            {isArchived && ' · archivovaný'}
                           </span>
                         </div>
                       </td>
@@ -606,7 +757,9 @@ export function AssetsClient({
                         <td
                           key={date}
                           className={`px-6 py-4 ${
-                            !isIncluded ? 'text-slate-400 line-through' : ''
+                            !isIncluded || isArchived
+                              ? 'text-slate-400 line-through'
+                              : ''
                           }`}
                         >
                           {formatCurrency(recordMap[date]?.[account.id] || 0)}
@@ -623,6 +776,42 @@ export function AssetsClient({
                               <ArrowRight size={14} className="rotate-45" />
                             ))}
                           {formatCurrency(Math.abs(diff))}
+                        </div>
+                      </td>
+                      <td className="px-3 py-4 text-right">
+                        <div className="flex justify-end gap-1 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
+                          {isArchived ? (
+                            <button
+                              type="button"
+                              onClick={() => unarchiveAccount(account)}
+                              className="p-1.5 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 rounded-md transition-colors"
+                              title="Obnoviť účet"
+                              aria-label={`Obnoviť účet ${account.name}`}
+                            >
+                              <ArchiveRestore size={14} />
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => archiveAccount(account)}
+                              className="p-1.5 text-slate-400 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-950/30 rounded-md transition-colors"
+                              title="Archivovať účet (história zostane zachovaná)"
+                              aria-label={`Archivovať účet ${account.name}`}
+                            >
+                              <Archive size={14} />
+                            </button>
+                          )}
+                          {canPurge && (
+                            <button
+                              type="button"
+                              onClick={() => purgeAccount(account)}
+                              className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30 rounded-md transition-colors"
+                              title="Zmazať natrvalo (účet nemá žiadne záznamy)"
+                              aria-label={`Zmazať účet ${account.name} natrvalo`}
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          )}
                         </div>
                       </td>
                     </motion.tr>
@@ -652,11 +841,16 @@ export function AssetsClient({
                     </div>
                   </td>
                   {dates.slice(0, 5).map((date) => {
-                    const fullTotal = accounts.reduce(
+                    // Archived accounts are never part of the current total —
+                    // they're historical context only.
+                    const activeForDate = accounts.filter(
+                      (acc) => !acc.archived_at
+                    );
+                    const fullTotal = activeForDate.reduce(
                       (sum, acc) => sum + (recordMap[date]?.[acc.id] || 0),
                       0
                     );
-                    const total = accounts
+                    const total = activeForDate
                       .filter((acc) => !excludedAccountIds.has(acc.id))
                       .reduce(
                         (sum, acc) => sum + (recordMap[date]?.[acc.id] || 0),
@@ -678,6 +872,7 @@ export function AssetsClient({
                     );
                   })}
                   <td className="px-6 py-4"></td>
+                  <td className="px-3 py-4"></td>
                 </tr>
               </tfoot>
             </table>
@@ -697,7 +892,10 @@ export function AssetsClient({
               </>
             ) : (
               accounts
-                .filter((acc) => !excludedAccountIds.has(acc.id))
+                .filter(
+                  (acc) =>
+                    !acc.archived_at && !excludedAccountIds.has(acc.id)
+                )
                 .map((acc) => ({
                   ...acc,
                   amount: recordMap[dates[0]]?.[acc.id] || 0,
@@ -706,7 +904,9 @@ export function AssetsClient({
                 .sort((a, b) => b.amount - a.amount)
                 .map((acc) => {
                   const total = accounts
-                    .filter((a) => !excludedAccountIds.has(a.id))
+                    .filter(
+                      (a) => !a.archived_at && !excludedAccountIds.has(a.id)
+                    )
                     .reduce(
                       (sum, a) => sum + (recordMap[dates[0]]?.[a.id] || 0),
                       0

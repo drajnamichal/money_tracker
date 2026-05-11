@@ -3,6 +3,8 @@ export interface AssetAccount {
   name: string;
   type: string;
   currency: 'EUR' | 'CZK';
+  /** Soft-delete timestamp. NULL = active, otherwise the account is archived. */
+  archived_at?: string | null;
   created_at?: string;
 }
 
