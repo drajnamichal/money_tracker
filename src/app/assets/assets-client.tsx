@@ -757,9 +757,11 @@ export function AssetsClient({
                         <td
                           key={date}
                           className={`px-6 py-4 ${
-                            !isIncluded || isArchived
+                            !isIncluded
                               ? 'text-slate-400 line-through'
-                              : ''
+                              : isArchived
+                                ? 'text-slate-400'
+                                : ''
                           }`}
                         >
                           {formatCurrency(recordMap[date]?.[account.id] || 0)}
@@ -841,16 +843,14 @@ export function AssetsClient({
                     </div>
                   </td>
                   {dates.slice(0, 5).map((date) => {
-                    // Archived accounts are never part of the current total —
-                    // they're historical context only.
-                    const activeForDate = accounts.filter(
-                      (acc) => !acc.archived_at
-                    );
-                    const fullTotal = activeForDate.reduce(
+                    // Archived accounts ARE counted in historical CELKOM —
+                    // a closed bank account still held money on that date.
+                    // Hiding it only applies to the "new record" form.
+                    const fullTotal = accounts.reduce(
                       (sum, acc) => sum + (recordMap[date]?.[acc.id] || 0),
                       0
                     );
-                    const total = activeForDate
+                    const total = accounts
                       .filter((acc) => !excludedAccountIds.has(acc.id))
                       .reduce(
                         (sum, acc) => sum + (recordMap[date]?.[acc.id] || 0),
@@ -892,10 +892,7 @@ export function AssetsClient({
               </>
             ) : (
               accounts
-                .filter(
-                  (acc) =>
-                    !acc.archived_at && !excludedAccountIds.has(acc.id)
-                )
+                .filter((acc) => !excludedAccountIds.has(acc.id))
                 .map((acc) => ({
                   ...acc,
                   amount: recordMap[dates[0]]?.[acc.id] || 0,
@@ -904,18 +901,29 @@ export function AssetsClient({
                 .sort((a, b) => b.amount - a.amount)
                 .map((acc) => {
                   const total = accounts
-                    .filter(
-                      (a) => !a.archived_at && !excludedAccountIds.has(a.id)
-                    )
+                    .filter((a) => !excludedAccountIds.has(a.id))
                     .reduce(
                       (sum, a) => sum + (recordMap[dates[0]]?.[a.id] || 0),
                       0
                     );
                   const percentage = total > 0 ? (acc.amount / total) * 100 : 0;
+                  const isArchivedAcc = !!acc.archived_at;
                   return (
-                    <div key={acc.id} className="space-y-1">
+                    <div
+                      key={acc.id}
+                      className={`space-y-1 ${isArchivedAcc ? 'opacity-60' : ''}`}
+                    >
                       <div className="flex justify-between text-sm">
-                        <span className="font-medium">{acc.name}</span>
+                        <span className="font-medium flex items-center gap-1.5">
+                          {isArchivedAcc && (
+                            <Archive
+                              size={12}
+                              className="text-slate-400"
+                              aria-label="Archivovaný účet"
+                            />
+                          )}
+                          {acc.name}
+                        </span>
                         <span className="text-slate-500">
                           {percentage.toFixed(1)}%
                         </span>
@@ -924,7 +932,7 @@ export function AssetsClient({
                         <motion.div
                           initial={{ width: 0 }}
                           animate={{ width: `${percentage}%` }}
-                          className="h-full bg-blue-600"
+                          className={`h-full ${isArchivedAcc ? 'bg-slate-400' : 'bg-blue-600'}`}
                         />
                       </div>
                     </div>
