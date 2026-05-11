@@ -6,7 +6,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { supabase } from '@/lib/supabase';
 import { formatCurrency } from '@/lib/utils';
-import { Loader2, Plus, ArrowRight, Save, X, RotateCcw } from 'lucide-react';
+import { Loader2, Plus, ArrowRight, Save, X, RotateCcw, Trash2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
 import { Skeleton } from '@/components/skeleton';
@@ -37,6 +37,41 @@ const assetSchema = z.object({
 
 type AssetFormValues = z.infer<typeof assetSchema>;
 
+// Locally-tracked drafts for brand-new accounts the user wants to create
+// at the same time as saving the wealth record. Each draft becomes a new
+// row in `asset_accounts` plus a corresponding row in `wealth_records`.
+// `type` values must match the DB CHECK constraint on `asset_accounts.type`.
+type AccountType = 'bank' | 'investment' | 'cash' | 'other';
+
+interface NewAccountDraft {
+  tempId: string;
+  name: string;
+  type: AccountType;
+  currency: 'EUR' | 'CZK';
+  amount: string;
+}
+
+const ACCOUNT_TYPE_OPTIONS: ReadonlyArray<{ value: AccountType; label: string }> =
+  [
+    { value: 'bank', label: 'Banka' },
+    { value: 'investment', label: 'Investícia' },
+    { value: 'cash', label: 'Hotovosť' },
+    { value: 'other', label: 'Iné' },
+  ];
+
+function createEmptyDraft(): NewAccountDraft {
+  return {
+    tempId:
+      typeof crypto !== 'undefined' && 'randomUUID' in crypto
+        ? crypto.randomUUID()
+        : Math.random().toString(36).slice(2),
+    name: '',
+    type: 'bank',
+    currency: 'EUR',
+    amount: '',
+  };
+}
+
 export function AssetsClient({
   initialRecords,
   initialAccounts,
@@ -55,11 +90,39 @@ export function AssetsClient({
   });
   const [saving, setSaving] = useState(false);
   const [isAdding, setIsAdding] = useState(false);
+  const [newAccountDrafts, setNewAccountDrafts] = useState<NewAccountDraft[]>(
+    []
+  );
   // Per-account "include in total" toggles. Held only in component state so a
   // page refresh restores the default (all accounts counted) — exactly the
   // behaviour requested by the user.
   const [excludedAccountIds, setExcludedAccountIds] = useState<Set<string>>(
     () => new Set()
+  );
+
+  const addNewAccountDraft = useCallback(() => {
+    setNewAccountDrafts((current) => [...current, createEmptyDraft()]);
+  }, []);
+
+  const removeNewAccountDraft = useCallback((tempId: string) => {
+    setNewAccountDrafts((current) =>
+      current.filter((draft) => draft.tempId !== tempId)
+    );
+  }, []);
+
+  const updateNewAccountDraft = useCallback(
+    <K extends keyof NewAccountDraft>(
+      tempId: string,
+      field: K,
+      value: NewAccountDraft[K]
+    ) => {
+      setNewAccountDrafts((current) =>
+        current.map((draft) =>
+          draft.tempId === tempId ? { ...draft, [field]: value } : draft
+        )
+      );
+    },
+    []
   );
 
   const toggleIncluded = useCallback((id: string) => {
@@ -124,8 +187,77 @@ export function AssetsClient({
   const onSave = async (data: AssetFormValues) => {
     setSaving(true);
     try {
-      const inserts = Object.entries(data.amounts)
-        .filter(([_, amount]) => amount !== '')
+      // 1) Validate brand-new account drafts (name required; can't clash with
+      //    existing names or with each other; amount must parse).
+      const trimmedDrafts = newAccountDrafts.map((draft) => ({
+        ...draft,
+        name: draft.name.trim(),
+      }));
+
+      const draftsWithContent = trimmedDrafts.filter(
+        (draft) => draft.name !== '' || draft.amount !== ''
+      );
+
+      const missingName = draftsWithContent.find((draft) => draft.name === '');
+      if (missingName) {
+        toast.error('Nový účet musí mať názov');
+        return;
+      }
+
+      const existingNamesLower = new Set(
+        accounts.map((acc) => acc.name.toLowerCase())
+      );
+      const seenDraftNamesLower = new Set<string>();
+      for (const draft of draftsWithContent) {
+        const lower = draft.name.toLowerCase();
+        if (existingNamesLower.has(lower)) {
+          toast.error(`Účet „${draft.name}" už existuje`);
+          return;
+        }
+        if (seenDraftNamesLower.has(lower)) {
+          toast.error(`Účet „${draft.name}" je zadaný dvakrát`);
+          return;
+        }
+        seenDraftNamesLower.add(lower);
+        if (draft.amount !== '' && Number.isNaN(Number(draft.amount))) {
+          toast.error(`Suma pre „${draft.name}" nie je platné číslo`);
+          return;
+        }
+      }
+
+      // 2) Insert new accounts first so we get their server-generated IDs,
+      //    then map drafts to those IDs for the wealth_records insert.
+      let draftIdMap: Record<string, string> = {};
+      if (draftsWithContent.length > 0) {
+        const accountRows = draftsWithContent.map((draft) => ({
+          name: draft.name,
+          type: draft.type,
+          currency: draft.currency,
+        }));
+        const { data: insertedAccounts, error: accountsError } = await supabase
+          .from('asset_accounts')
+          .insert(accountRows)
+          .select('id, name');
+
+        assertSuccess(accountsError, 'Pridanie nového účtu');
+
+        const byName = new Map<string, string>();
+        (insertedAccounts ?? []).forEach((row: { id: string; name: string }) => {
+          byName.set(row.name, row.id);
+        });
+        draftIdMap = draftsWithContent.reduce<Record<string, string>>(
+          (acc, draft) => {
+            const newId = byName.get(draft.name);
+            if (newId) acc[draft.tempId] = newId;
+            return acc;
+          },
+          {}
+        );
+      }
+
+      // 3) Build wealth_records inserts for existing accounts + new ones.
+      const existingInserts = Object.entries(data.amounts)
+        .filter(([, amount]) => amount !== '')
         .map(([accountId, amount]) => {
           const account = accounts.find((a) => a.id === accountId);
           const numAmount = Number(amount);
@@ -140,16 +272,36 @@ export function AssetsClient({
           };
         });
 
-      if (inserts.length === 0) {
+      const newAccountInserts = draftsWithContent
+        .filter((draft) => draft.amount !== '' && draftIdMap[draft.tempId])
+        .map((draft) => {
+          const numAmount = Number(draft.amount);
+          const amountEur =
+            draft.currency === 'CZK' ? numAmount / exchangeRate : numAmount;
+          return {
+            account_id: draftIdMap[draft.tempId],
+            record_date: data.recordDate,
+            amount: numAmount,
+            amount_eur: amountEur,
+          };
+        });
+
+      const inserts = [...existingInserts, ...newAccountInserts];
+
+      if (inserts.length === 0 && draftsWithContent.length === 0) {
         toast.error('Prosím zadajte aspoň jednu sumu');
         return;
       }
 
-      const { error } = await supabase.from('wealth_records').insert(inserts);
-
-      assertSuccess(error, 'Uloženie záznamov majetku');
+      if (inserts.length > 0) {
+        const { error } = await supabase
+          .from('wealth_records')
+          .insert(inserts);
+        assertSuccess(error, 'Uloženie záznamov majetku');
+      }
 
       setIsAdding(false);
+      setNewAccountDrafts([]);
       await refresh();
       toast.success('Záznamy boli úspešne uložené');
     } catch (err) {
@@ -208,7 +360,10 @@ export function AssetsClient({
                   )}
                 </div>
                 <button
-                  onClick={() => setIsAdding(false)}
+                  onClick={() => {
+                    setIsAdding(false);
+                    setNewAccountDrafts([]);
+                  }}
                   className="text-slate-400 hover:text-slate-600"
                 >
                   <X size={20} />
@@ -232,7 +387,7 @@ export function AssetsClient({
                         placeholder="0.00"
                       />
                       <span className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 text-sm">
-                        €
+                        {account.currency === 'CZK' ? 'Kč' : '€'}
                       </span>
                     </div>
                     {errors.amounts?.[account.id] && (
@@ -242,12 +397,113 @@ export function AssetsClient({
                     )}
                   </div>
                 ))}
+
+                {newAccountDrafts.map((draft) => (
+                  <div
+                    key={draft.tempId}
+                    className="space-y-1.5 rounded-xl border border-dashed border-blue-300 dark:border-blue-800/60 bg-blue-50/40 dark:bg-blue-950/20 p-3"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <input
+                        type="text"
+                        value={draft.name}
+                        onChange={(e) =>
+                          updateNewAccountDraft(
+                            draft.tempId,
+                            'name',
+                            e.target.value
+                          )
+                        }
+                        placeholder="Názov nového účtu"
+                        className="w-full bg-white dark:bg-slate-800 border rounded-lg px-3 py-1.5 text-xs font-bold uppercase tracking-wider outline-none focus:ring-2 focus:ring-blue-500"
+                        autoFocus
+                      />
+                      <button
+                        type="button"
+                        onClick={() => removeNewAccountDraft(draft.tempId)}
+                        className="shrink-0 p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30 rounded-md transition-colors"
+                        title="Odstrániť tento účet"
+                        aria-label="Odstrániť tento účet"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                    <div className="flex gap-2">
+                      <div className="relative flex-1">
+                        <input
+                          type="number"
+                          step="0.01"
+                          value={draft.amount}
+                          onChange={(e) =>
+                            updateNewAccountDraft(
+                              draft.tempId,
+                              'amount',
+                              e.target.value
+                            )
+                          }
+                          className="w-full bg-white dark:bg-slate-800 border rounded-xl px-4 py-2.5 outline-none focus:ring-2 focus:ring-blue-500 pr-12"
+                          placeholder="0.00"
+                        />
+                        <span className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 text-sm">
+                          {draft.currency === 'CZK' ? 'Kč' : '€'}
+                        </span>
+                      </div>
+                      <select
+                        value={draft.currency}
+                        onChange={(e) =>
+                          updateNewAccountDraft(
+                            draft.tempId,
+                            'currency',
+                            e.target.value as 'EUR' | 'CZK'
+                          )
+                        }
+                        className="bg-white dark:bg-slate-800 border rounded-xl px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-500"
+                        aria-label="Mena"
+                      >
+                        <option value="EUR">EUR</option>
+                        <option value="CZK">CZK</option>
+                      </select>
+                    </div>
+                    <select
+                      value={draft.type}
+                      onChange={(e) =>
+                        updateNewAccountDraft(
+                          draft.tempId,
+                          'type',
+                          e.target.value as AccountType
+                        )
+                      }
+                      className="w-full bg-white dark:bg-slate-800 border rounded-xl px-3 py-2 text-xs outline-none focus:ring-2 focus:ring-blue-500"
+                      aria-label="Typ účtu"
+                    >
+                      {ACCOUNT_TYPE_OPTIONS.map((opt) => (
+                        <option key={opt.value} value={opt.value}>
+                          {opt.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                ))}
+
+                <button
+                  type="button"
+                  onClick={addNewAccountDraft}
+                  className="flex flex-col items-center justify-center gap-1 rounded-xl border-2 border-dashed border-slate-300 dark:border-slate-700 text-slate-500 hover:text-blue-600 hover:border-blue-400 hover:bg-blue-50/40 dark:hover:bg-blue-950/20 transition-colors min-h-[88px] p-3"
+                >
+                  <Plus size={20} />
+                  <span className="text-xs font-bold uppercase tracking-wider">
+                    Pridať nový
+                  </span>
+                </button>
               </div>
 
               <div className="flex justify-end gap-3 pt-6 border-t">
                 <button
                   type="button"
-                  onClick={() => setIsAdding(false)}
+                  onClick={() => {
+                    setIsAdding(false);
+                    setNewAccountDrafts([]);
+                  }}
                   className="px-6 py-2.5 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-colors font-medium"
                 >
                   Zrušiť
