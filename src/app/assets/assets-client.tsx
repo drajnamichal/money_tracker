@@ -1,12 +1,12 @@
 'use client';
 
-import { useEffect, useState, useMemo } from 'react';
+import { useCallback, useEffect, useState, useMemo } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { supabase } from '@/lib/supabase';
 import { formatCurrency } from '@/lib/utils';
-import { Loader2, Plus, ArrowRight, Save, X } from 'lucide-react';
+import { Loader2, Plus, ArrowRight, Save, X, RotateCcw } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
 import { Skeleton } from '@/components/skeleton';
@@ -55,6 +55,28 @@ export function AssetsClient({
   });
   const [saving, setSaving] = useState(false);
   const [isAdding, setIsAdding] = useState(false);
+  // Per-account "include in total" toggles. Held only in component state so a
+  // page refresh restores the default (all accounts counted) — exactly the
+  // behaviour requested by the user.
+  const [excludedAccountIds, setExcludedAccountIds] = useState<Set<string>>(
+    () => new Set()
+  );
+
+  const toggleIncluded = useCallback((id: string) => {
+    setExcludedAccountIds((current) => {
+      const next = new Set(current);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  }, []);
+
+  const resetIncluded = useCallback(() => {
+    setExcludedAccountIds(new Set());
+  }, []);
 
   const {
     register,
@@ -262,7 +284,13 @@ export function AssetsClient({
             <table className="w-full text-sm text-left">
               <thead className="bg-slate-50 dark:bg-slate-800/50 border-b">
                 <tr>
-                  <th className="px-6 py-4 font-bold text-slate-900 dark:text-white sticky left-0 bg-slate-50 dark:bg-slate-800">
+                  <th
+                    className="px-3 py-4 text-center font-bold text-slate-900 dark:text-white sticky left-0 bg-slate-50 dark:bg-slate-800"
+                    title="Započítať do celkového majetku"
+                  >
+                    ✓
+                  </th>
+                  <th className="px-6 py-4 font-bold text-slate-900 dark:text-white sticky left-12 bg-slate-50 dark:bg-slate-800">
                     Účet / Inštitúcia
                   </th>
                   {dates.slice(0, 5).map((date) => (
@@ -282,15 +310,35 @@ export function AssetsClient({
                   const latestAmount = recordMap[dates[0]]?.[account.id] || 0;
                   const prevAmount = recordMap[dates[1]]?.[account.id] || 0;
                   const diff = latestAmount - prevAmount;
+                  const isIncluded = !excludedAccountIds.has(account.id);
 
                   return (
                     <motion.tr
                       key={account.id}
                       initial={{ opacity: 0 }}
                       animate={{ opacity: 1 }}
-                      className="hover:bg-blue-50/50 dark:hover:bg-blue-900/10 transition-colors"
+                      className={`hover:bg-blue-50/50 dark:hover:bg-blue-900/10 transition-colors ${
+                        !isIncluded
+                          ? 'opacity-60 bg-slate-50/40 dark:bg-slate-800/20'
+                          : ''
+                      }`}
                     >
-                      <td className="px-6 py-4 sticky left-0 bg-white dark:bg-slate-900 font-medium border-r">
+                      <td className="px-3 py-4 text-center sticky left-0 bg-white dark:bg-slate-900">
+                        <label className="inline-flex items-center justify-center cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={isIncluded}
+                            onChange={() => toggleIncluded(account.id)}
+                            aria-label={
+                              isIncluded
+                                ? `Vyradiť ${account.name} z celkového majetku`
+                                : `Pridať ${account.name} do celkového majetku`
+                            }
+                            className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-2 focus:ring-blue-500 focus:ring-offset-0 cursor-pointer accent-blue-600"
+                          />
+                        </label>
+                      </td>
+                      <td className="px-6 py-4 sticky left-12 bg-white dark:bg-slate-900 font-medium border-r">
                         <div className="flex flex-col">
                           <span>{account.name}</span>
                           <span className="text-xs text-slate-400 capitalize">
@@ -299,7 +347,12 @@ export function AssetsClient({
                         </div>
                       </td>
                       {dates.slice(0, 5).map((date) => (
-                        <td key={date} className="px-6 py-4">
+                        <td
+                          key={date}
+                          className={`px-6 py-4 ${
+                            !isIncluded ? 'text-slate-400 line-through' : ''
+                          }`}
+                        >
                           {formatCurrency(recordMap[date]?.[account.id] || 0)}
                         </td>
                       ))}
@@ -322,16 +375,48 @@ export function AssetsClient({
               </tbody>
               <tfoot className="bg-slate-50 dark:bg-slate-800/50 font-bold border-t">
                 <tr>
-                  <td className="px-6 py-4 sticky left-0 bg-slate-50 dark:bg-slate-800 border-r text-blue-600">
-                    CELKOM
+                  <td
+                    colSpan={2}
+                    className="px-6 py-4 sticky left-0 bg-slate-50 dark:bg-slate-800 border-r text-blue-600"
+                  >
+                    <div className="flex items-center gap-3">
+                      <span>CELKOM</span>
+                      {excludedAccountIds.size > 0 && (
+                        <button
+                          type="button"
+                          onClick={resetIncluded}
+                          className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-3 py-1 text-[10px] font-bold uppercase tracking-wide text-slate-500 transition-colors hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
+                          title="Znova zaškrtnúť všetky účty"
+                        >
+                          <RotateCcw size={12} />
+                          Resetovať ({accounts.length - excludedAccountIds.size}/
+                          {accounts.length})
+                        </button>
+                      )}
+                    </div>
                   </td>
                   {dates.slice(0, 5).map((date) => {
-                    const total = accounts.reduce(
+                    const fullTotal = accounts.reduce(
                       (sum, acc) => sum + (recordMap[date]?.[acc.id] || 0),
                       0
                     );
+                    const total = accounts
+                      .filter((acc) => !excludedAccountIds.has(acc.id))
+                      .reduce(
+                        (sum, acc) => sum + (recordMap[date]?.[acc.id] || 0),
+                        0
+                      );
+                    const hasExclusions = excludedAccountIds.size > 0;
                     return (
-                      <td key={date} className="px-6 py-4 text-blue-600">
+                      <td
+                        key={date}
+                        className="px-6 py-4 text-blue-600"
+                        title={
+                          hasExclusions
+                            ? `Pôvodne: ${formatCurrency(fullTotal)}`
+                            : undefined
+                        }
+                      >
                         {formatCurrency(total)}
                       </td>
                     );
@@ -356,6 +441,7 @@ export function AssetsClient({
               </>
             ) : (
               accounts
+                .filter((acc) => !excludedAccountIds.has(acc.id))
                 .map((acc) => ({
                   ...acc,
                   amount: recordMap[dates[0]]?.[acc.id] || 0,
@@ -363,11 +449,13 @@ export function AssetsClient({
                 .filter((acc) => acc.amount > 0)
                 .sort((a, b) => b.amount - a.amount)
                 .map((acc) => {
-                  const total = accounts.reduce(
-                    (sum, a) => sum + (recordMap[dates[0]]?.[a.id] || 0),
-                    0
-                  );
-                  const percentage = (acc.amount / total) * 100;
+                  const total = accounts
+                    .filter((a) => !excludedAccountIds.has(a.id))
+                    .reduce(
+                      (sum, a) => sum + (recordMap[dates[0]]?.[a.id] || 0),
+                      0
+                    );
+                  const percentage = total > 0 ? (acc.amount / total) * 100 : 0;
                   return (
                     <div key={acc.id} className="space-y-1">
                       <div className="flex justify-between text-sm">
