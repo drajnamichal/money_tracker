@@ -93,6 +93,12 @@ export function RetirementClient({ initialRecords }: RetirementClientProps) {
         (a) => a.account_name === selectedAccount
       );
 
+      const { data: userData, error: userError } = await supabase.auth.getUser();
+      assertSuccess(userError, 'Načítanie používateľa');
+      if (!userData.user) {
+        throw new Error('Pre uloženie dôchodkových dát musíš byť prihlásený');
+      }
+
       const { error } = await supabase.from('retirement_records').insert([
         {
           account_name: selectedAccount,
@@ -102,6 +108,7 @@ export function RetirementClient({ initialRecords }: RetirementClientProps) {
           profit: profit,
           profit_percentage: profitPct,
           record_date: editValues.record_date,
+          user_id: userData.user.id,
         },
       ]);
 
